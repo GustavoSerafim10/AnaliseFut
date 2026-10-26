@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { pct, type Leitura } from '../estado';
+import { isoLocal, pct, type Leitura } from '../estado';
 import { lerImagem } from '../ocr';
 
 interface Props {
@@ -32,7 +32,7 @@ export function UploadPrints({ rotulo, dica, leituras, desabilitado, onLido, onR
         const texto = await lerImagem(arq, (p) =>
           setFila({ atual: arq.name, feitos: i, total: lista.length, p }),
         );
-        onLido({ arquivo: arq.name, texto });
+        onLido({ arquivo: arq.name, texto, capturadoEm: isoLocal(new Date(arq.lastModified)) });
       } catch (e) {
         setErro(`Falha ao ler ${arq.name}: ${(e as Error).message}`);
       }

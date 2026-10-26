@@ -103,6 +103,8 @@ export function varrerMercados(
   modelo: ModeloPlacar,
   w: number | null,
   nomes: NomesTimes,
+  /** matriz do λ_market: referência para checar lado invertido */
+  modeloMercado?: ModeloPlacar,
 ): ResultadoVarredura {
   const descartados: Descarte[] = precos.descartes.map((d) => ({
     chave: d.chave,
@@ -190,9 +192,13 @@ export function varrerMercados(
   for (const [g, lados] of porGrupo) {
     if (lados.length !== 2) continue;
     const [fav, outro] = lados[0].pMercado >= lados[1].pMercado ? lados : [lados[1], lados[0]];
-    if (fav.pModelo < 0.5 && outro.pModelo - fav.pModelo >= 0.1) {
+    // compara com o PRÓPRIO mercado (λ ajustado em todas as linhas da casa): lado trocado na
+    // leitura deixa a casa incoerente consigo mesma. Sem λ_market, cai para o modelo.
+    const ref = modeloMercado ?? modelo;
+    const pRef = (a: Avaliacao) => probEfetiva(distribuicaoModelo(a.liq, ref));
+    if (pRef(fav) < 0.5 && pRef(outro) - pRef(fav) >= (modeloMercado ? 0.2 : 0.1)) {
       avisosLado.push(
-        `${g}: o mercado favorece "${fav.descricao}" mas o modelo dá ${(outro.pModelo * 100).toFixed(0)}% ao outro lado — conferir se o lado/odd não foi invertido`,
+        `${g}: as odds favorecem "${fav.descricao}" mas o resto do mercado indica ${(pRef(outro) * 100).toFixed(0)}% para o outro lado — conferir se o lado/odd não foi invertido na leitura`,
       );
     }
   }

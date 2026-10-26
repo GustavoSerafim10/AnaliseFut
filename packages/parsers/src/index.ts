@@ -26,6 +26,9 @@ export function lerPrint(texto: string, ctx: ContextoParser): LeituraPrint {
     linhas: [],
     avisos: [] as string[],
     naoReconhecidas: [] as string[],
+    ignoradas: 0,
+    orfas: [] as string[],
+    lidasPorMercado: [],
     fonte,
     reconhecido: false,
   };

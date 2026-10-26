@@ -240,7 +240,10 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
     mercadoMuitoLiquido: ctx.mercadoMuitoLiquido,
     escalacaoIncerta: ctx.escalacaoIncerta,
   });
-  const varredura = varrerMercados(precos, modelo, w, nomes);
+  const modeloMercado = lambdaMercado
+    ? criarModelo({ casa: lambdaMercado.casa, fora: lambdaMercado.fora }, rho, fracao1T)
+    : undefined;
+  const varredura = varrerMercados(precos, modelo, w, nomes, modeloMercado);
   avisos.push(...varredura.avisosLado);
   const previsao = previsaoDe(modelo, precos, w);
 

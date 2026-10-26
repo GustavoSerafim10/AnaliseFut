@@ -1,10 +1,10 @@
-import type { TipoMercado } from '@pe/engine';
-import { juntarLinhas, parse1win } from '@pe/parsers';
+import { chaveSelecao, type LinhaOdd, type TipoMercado } from '@pe/engine';
+import { juntarLinhas, parse1winVarios } from '@pe/parsers';
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
 import { UploadPrints } from '../componentes/UploadPrints';
-import { FUSO } from '../estado';
+import { FUSO, type Leitura } from '../estado';
 import type { PropsAba } from './tipos';
 
 const ORDEM_MERCADO: TipoMercado[] = ['1X2', 'DC', 'DNB', 'AH', 'total', 'total_time', 'ambas'];
@@ -16,18 +16,30 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const nomes = { casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' };
   const semTimes = !r.jogo.casa || !r.jogo.fora;
   const daCasa = r.odds.map((l, i) => ({ l, i })).filter(({ l }) => l.casa === casa);
-  const naoLidas = (r.prints[grupo] ?? []).flatMap(
-    (p) => parse1win(p.texto, { jogo: nomes, data: r.jogo.data, fuso: FUSO, casa }).naoReconhecidas,
-  );
+  // todos os prints da casa lidos juntos: blocos sem título herdam o mercado pela linha repetida
+  const lerTodos = (prints: Leitura[]) =>
+    parse1winVarios(
+      prints.map((p) => p.texto),
+      {
+        jogo: nomes,
+        data: r.jogo.data,
+        fuso: FUSO,
+        casa,
+        horariosPadrao: prints.map((p) => p.capturadoEm),
+      },
+    );
+  const leitura = lerTodos(r.prints[grupo] ?? []);
 
+  /** Acrescenta só odds novas: não sobrescreve as já existentes (nem as que você corrigiu). */
   const adicionarLinhas = (novas: OddLine[]) =>
-    setR((x) => ({
-      ...x,
-      odds: juntarLinhas(
-        x.odds,
-        novas.map((o) => ({ ...o, casa })),
-      ).linhas,
-    }));
+    setR((x) => {
+      const chave = (o: OddLine) => `${o.casa.toLowerCase()}#${chaveSelecao(o as LinhaOdd)}`;
+      const existentes = new Set(x.odds.map(chave));
+      const extras = juntarLinhas(novas.map((o) => ({ ...o, casa }))).linhas.filter(
+        (o) => !existentes.has(chave(o)),
+      );
+      return { ...x, odds: [...x.odds, ...extras] };
+    });
   const mudar = (i: number, m: Partial<OddLine>) =>
     setR((x) => ({ ...x, odds: x.odds.map((l, j) => (j === i ? { ...l, ...m } : l)) }));
   const remover = (i: number) => setR((x) => ({ ...x, odds: x.odds.filter((_, j) => j !== i) }));
@@ -82,9 +94,7 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
             ...x,
             prints: { ...x.prints, [grupo]: [...(x.prints[grupo] ?? []), lido] },
           }));
-          adicionarLinhas(
-            parse1win(lido.texto, { jogo: nomes, data: r.jogo.data, fuso: FUSO, casa }).linhas,
-          );
+          adicionarLinhas(lerTodos([...(r.prints[grupo] ?? []), lido]).linhas);
         }}
         onRemover={(i) =>
           setR((x) => ({
@@ -94,10 +104,18 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         }
       />
 
-      {naoLidas.length > 0 && (
+      {leitura.ignoradas > 0 && (
+        <p className="dica">
+          {leitura.ignoradas} linhas de mercados sem modelo (cartões, vitória antecipada, vencer de
+          virada…) foram ignoradas de propósito.
+        </p>
+      )}
+      {leitura.naoReconhecidas.length > 0 && (
         <details className="caixa alerta">
-          <summary>{naoLidas.length} linhas com números que o leitor não entendeu</summary>
-          <pre>{naoLidas.join('\n')}</pre>
+          <summary>
+            {leitura.naoReconhecidas.length} linhas com números que o leitor não entendeu
+          </summary>
+          <pre>{leitura.naoReconhecidas.join('\n')}</pre>
           <p className="miudo">Se alguma for uma odd, adicione à mão abaixo.</p>
         </details>
       )}

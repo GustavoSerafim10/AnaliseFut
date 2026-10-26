@@ -1,0 +1,24 @@
+16134 - NOIR: 2
+Cartoes/Penalidades Intervalos Chutes Placar exa
+Will a red card be shown? A
+Sim 3.36 Nao 1.28
+Sera marcada uma penalidade? A
+Sim 2.75 Nao 1.36
+Primeiro cartao A
+CR Flamengo Atletico-MG Sem Cartao
+2.38 1.53 21.0
+Cartões amarelos. Resultado do jogo O ~
+CR Flamengo Empate Atlético-MG
+3.15 3.9 1.85
+Hipótese dupla. Cartões amarelos O A
+CR Flamengo Ou CR Flamengo Ou Empate Ou Atiético-
+Empate Atlético-MG MG
+1.75 117 1.25
+Total. Cartões amarelos O A
+Menos Mais
+Abaixo De 3.5 21 AcimaDe3.5 1.65
+Abaixo De 4.5 1.46 AcimaDe 4.5 2.52
+Cartões amarelos. CR Flamengo total O A
+Menos Mais
+— a 8; O
+o ã

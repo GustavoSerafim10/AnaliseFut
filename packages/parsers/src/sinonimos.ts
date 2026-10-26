@@ -1,6 +1,6 @@
 /**
  * Dicionário de sinônimos: título do mercado no print → tipo de mercado do motor.
- * Para uma casa nova, basta acrescentar padrões aqui.
+ * Calibrado com prints reais da 1win. Para uma casa nova, basta acrescentar padrões aqui.
  */
 import type { NomesTimes, Periodo, Time, TipoMercado } from '@pe/engine';
 import { semAcento } from './texto';
@@ -12,43 +12,84 @@ export interface MercadoDetectado {
   time?: Time;
 }
 
-/** Ordem importa: os mais específicos primeiro. */
+/**
+ * Ordem importa: mais específicos primeiro. Mercados que PARECEM outros mas se liquidam
+ * diferente (ex.: "Vitória antecipada 1:0" não é o 1X2) vão para 'outro' antes de tudo.
+ */
 export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
-  [/escanteios?.*(handicap)|cantos?.*handicap/, 'escanteios_ah'],
+  [
+    /vitoria antecipada|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|red card|penalidade|penalti/,
+    'outro',
+  ],
+  [/cart(ao|oes).*handicap|handicap.*cart(ao|oes)/, 'cartoes_ah'],
+  [/cart(ao|oes)|amarelo|vermelho/, 'outro'],
+  [/primeiro escanteio|1o escanteio|primeiro canto/, 'primeiro_escanteio'],
+  [/handicap de escanteios|escanteios?.*handicap|cantos?.*handicap/, 'escanteios_ah'],
+  [/escanteios?.*resultado|cantos?.*resultado/, 'escanteios_1x2'],
   [/(escanteios?|cantos?)[. ]*(total|mais\/menos|over)?/, 'escanteios_total'],
-  [/cartoes?.*handicap/, 'cartoes_ah'],
+  [/chutes|finalizac|impediment|laterais|tiros de meta/, 'outro'],
+  [/resultado correto|placar (exato|correto)|resultado exato/, 'placar_exato'],
   [/intervalo ?\/ ?final|intervalo final|ht ?\/ ?ft/, 'intervalo_final'],
-  [/dupla (chance|hipotese)|double chance/, 'DC'],
+  [/dupla (chance|hipotese)|hipotese dupla|double chance/, 'DC'],
   [/empate anula|draw no bet|\bdnb\b/, 'DNB'],
   [/ambos (os times )?marca|ambas (as equipes )?marca|\bbtts\b|both teams/, 'ambas'],
+  [/marcar em ambos os tempos/, 'marcar_2_tempos'],
+  [/vencer sem sofrer/, 'vencer_sem_sofrer'],
+  [/primeiro gol|marcar o primeiro|marca primeiro/, 'primeiro_gol'],
+  [/ultimo gol|marcar o ultimo/, 'ultimo_gol'],
   [/handicap europeu|handicap 3/, 'AH_europeu'],
   [/handicap( asiatico)?/, 'AH'],
-  [/placar (exato|correto)|resultado exato/, 'placar_exato'],
-  [/par ?\/ ?impar|par ou impar/, 'par_impar'],
+  [/par ?\/ ?impar|impar ?\/ ?par|par ou impar/, 'par_impar'],
   [
-    /resultado do tempo regulamentar|resultado final|\b1x2\b|vencedor (da partida|do jogo)|^resultado$/,
+    /resultado do tempo regulamentar|resultado (final|do jogo)|\b1x2\b|vencedor (da partida|do jogo)|^resultado$/,
     '1X2',
   ],
-  [/total de gols|gols mais ?\/ ?menos|over ?\/ ?under|mais ?\/ ?menos|^total\b|\btotal$/, 'total'],
+  [
+    /total de gols|gols mais ?\/ ?menos|over ?\/ ?under|mais ?\/ ?menos|^total\b|\btotal\b/,
+    'total',
+  ],
 ];
 
+/** Barra de abas da casa ("Todos Principal Totais Handicap metade"): não é título de mercado. */
+export function ehBarraDeAbas(linha: string): boolean {
+  const t = semAcento(linha);
+  const abas = [
+    'todos',
+    'principal',
+    'totais',
+    'handicap',
+    'metade',
+    'intervalos',
+    'chutes',
+    'placar exa',
+    'cartoes/penalidades',
+  ];
+  return abas.filter((a) => t.includes(a)).length >= 2;
+}
+
 function detectarPeriodo(t: string): Periodo {
-  if (/1[ºo°]? ?tempo|primeiro tempo|1st half|\b1t\b/.test(t)) return '1T';
-  if (/2[ºo°]? ?tempo|segundo tempo|2nd half|\b2t\b/.test(t)) return '2T';
+  if (/1[ºo°]? ?(tempo|parte)|primeir[oa] (tempo|parte)|1st half|\b1t\b/.test(t)) return '1T';
+  if (/2[ºo°]? ?(tempo|parte)|segund[oa] (tempo|parte)|2nd half|\b2t\b/.test(t)) return '2T';
   return 'FT';
 }
 
 export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoDetectado | null {
   const t = semAcento(linha).trim();
+  if (ehBarraDeAbas(t)) return null;
   const periodo = detectarPeriodo(t);
 
-  // "Aston Villa total", "Total individual Viking", "Total do time"
-  if (/\btotal\b/.test(t) && !/escanteio|canto|cartao/.test(t)) {
+  // "Aston Villa total", "Escanteios. CR Flamengo total"
+  if (/\btotal\b/.test(t) && !/cart(ao|oes)|amarelo/.test(t)) {
     const time = reconhecerTime(
-      t.replace(/total|individual|de gols|do time|da equipe/g, ' '),
+      t.replace(/escanteios?|cantos?|total|individual|de gols|do time|da equipe/g, ' '),
       jogo,
     );
-    if (time) return { mercado: 'total_time', periodo, time };
+    if (time)
+      return {
+        mercado: /escanteio|canto/.test(t) ? 'escanteios_time' : 'total_time',
+        periodo,
+        time,
+      };
   }
   for (const [re, mercado] of SINONIMOS_MERCADO) {
     if (re.test(t)) return { mercado, periodo };

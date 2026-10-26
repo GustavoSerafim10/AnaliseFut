@@ -11,6 +11,14 @@ const CHAVE = 'pe-rascunho-v2';
 export interface Leitura {
   arquivo: string;
   texto: string;
+  /** hora em que o print foi salvo (ISO, fuso de Brasília): serve de horário de coleta */
+  capturadoEm?: string;
+}
+
+/** Date → "2026-10-26T16:13:00-03:00" no horário local do aparelho. */
+export function isoLocal(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00${FUSO}`;
 }
 
 export type NivelDesfalque = 'auto' | 'nenhum' | 'baixo' | 'medio' | 'alto' | 'critico';
