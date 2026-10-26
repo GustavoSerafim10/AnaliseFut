@@ -5,4 +5,9 @@ export default tseslint.config(
   { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // scripts de linha de comando rodam no Node
+    files: ['**/scripts/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+  },
 );

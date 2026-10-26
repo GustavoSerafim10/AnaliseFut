@@ -1,98 +1,122 @@
-import { analisarJogo, type LinhaOdd, type ResultadoAnalise } from '@pe/engine';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  carregarRascunho,
-  inicioIso,
-  num,
-  rascunhoNovo,
-  salvarRascunho,
-  type Rascunho,
-} from './estado';
-import { lambdaDoRascunho } from './lambda';
-import { PassoConferencia } from './passos/PassoConferencia';
-import { PassoContexto } from './passos/PassoContexto';
-import { PassoJogo } from './passos/PassoJogo';
-import { PassoOdds } from './passos/PassoOdds';
-import { PassoResultado } from './passos/PassoResultado';
+import { AbaAnalise } from './abas/AbaAnalise';
+import { AbaFlashscore } from './abas/AbaFlashscore';
+import { AbaJogo } from './abas/AbaJogo';
+import { AbaOdds } from './abas/AbaOdds';
+import { AbaStats } from './abas/AbaStats';
+import { AbaTabela } from './abas/AbaTabela';
+import { AbaUltimas } from './abas/AbaUltimas';
+import { derivar } from './dados';
+import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
 
-const PASSOS = ['Jogo', 'Prints', 'Conferência', 'Contexto', 'Resultado'] as const;
+type Aba =
+  | { id: 'jogo' | 'sofascore' | 'superscore' | 'flashscore' | 'tabela' | 'ultimas' | 'analise' }
+  | { id: 'odds'; casa: string };
 
-function calcular(r: Rascunho): { resultado: ResultadoAnalise | null; pendencias: string[] } {
-  const pendencias: string[] = [];
-  if (!r.jogo.casa || !r.jogo.fora) pendencias.push('preencher os times (passo 1)');
-  const lam = lambdaDoRascunho(r);
-  if (!lam.ok) pendencias.push(`λ do modelo: ${lam.erro} (passo 1)`);
-  if (!r.linhas.length) pendencias.push('incluir odds (passo 2)');
-  if (!r.conferido) pendencias.push('confirmar a conferência das odds (passo 3)');
-  if (pendencias.length || !lam.ok) return { resultado: null, pendencias };
-
-  const argumentos = r.redTeam.argumentos.map((a) => a.trim()).filter(Boolean);
-  const fezRedTeam = argumentos.length > 0 || r.redTeam.sobreviveu;
-  const resultado = analisarJogo({
-    jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
-    dq: r.dq,
-    lambdaModelo: lam.lambdas,
-    linhas: r.linhas as LinhaOdd[],
-    contexto: { ...r.contexto, priorNeutro: r.contexto.priorNeutro || lam.priorNeutro },
-    redTeam: fezRedTeam ? { ...r.redTeam, argumentos } : undefined,
-    banca: num(r.banca),
-  });
-  return { resultado, pendencias };
-}
+const chave = (a: Aba) => (a.id === 'odds' ? `odds:${a.casa}` : a.id);
 
 export function App() {
   const [r, setR] = useState<Rascunho>(carregarRascunho);
-  const [passo, setPasso] = useState(0);
-
+  const [aba, setAba] = useState<Aba>({ id: 'jogo' });
   useEffect(() => salvarRascunho(r), [r]);
-  const { resultado, pendencias } = useMemo(
-    () => (passo === 4 ? calcular(r) : { resultado: null, pendencias: [] }),
-    [r, passo],
-  );
+  const d = useMemo(() => derivar(r), [r]);
+
+  const contagem = (g: string) => (r.prints[g] ?? []).length;
+  const grupos: { titulo: string; abas: { aba: Aba; rotulo: string; marca?: string }[] }[] = [
+    { titulo: '', abas: [{ aba: { id: 'jogo' }, rotulo: 'Jogo' }] },
+    {
+      titulo: 'Estatísticas',
+      abas: [
+        {
+          aba: { id: 'sofascore' },
+          rotulo: 'SofaScore',
+          marca: contagem('sofascore') ? String(contagem('sofascore')) : undefined,
+        },
+        {
+          aba: { id: 'superscore' },
+          rotulo: 'SuperScore',
+          marca: contagem('superscore') ? String(contagem('superscore')) : undefined,
+        },
+        {
+          aba: { id: 'flashscore' },
+          rotulo: 'Flashscore',
+          marca: r.flashscore.trim() ? '✓' : undefined,
+        },
+        { aba: { id: 'tabela' }, rotulo: 'Tabela e desfalques' },
+        { aba: { id: 'ultimas' }, rotulo: 'Últimas partidas' },
+      ],
+    },
+    {
+      titulo: 'Odds',
+      abas: r.casas.map((casa) => {
+        const n = r.odds.filter((o) => o.casa === casa).length;
+        return { aba: { id: 'odds', casa } as Aba, rotulo: casa, marca: n ? String(n) : undefined };
+      }),
+    },
+    { titulo: '', abas: [{ aba: { id: 'analise' }, rotulo: 'Análise ▶' }] },
+  ];
+
+  function novaCasa() {
+    const nome = prompt('Nome da casa de apostas (ex.: Bet365, Betano, Superbet):')?.trim();
+    if (!nome) return;
+    if (!r.casas.includes(nome)) setR((x) => ({ ...x, casas: [...x.casas, nome] }));
+    setAba({ id: 'odds', casa: nome });
+  }
 
   function novaAnalise() {
     if (confirm('Começar uma nova análise? O rascunho atual será apagado.')) {
       setR(rascunhoNovo());
-      setPasso(0);
+      setAba({ id: 'jogo' });
     }
   }
 
+  const props = { r, setR, d };
   return (
     <>
       <header className="topo">
         <div>
-          <strong>Pricing Engine V3.3</strong>
+          <strong>
+            {r.jogo.casa && r.jogo.fora ? `${r.jogo.casa} × ${r.jogo.fora}` : 'Pricing Engine V3.3'}
+          </strong>
           <span className="miudo"> · NO BET é o padrão</span>
         </div>
         <button className="discreto" onClick={novaAnalise}>
           Nova análise
         </button>
       </header>
-      <nav className="passos">
-        {PASSOS.map((p, i) => (
-          <button key={p} className={i === passo ? 'ativo' : ''} onClick={() => setPasso(i)}>
-            {i + 1}. {p}
-          </button>
+      <nav className="abas">
+        {grupos.map((g, gi) => (
+          <div key={gi} className="grupo-abas">
+            {g.titulo && <span className="titulo-grupo">{g.titulo}</span>}
+            {g.abas.map(({ aba: a, rotulo, marca }) => (
+              <button
+                key={chave(a)}
+                className={chave(a) === chave(aba) ? 'ativo' : ''}
+                onClick={() => setAba(a)}
+              >
+                {rotulo}
+                {marca && <span className="marca">{marca}</span>}
+              </button>
+            ))}
+            {g.titulo === 'Odds' && (
+              <button className="discreto" onClick={novaCasa}>
+                + casa
+              </button>
+            )}
+          </div>
         ))}
       </nav>
       <main>
-        {passo === 0 && <PassoJogo r={r} setR={setR} />}
-        {passo === 1 && <PassoOdds r={r} setR={setR} />}
-        {passo === 2 && <PassoConferencia r={r} setR={setR} />}
-        {passo === 3 && <PassoContexto r={r} setR={setR} />}
-        {passo === 4 && <PassoResultado resultado={resultado} pendencias={pendencias} />}
-        <div className="navegacao">
-          <button disabled={passo === 0} onClick={() => setPasso(passo - 1)}>
-            ← Voltar
-          </button>
-          <button
-            className="primario"
-            disabled={passo === PASSOS.length - 1}
-            onClick={() => setPasso(passo + 1)}
-          >
-            {passo === 3 ? 'Calcular →' : 'Avançar →'}
-          </button>
-        </div>
+        {aba.id === 'jogo' && <AbaJogo {...props} />}
+        {aba.id === 'sofascore' && <AbaStats {...props} fonte="sofascore" />}
+        {aba.id === 'superscore' && <AbaStats {...props} fonte="superscore" />}
+        {aba.id === 'flashscore' && <AbaFlashscore {...props} />}
+        {aba.id === 'tabela' && <AbaTabela {...props} />}
+        {aba.id === 'ultimas' && <AbaUltimas {...props} />}
+        {aba.id === 'odds' && r.casas.includes(aba.casa) && (
+          <AbaOdds key={aba.casa} {...props} casa={aba.casa} />
+        )}
+        {aba.id === 'analise' && <AbaAnalise {...props} />}
       </main>
     </>
   );

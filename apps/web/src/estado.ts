@@ -1,67 +1,87 @@
 /**
- * Estado da análise em edição (rascunho). Fica no localStorage do aparelho só como
- * conveniência; o histórico de verdade (IndexedDB) é a Fase 4.
+ * Estado da análise em edição. Guardamos o TEXTO lido de cada print (não a imagem):
+ * tudo o mais é recalculado a partir dele, então corrigir o leitor corrige análises antigas.
+ * Fica no localStorage do aparelho só como conveniência; histórico de verdade é a Fase 4.
  */
-import type { ContextoAnalise, DQ, EstatisticasTime } from '@pe/engine';
 import type { OddLine } from '@pe/schemas';
 
 export const FUSO = '-03:00';
-const CHAVE = 'pe-rascunho-v1';
+const CHAVE = 'pe-rascunho-v2';
 
-export interface StatsForm {
-  jogos: string;
-  golsPro: string;
-  golsContra: string;
-  xg: string;
-  chutesNoAlvo: string;
-  chutesNoAlvoContra: string;
+export interface Leitura {
+  arquivo: string;
+  texto: string;
 }
+
+export type NivelDesfalque = 'nenhum' | 'baixo' | 'medio' | 'alto' | 'critico';
+
+export const FATOR_DESFALQUE: Record<NivelDesfalque, number> = {
+  nenhum: 1,
+  baixo: 0.98,
+  medio: 0.95,
+  alto: 0.9,
+  critico: 0.85,
+};
+
+export const ROTULO_DESFALQUE: Record<NivelDesfalque, string> = {
+  nenhum: 'nenhum impacto',
+  baixo: 'baixo (−2%)',
+  medio: 'médio (−5%)',
+  alto: 'alto (−10%)',
+  critico: 'crítico (−15%)',
+};
 
 export interface Rascunho {
   jogo: { casa: string; fora: string; competicao: string; data: string; hora: string };
-  dq: DQ;
-  lambda: {
-    modo: 'stats' | 'manual';
-    manualCasa: string;
-    manualFora: string;
-    statsCasa: StatsForm;
-    statsFora: StatsForm;
+  config: {
+    ligaTop: boolean;
+    favoritoLigaMaisForte: boolean;
+    escalacaoProvavel: boolean;
+    escalacaoIncerta: boolean;
+    mercadoMuitoLiquido: boolean;
     mediaGols: string;
     mando: string;
   };
-  linhas: OddLine[];
-  conferido: boolean;
-  contexto: ContextoAnalise;
+  /** textos de OCR por grupo: sofascore, superscore, classificacao, desfalques, ultimas, odds:<casa> */
+  prints: Record<string, Leitura[]>;
+  flashscore: string;
+  /** correções manuais das estatísticas: `${campo}.${time}` → valor */
+  correcoes: Record<string, number>;
+  desfalqueAtaque: { casa: NivelDesfalque; fora: NivelDesfalque };
+  desfalqueDefesa: { casa: NivelDesfalque; fora: NivelDesfalque };
+  casas: string[];
+  odds: OddLine[];
+  explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
   banca: string;
 }
 
-const statsVazio = (): StatsForm => ({
-  jogos: '',
-  golsPro: '',
-  golsContra: '',
-  xg: '',
-  chutesNoAlvo: '',
-  chutesNoAlvoContra: '',
-});
-
 export function rascunhoNovo(): Rascunho {
-  const hoje = new Date().toISOString().slice(0, 10);
   return {
-    jogo: { casa: '', fora: '', competicao: '', data: hoje, hora: '16:00' },
-    dq: 'C',
-    lambda: {
-      modo: 'stats',
-      manualCasa: '',
-      manualFora: '',
-      statsCasa: statsVazio(),
-      statsFora: statsVazio(),
+    jogo: {
+      casa: '',
+      fora: '',
+      competicao: '',
+      data: new Date().toISOString().slice(0, 10),
+      hora: '',
+    },
+    config: {
+      ligaTop: true,
+      favoritoLigaMaisForte: false,
+      escalacaoProvavel: false,
+      escalacaoIncerta: false,
+      mercadoMuitoLiquido: false,
       mediaGols: '1.30',
       mando: '1.12',
     },
-    linhas: [],
-    conferido: false,
-    contexto: {},
+    prints: {},
+    flashscore: '',
+    correcoes: {},
+    desfalqueAtaque: { casa: 'nenhum', fora: 'nenhum' },
+    desfalqueDefesa: { casa: 'nenhum', fora: 'nenhum' },
+    casas: ['1win'],
+    odds: [],
+    explicacaoDivergencia: '',
     redTeam: { argumentos: ['', '', ''], atacaPremissa: false, sobreviveu: false },
     banca: '',
   };
@@ -70,7 +90,11 @@ export function rascunhoNovo(): Rascunho {
 export function carregarRascunho(): Rascunho {
   try {
     const s = localStorage.getItem(CHAVE);
-    if (s) return { ...rascunhoNovo(), ...(JSON.parse(s) as Rascunho) };
+    if (s) {
+      const salvo = JSON.parse(s) as Partial<Rascunho>;
+      const novo = rascunhoNovo();
+      return { ...novo, ...salvo, config: { ...novo.config, ...salvo.config } };
+    }
   } catch {
     /* sem storage (aba privada etc.): começa vazio */
   }
@@ -93,22 +117,7 @@ export function num(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function statsDoForm(f: StatsForm): EstatisticasTime | null {
-  const jogos = num(f.jogos);
-  const golsPro = num(f.golsPro);
-  const golsContra = num(f.golsContra);
-  if (jogos === undefined || golsPro === undefined || golsContra === undefined) return null;
-  return {
-    jogos,
-    golsPro,
-    golsContra,
-    xg: num(f.xg),
-    chutesNoAlvo: num(f.chutesNoAlvo),
-    chutesNoAlvoContra: num(f.chutesNoAlvoContra),
-  };
-}
-
-export const inicioIso = (r: Rascunho) => `${r.jogo.data}T${r.jogo.hora}:00${FUSO}`;
+export const inicioIso = (r: Rascunho) => `${r.jogo.data}T${r.jogo.hora || '00:00'}:00${FUSO}`;
 
 export const pct = (x: number | null | undefined, casas = 1) =>
   x === null || x === undefined || !Number.isFinite(x) ? '—' : `${(x * 100).toFixed(casas)}%`;

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run dev -w @pe/web",
     "build": "npm run build -w @pe/web",
+    "ocr": "node packages/parsers/scripts/ocr.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p packages/engine && tsc -p packages/schemas && tsc -p packages/parsers && tsc -p apps/web",
@@ -19,8 +20,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@types/node": "^24.19.2",
     "eslint": "^9.34.0",
     "prettier": "^3.6.2",
+    "sharp": "^0.35.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",
     "vitest": "^5.0.5"

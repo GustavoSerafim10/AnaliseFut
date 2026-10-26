@@ -388,3 +388,112 @@ dl.numeros dd {
   flex: 1;
   max-width: 260px;
 }
+
+/* ---------- navegação por abas agrupadas ---------- */
+.abas {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 8px 16px;
+  max-width: 1000px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--borda);
+}
+.grupo-abas {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  position: relative;
+  padding-top: 14px;
+}
+.titulo-grupo {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--suave);
+  white-space: nowrap;
+}
+.grupo-abas button {
+  white-space: nowrap;
+}
+.marca {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--borda);
+  color: var(--texto);
+}
+button.ativo .marca {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+button.mini {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.titulo-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dica.bloco {
+  display: block;
+}
+.lista-prints {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+.lista-prints li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--borda);
+  padding: 4px 0;
+  font-size: 13px;
+}
+.lista-prints details {
+  flex: 1;
+  min-width: 0;
+}
+.linha-alerta td:first-child,
+.alerta-txt {
+  color: var(--alerta);
+}
+.linha-destaque {
+  background: var(--azul-fundo);
+  font-weight: 600;
+}
+.celula-duvida input {
+  border-color: var(--erro);
+  background: var(--erro-fundo);
+}
+.celula-vazia input {
+  border-style: dashed;
+}
+table.consolidada input {
+  min-width: 70px;
+  min-height: 34px;
+  padding: 4px 8px;
+}
+.odd-grande {
+  color: var(--primaria);
+  white-space: nowrap;
+}
+.relatorio ul {
+  padding-left: 18px;
+}
+.relatorio li {
+  margin: 3px 0;
+}
+main {
+  max-width: 1000px;
+  padding-bottom: 40px;
+}

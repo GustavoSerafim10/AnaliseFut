@@ -1,0 +1,20 @@
+19 xGOT 13
+56 Chutes fora do gol 53
+45 Chutes bloqueados 38
+10.2 Finalizações dentro da área 9.0
+56 Finalizações fora da área 5.0
+0.5 Bola na trave 0.5
+12.0 Faltas Cobradas 13.3
+ATAQUE
+109.7 Ataques 96.9
+59.9 Ataques perigosos 46.7
+15 Grandes chances marcadas 12
+21 Grandes chances perdidas 20
+71 Dribles vencidos 76
+mas Posses perdidas 17.3
+27.2 Toques na área adversária 211
+PASSES
+4923 Passes certos In
+221.4 Passes certos no campo de defesa 180.2
+270.9 Passes certos no campo de ataque 190.9
+128.7 Passes no terço final 87.9

@@ -13,3 +13,5 @@ export * from './sensibilidade';
 export * from './kelly';
 export * from './varredura';
 export * from './decisao';
+export * from './dataQuality';
+export * from './relatorio';

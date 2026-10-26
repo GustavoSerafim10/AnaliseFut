@@ -44,9 +44,19 @@ packages/schemas  schemas zod (OddLine, StatsTime, importação JSON)
 packages/parsers  texto do OCR → odds: detecção da fonte, sinônimos de mercado,
                   reconhecimento de times, parser da 1win, sanidade, junção de prints
 apps/web          site React + Vite (mobile-first)
-  src/passos/     1 Jogo → 2 Prints/JSON → 3 Conferência → 4 Contexto/red team → 5 Resultado
-  src/ocr.ts      Tesseract.js no navegador (pré-processamento: cinza, contraste, ampliação)
+  src/abas/       Jogo · Estatísticas (SofaScore, SuperScore, Flashscore, Tabela e desfalques,
+                  Últimas partidas) · Odds (uma aba por casa) · Análise
+  src/dados.ts    tudo derivado dos textos lidos: parsers → cruzamento → λ → DQ → motor → análise
+  src/claude.ts   botão "Copiar para o Claude" (só copia texto; nenhuma API)
+  src/ocr.ts      Tesseract.js no navegador (cinza, inverte tema escuro, amplia 3x, limiar)
 ```
+
+### Dicas de print (testadas com prints reais)
+- **SofaScore** "Comparar equipes" e **SuperScore** "Estatísticas do time → Média": pode printar
+  a tela normal, vários prints rolando a página. O leitor corrige o ponto decimal perdido
+  ("20" → 2,0), cruza as duas fontes e marca em vermelho o que diverge.
+- **Classificação** e **desfalques**: recorte só a tabela/lista. Com barras laterais o OCR se perde.
+- `npm run ocr -- print.png` mostra o texto que o OCR lê de um print (útil para criar fixtures).
 
 ### Usar no celular
 Com `npm run dev` rodando no PC, abra no celular (mesmo Wi-Fi) o endereço `Network: http://192.168.x.x:5173`
