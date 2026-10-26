@@ -10,11 +10,19 @@ export function AbaUltimas({ r, setR }: PropsAba) {
         o site guarda e mostra o texto lido; o leitor automático (placares, mando, sequência) entra
         assim que você mandar um print de exemplo para calibrar.
       </p>
-      <UploadPrints
-        rotulo="Enviar prints das últimas partidas"
-        leituras={r.prints.ultimas ?? []}
-        {...acoesPrints(setR, 'ultimas')}
-      />
+      {(['casa', 'fora'] as const).map((t) => (
+        <div key={t}>
+          <h3>
+            {(t === 'casa' ? r.jogo.casa : r.jogo.fora) ||
+              (t === 'casa' ? 'Mandante' : 'Visitante')}
+          </h3>
+          <UploadPrints
+            rotulo={`Últimas partidas do ${t === 'casa' ? 'mandante' : 'visitante'}`}
+            leituras={r.prints[`ultimas:${t}`] ?? []}
+            {...acoesPrints(setR, `ultimas:${t}`)}
+          />
+        </div>
+      ))}
     </section>
   );
 }

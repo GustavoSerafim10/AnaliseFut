@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  avaliarImpactoDesfalques,
   consolidar,
   destaquesComparativos,
   estatisticasParaModelo,
@@ -136,6 +137,30 @@ describe('classificação (SofaScore, print recortado)', () => {
     expect(linhas.find((l) => l.doJogo === 'casa')).toMatchObject({ posicao: 2, time: 'Flamengo' });
     expect(linhas.find((l) => l.doJogo === 'fora')?.posicao).toBe(6);
     expect(linhas.find((l) => l.time === 'Palmeiras')?.pontos).toBe(69);
+  });
+});
+
+describe('impacto automático dos desfalques', () => {
+  const desfalques = [
+    { time: 'casa' as const, jogador: 'Giorgian De Arrascaeta' },
+    { time: 'fora' as const, jogador: 'Gustavo Scarpa' },
+  ];
+  it('sem evidência no texto → nenhum (conservador)', () => {
+    const flash = lerTextoFlashscore(
+      'Notícias\nO Flamengo vive boa fase. O Atlético também.',
+      jogo,
+    );
+    expect(avaliarImpactoDesfalques(desfalques, flash, 'casa').nivel).toBe('nenhum');
+  });
+  it('ausente citado como peça importante → médio, com o motivo', () => {
+    const flash = lerTextoFlashscore(
+      'Notícias\nArrascaeta é o principal criador do Flamengo na temporada.',
+      jogo,
+    );
+    const r = avaliarImpactoDesfalques(desfalques, flash, 'casa');
+    expect(r.nivel).toBe('medio');
+    expect(r.importantes).toEqual(['Giorgian De Arrascaeta']);
+    expect(avaliarImpactoDesfalques(desfalques, flash, 'fora').nivel).toBe('nenhum');
   });
 });
 

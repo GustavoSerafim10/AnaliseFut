@@ -59,9 +59,55 @@ export function AbaAnalise({ r, setR, d }: PropsAba) {
 
   const campos = CAMPOS_STATS.filter((c) => d.tabela[c.campo] || ESSENCIAIS.includes(c.campo));
 
+  const nCampos = (l: typeof d.sofa) => (l ? Object.keys(l.campos).length : 0);
+  const nUltimas =
+    (r.prints['ultimas:casa'] ?? []).length + (r.prints['ultimas:fora'] ?? []).length;
+  const situacao = [
+    { nome: 'Jogo', ok: !!(r.jogo.casa && r.jogo.fora && r.jogo.hora), obrigatorio: true },
+    {
+      nome: 'SofaScore',
+      ok: nCampos(d.sofa) > 0,
+      obrigatorio: false,
+      detalhe: nCampos(d.sofa) ? `${nCampos(d.sofa)} dados` : '',
+    },
+    {
+      nome: 'SuperScore',
+      ok: nCampos(d.sup) > 0,
+      obrigatorio: false,
+      detalhe: nCampos(d.sup) ? `${nCampos(d.sup)} dados` : '',
+    },
+    {
+      nome: 'Estatísticas p/ o modelo',
+      ok: !!(d.modeloCasa.stats && d.modeloFora.stats),
+      obrigatorio: true,
+    },
+    { nome: 'Flashscore', ok: !!d.flash, obrigatorio: false },
+    { nome: 'Desfalques', ok: d.desfalques.length > 0, obrigatorio: false },
+    { nome: 'Classificação', ok: d.classificacao.length > 0, obrigatorio: false },
+    { nome: 'Últimas partidas', ok: nUltimas > 0, obrigatorio: false },
+    {
+      nome: 'Odds',
+      ok: r.odds.length > 0 && !d.errosOdds,
+      obrigatorio: true,
+      detalhe: r.odds.length ? `${r.odds.length} · ${r.casas.length} casa(s)` : '',
+    },
+  ];
+
   return (
     <section className="passo">
       <h2>Análise</h2>
+      <p className="dica">
+        Esta aba se atualiza sozinha: cada print, texto ou correção nas outras abas recalcula tudo
+        na hora.
+      </p>
+      <div className="situacao">
+        {situacao.map((s) => (
+          <span key={s.nome} className={s.ok ? 'ok' : s.obrigatorio ? 'falta' : 'opcional'}>
+            {s.ok ? '✓' : s.obrigatorio ? '✗' : '○'} {s.nome}
+            {s.detalhe && <small> {s.detalhe}</small>}
+          </span>
+        ))}
+      </div>
 
       {d.pendencias.length > 0 && (
         <div className="caixa alerta">
@@ -250,30 +296,50 @@ export function AbaAnalise({ r, setR, d }: PropsAba) {
       </div>
 
       <h3>Impacto dos desfalques</h3>
-      <div className="grade2">
-        {(['casa', 'fora'] as const).map((t) => (
-          <div key={t}>
-            <strong>{nome(t)}</strong>
-            {(['desfalqueAtaque', 'desfalqueDefesa'] as const).map((tipo) => (
-              <label key={tipo}>
-                {tipo === 'desfalqueAtaque'
-                  ? 'No ataque (menos gols dele)'
-                  : 'Na defesa (mais gols do adversário)'}
-                <select
-                  value={r[tipo][t]}
-                  onChange={(e) => desfalque(tipo, t, e.target.value as NivelDesfalque)}
-                >
-                  {(Object.keys(ROTULO_DESFALQUE) as NivelDesfalque[]).map((n) => (
-                    <option key={n} value={n}>
-                      {ROTULO_DESFALQUE[n]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        ))}
-      </div>
+      <p className="dica">
+        Automático: só ajusta quando o texto do Flashscore cita um jogador ausente como peça
+        importante (principal, artilheiro, destaque, titular). Sem essa evidência fica sem ajuste, o
+        que é conservador: o mercado já precifica desfalques conhecidos.
+      </p>
+      {(['casa', 'fora'] as const).map((t) => (
+        <div key={t} className="caixa">
+          <strong>{nome(t)}</strong>: {d.impacto[t].motivo}
+          {r.desfalqueAtaque[t] !== 'auto' && (
+            <div className="miudo alerta-txt">
+              Você escolheu manualmente: {ROTULO_DESFALQUE[r.desfalqueAtaque[t]]}
+            </div>
+          )}
+        </div>
+      ))}
+      <details>
+        <summary>Ajustar manualmente (só se você conhece o elenco)</summary>
+        <div className="grade2">
+          {(['casa', 'fora'] as const).map((t) => (
+            <div key={t}>
+              <strong>{nome(t)}</strong>
+              {(['desfalqueAtaque', 'desfalqueDefesa'] as const).map((tipo) => (
+                <label key={tipo}>
+                  {tipo === 'desfalqueAtaque'
+                    ? 'No ataque (menos gols dele)'
+                    : 'Na defesa (mais gols do adversário)'}
+                  <select
+                    value={r[tipo][t]}
+                    onChange={(e) => desfalque(tipo, t, e.target.value as NivelDesfalque)}
+                  >
+                    {(Object.keys(ROTULO_DESFALQUE) as NivelDesfalque[])
+                      .filter((n) => tipo === 'desfalqueAtaque' || n !== 'auto')
+                      .map((n) => (
+                        <option key={n} value={n}>
+                          {ROTULO_DESFALQUE[n]}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+      </details>
 
       <h3>Modelo</h3>
       <div className="caixa">

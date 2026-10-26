@@ -13,9 +13,11 @@ export interface Leitura {
   texto: string;
 }
 
-export type NivelDesfalque = 'nenhum' | 'baixo' | 'medio' | 'alto' | 'critico';
+export type NivelDesfalque = 'auto' | 'nenhum' | 'baixo' | 'medio' | 'alto' | 'critico';
 
+/** 'auto' é resolvido em dados.ts pela sugestão automática antes de virar fator. */
 export const FATOR_DESFALQUE: Record<NivelDesfalque, number> = {
+  auto: 1,
   nenhum: 1,
   baixo: 0.98,
   medio: 0.95,
@@ -24,6 +26,7 @@ export const FATOR_DESFALQUE: Record<NivelDesfalque, number> = {
 };
 
 export const ROTULO_DESFALQUE: Record<NivelDesfalque, string> = {
+  auto: 'automático (pelo texto do Flashscore)',
   nenhum: 'nenhum impacto',
   baixo: 'baixo (−2%)',
   medio: 'médio (−5%)',
@@ -77,7 +80,7 @@ export function rascunhoNovo(): Rascunho {
     prints: {},
     flashscore: '',
     correcoes: {},
-    desfalqueAtaque: { casa: 'nenhum', fora: 'nenhum' },
+    desfalqueAtaque: { casa: 'auto', fora: 'auto' },
     desfalqueDefesa: { casa: 'nenhum', fora: 'nenhum' },
     casas: ['1win'],
     odds: [],

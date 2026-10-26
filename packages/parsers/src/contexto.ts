@@ -243,3 +243,51 @@ export function lerTextoFlashscore(texto: string, jogo: NomesTimes): LeituraFlas
   }
   return { trechos, campanhas };
 }
+
+// ---------- impacto dos desfalques (sugestão automática) ----------
+
+export type NivelImpacto = 'nenhum' | 'medio' | 'alto';
+
+export interface ImpactoSugerido {
+  nivel: NivelImpacto;
+  importantes: string[];
+  motivo: string;
+}
+
+const IMPORTANTE =
+  /principa|artilheir|destaque|lider|titular|melhor|importante|craque|camisa 10|capitao/;
+
+/**
+ * Só sobe o impacto com evidência no texto: um jogador ausente citado pelo Flashscore como
+ * principal/artilheiro/destaque/titular. Sem evidência → nenhum (o modelo fica perto do mercado).
+ */
+export function avaliarImpactoDesfalques(
+  desfalques: Desfalque[],
+  flash: LeituraFlashscore | null,
+  time: Time,
+): ImpactoSugerido {
+  const doTime = desfalques.filter((d) => d.time === time);
+  if (!doTime.length)
+    return { nivel: 'nenhum', importantes: [], motivo: 'nenhum desfalque informado' };
+  const frases = (flash?.trechos ?? []).filter((t) => IMPORTANTE.test(semAcento(t.texto)));
+  const importantes = doTime
+    .filter((d) => {
+      const sobrenomes = semAcento(d.jogador)
+        .split(/\s+/)
+        .filter((p) => p.length >= 4);
+      return frases.some((f) => sobrenomes.some((s) => semAcento(f.texto).includes(s)));
+    })
+    .map((d) => d.jogador);
+  if (!importantes.length) {
+    return {
+      nivel: 'nenhum',
+      importantes,
+      motivo: `${doTime.length} desfalque(s), nenhum citado como peça importante no texto do Flashscore: sem ajuste (conservador)`,
+    };
+  }
+  return {
+    nivel: importantes.length >= 2 ? 'alto' : 'medio',
+    importantes,
+    motivo: `citado(s) como peça importante no Flashscore: ${importantes.join(', ')}`,
+  };
+}

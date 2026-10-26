@@ -15,6 +15,7 @@ import {
   type ResultadoLambdaModelo,
 } from '@pe/engine';
 import {
+  avaliarImpactoDesfalques,
   checarSanidade,
   consolidar,
   destaquesComparativos,
@@ -26,6 +27,7 @@ import {
   lerTextoFlashscore,
   type Desfalque,
   type EstatisticasModelo,
+  type ImpactoSugerido,
   type LeituraFlashscore,
   type LeituraStats,
   type LinhaClassificacao,
@@ -43,6 +45,7 @@ export interface Derivado {
   lambda: ResultadoLambdaModelo | null;
   desfalques: Desfalque[];
   avisosDesfalques: string[];
+  impacto: Record<'casa' | 'fora', ImpactoSugerido>;
   classificacao: LinhaClassificacao[];
   avisosClassificacao: string[];
   flash: LeituraFlashscore | null;
@@ -76,20 +79,30 @@ export function derivar(r: Rascunho): Derivado {
   const clas = textos(r, 'classificacao').map((t) => lerClassificacao(t, nomes));
   const flash = r.flashscore.trim() ? lerTextoFlashscore(r.flashscore, nomes) : null;
 
+  // impacto dos desfalques: automático pelo texto do Flashscore, salvo escolha manual
+  const impacto = {
+    casa: avaliarImpactoDesfalques(desfalques, flash, 'casa'),
+    fora: avaliarImpactoDesfalques(desfalques, flash, 'fora'),
+  };
+
   // λ do modelo + ajustes de desfalque declarados
   let lambda: ResultadoLambdaModelo | null = null;
   if (modeloCasa.stats && modeloFora.stats) {
     const ajustes: AjusteLambda[] = [];
     for (const t of ['casa', 'fora'] as const) {
       const outro = t === 'casa' ? 'fora' : 'casa';
-      const at = r.desfalqueAtaque[t];
-      const df = r.desfalqueDefesa[t];
+      const escolhido = r.desfalqueAtaque[t];
+      const at = escolhido === 'auto' ? impacto[t].nivel : escolhido;
+      const df = r.desfalqueDefesa[t] === 'auto' ? 'nenhum' : r.desfalqueDefesa[t];
       if (at !== 'nenhum')
         ajustes.push({
           time: t,
           tipo: 'desfalque',
           fator: FATOR_DESFALQUE[at],
-          descricao: `desfalques no ataque de ${nomes[t]}: ${ROTULO_DESFALQUE[at]}`,
+          descricao:
+            escolhido === 'auto'
+              ? `desfalques no ataque de ${nomes[t]} (automático): ${ROTULO_DESFALQUE[at]} — ${impacto[t].motivo}`
+              : `desfalques no ataque de ${nomes[t]}: ${ROTULO_DESFALQUE[at]}`,
         });
       if (df !== 'nenhum')
         ajustes.push({
@@ -179,6 +192,7 @@ export function derivar(r: Rascunho): Derivado {
     lambda,
     desfalques,
     avisosDesfalques: desf.flatMap((d) => d.avisos),
+    impacto,
     classificacao: clas.flatMap((c) => c.linhas),
     avisosClassificacao: clas.flatMap((c) => c.avisos),
     flash,
