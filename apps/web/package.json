@@ -1,0 +1,25 @@
+{
+  "name": "@pe/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -p . && vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@pe/engine": "*",
+    "@pe/parsers": "*",
+    "@pe/schemas": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^7.3.7"
+  }
+}
