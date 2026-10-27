@@ -173,6 +173,15 @@ export function App() {
     }
   }
 
+  // "Ver o lance": esconde o site e deixa o estádio animado em tela cheia (Esc volta)
+  const [verLance, setVerLance] = useState(false);
+  useEffect(() => {
+    document.body.classList.toggle('so-lance', verLance);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setVerLance(false);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [verLance]);
+
   const [figurinhas, setFigurinhasState] = useState<Figurinhas>(carregarFigurinhas);
   const setFigurinhas = (f: Figurinhas) => {
     setFigurinhasState(f);
@@ -226,10 +235,20 @@ export function App() {
             </div>
           </div>
         </div>
-        <button className="discreto" onClick={novaAnalise}>
-          Nova análise
-        </button>
+        <div className="linha-acoes" style={{ margin: 0, flexWrap: 'nowrap' }}>
+          <button className="mini botao-lance" onClick={() => setVerLance(true)}>
+            ▶ Ver o lance
+          </button>
+          <button className="discreto" onClick={novaAnalise}>
+            Nova análise
+          </button>
+        </div>
       </header>
+      {verLance && (
+        <button className="sair-lance" onClick={() => setVerLance(false)}>
+          ✕ Voltar para a análise
+        </button>
+      )}
       {demo && (
         <div className="faixa-demo">
           ⚽ Jogo de exemplo (odds fictícias): nada aqui é salvo.{' '}

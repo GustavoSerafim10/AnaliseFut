@@ -769,202 +769,194 @@ dl.numeros dd {
   margin: 6px 0 0;
 }
 
-/* ---------- estádio: o lance animado no fundo ---------- */
+/* ---------- estádio: o lance animado no fundo (ciclo de 10 s) ----------
+   0–34% 10 canarinho conduz e toca · 40–52% 11 domina · 52–60% chapéu no zagueiro
+   60–66% rola para o 10 argentino · 66–74% condução · 74–82% chute no ângulo
+   80–95% rede, flashes, confete e GOLAÇO · 94–100% cena some e recomeça */
 .estadio {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   width: 100%;
-  height: 78vh;
+  height: 100%;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.75;
+  opacity: 0.55;
+  transition: opacity 0.6s ease;
+}
+.estadio * {
+  animation-duration: 10s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+.estadio.com-galeria .fundo-estadio {
+  opacity: 0.35;
+}
+.estadio.com-galeria .gramado {
+  opacity: 0.7;
 }
 .estadio .linhas {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.16);
-  stroke-width: 2;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 3;
 }
 .estadio .trave {
   fill: none;
-  stroke: #e9eef7;
-  stroke-width: 4;
+  stroke: #f4f7fb;
+  stroke-width: 6;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .estadio .rede line {
-  stroke: rgba(255, 255, 255, 0.28);
-  stroke-width: 1;
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1.2;
 }
 .estadio .rede {
   transform-box: fill-box;
   transform-origin: 0% 50%;
-  animation: rede 6s infinite;
+  animation-name: rede;
 }
-.estadio .sombra-jogador {
-  fill: rgba(0, 0, 0, 0.45);
-}
-.estadio .perna {
-  stroke: #1b2333;
-  stroke-width: 5;
-  stroke-linecap: round;
-}
-.estadio .chuteira {
-  stroke: #f5f7fa;
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-.estadio .calcao {
-  fill: #f3f5f9;
-}
-.estadio .braco {
-  stroke: #5b4636;
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-.estadio .cabeca {
-  fill: #5b4636;
+.estadio .sombra-chao {
+  fill: rgba(0, 0, 0, 0.35);
 }
 .estadio .numero {
   font-family: 'Bebas Neue', Impact, sans-serif;
-  font-size: 14px;
+  font-size: 24px;
 }
-.estadio .corpo {
-  animation: corrida 0.5s ease-in-out infinite alternate;
+
+/* torcida e luz */
+.estadio .flash {
+  fill: #fff;
+  opacity: 0;
+  animation-name: pisca;
+  animation-duration: 2.6s;
 }
-.estadio .chute {
+.estadio .flash-gol {
+  animation-name: pisca-gol;
+  animation-duration: 10s;
+}
+.estadio .feixe {
+  animation-name: feixe;
+  animation-duration: 6s;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+}
+.estadio .lampadas {
+  filter: drop-shadow(0 0 14px #fff8dc);
+}
+.estadio .led {
+  animation-name: led;
+  animation-duration: 18s;
+}
+.estadio .led-texto {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 19px;
+  letter-spacing: 3px;
+  fill: #ffcc29;
+}
+
+/* jogadores: corrida (pernas e braços alternados) */
+.estadio .perna,
+.estadio .braco {
   transform-box: fill-box;
   transform-origin: 50% 0%;
 }
-.estadio .chute-0 {
-  animation: chute-0 6s infinite;
+.estadio .balanca-a {
+  animation: balanca 0.36s ease-in-out infinite alternate;
 }
-.estadio .chute-1 {
-  animation: chute-1 6s infinite;
+.estadio .balanca-b {
+  animation: balanca 0.36s ease-in-out infinite alternate-reverse;
 }
-.estadio .chute-2 {
-  animation: chute-2 6s infinite;
+.estadio .jogador-0 {
+  animation-name: jogador-0;
+}
+.estadio .jogador-1 {
+  animation-name: jogador-1;
+}
+.estadio .jogador-2 {
+  animation-name: jogador-2;
+}
+.estadio .zagueiro {
+  animation-name: zagueiro;
+}
+.estadio .carrinho {
+  animation-name: carrinho;
+}
+.estadio .goleiro {
+  transform: translate(1530px, 566px);
+}
+.estadio .mergulho {
+  animation-name: mergulho;
+  animation-timing-function: ease-out;
+}
+.estadio .comemora {
+  animation-name: comemora;
+  animation-timing-function: ease-in-out;
+}
+.estadio .lance {
+  animation-name: lance;
+}
+
+/* bola: posição no chão + altura (arco) + quique de condução */
+.estadio .bola-chao {
+  animation-name: bola-chao;
+}
+.estadio .bola-altura {
+  animation-name: bola-altura;
+  animation-timing-function: ease-in-out;
+}
+.estadio .sombra-bola {
+  fill: rgba(0, 0, 0, 0.4);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: sombra-bola;
+}
+.estadio .quique {
+  animation: quique 0.36s ease-in-out infinite alternate;
 }
 .estadio .bola {
   fill: #fff;
-  animation: bola 6s infinite;
+  stroke: #1b2333;
+  stroke-width: 1;
 }
-.estadio .bola path {
+.estadio .gomos {
   fill: #1b2333;
   transform-box: fill-box;
   transform-origin: center;
-  animation: gira 0.4s linear infinite;
-}
-.estadio .gol-texto {
-  font-family: 'Bebas Neue', Impact, sans-serif;
-  font-size: 56px;
-  letter-spacing: 3px;
-  fill: var(--canarinho);
-  opacity: 0;
-  animation: grito 6s infinite;
+  animation: gira 0.45s linear infinite;
 }
 
-@keyframes corrida {
+/* festa */
+.estadio .golaco {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 170px;
+  letter-spacing: 6px;
+  stroke: #1a1300;
+  stroke-width: 7px;
+  paint-order: stroke;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 24px rgba(255, 214, 10, 0.55));
+  animation-name: golaco;
+}
+.estadio .confete {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: confete;
+  animation-timing-function: ease-in;
+}
+
+@keyframes balanca {
+  from {
+    transform: rotate(-26deg);
+  }
   to {
-    transform: translateY(-2px);
+    transform: rotate(26deg);
   }
 }
-/* R10 toca (0–4%) → Ney domina e toca (34–38%) → Messi bate (64–68%) → rede (78–88%) */
-@keyframes bola {
-  0%,
-  4% {
-    transform: translate(186px, 329px);
-    opacity: 1;
-  }
-  24% {
-    transform: translate(399px, 261px);
-  }
-  34% {
-    transform: translate(404px, 263px);
-  }
-  56% {
-    transform: translate(600px, 321px);
-  }
-  66% {
-    transform: translate(604px, 320px);
-  }
-  78% {
-    transform: translate(812px, 272px);
-  }
-  88% {
-    transform: translate(818px, 280px);
-    opacity: 1;
-  }
-  93% {
-    transform: translate(818px, 280px);
-    opacity: 0;
-  }
-  94% {
-    transform: translate(186px, 329px);
-    opacity: 0;
-  }
-  100% {
-    transform: translate(186px, 329px);
-    opacity: 1;
-  }
-}
-@keyframes chute-0 {
-  0%,
-  6%,
-  100% {
-    transform: rotate(0);
-  }
-  2% {
-    transform: rotate(-55deg);
-  }
-}
-@keyframes chute-1 {
-  0%,
-  33%,
-  40%,
-  100% {
-    transform: rotate(0);
-  }
-  36% {
-    transform: rotate(-50deg);
-  }
-}
-@keyframes chute-2 {
-  0%,
-  63%,
-  70%,
-  100% {
-    transform: rotate(0);
-  }
-  66% {
-    transform: rotate(-70deg);
-  }
-}
-@keyframes rede {
-  0%,
-  77%,
-  92%,
-  100% {
-    transform: scaleX(1);
-  }
-  80% {
-    transform: scaleX(1.25);
-  }
-  84% {
-    transform: scaleX(1.1);
-  }
-}
-@keyframes grito {
-  0%,
-  78%,
-  97%,
-  100% {
-    opacity: 0;
-    transform: translateY(0);
-  }
-  82%,
-  92% {
-    opacity: 1;
+@keyframes quique {
+  to {
     transform: translateY(-6px);
   }
 }
@@ -973,10 +965,365 @@ dl.numeros dd {
     transform: rotate(360deg);
   }
 }
+@keyframes pisca {
+  0%,
+  86%,
+  100% {
+    opacity: 0;
+  }
+  90% {
+    opacity: 1;
+  }
+}
+@keyframes pisca-gol {
+  0%,
+  80%,
+  97%,
+  100% {
+    opacity: 0;
+  }
+  82%,
+  86%,
+  91% {
+    opacity: 1;
+  }
+  84%,
+  88%,
+  94% {
+    opacity: 0.25;
+  }
+}
+@keyframes feixe {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes led {
+  to {
+    transform: translateX(-1400px);
+  }
+}
+@keyframes lance {
+  0% {
+    opacity: 0;
+  }
+  3%,
+  94% {
+    opacity: 1;
+  }
+  97%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes jogador-0 {
+  0% {
+    transform: translate(240px, 700px);
+  }
+  30% {
+    transform: translate(600px, 648px);
+  }
+  36% {
+    transform: translate(640px, 645px);
+  }
+  94%,
+  96% {
+    transform: translate(780px, 662px);
+  }
+  97%,
+  100% {
+    transform: translate(240px, 700px);
+  }
+}
+@keyframes jogador-1 {
+  0% {
+    transform: translate(980px, 600px);
+  }
+  40% {
+    transform: translate(860px, 576px);
+  }
+  52% {
+    transform: translate(866px, 576px);
+  }
+  60% {
+    transform: translate(1010px, 566px);
+  }
+  66% {
+    transform: translate(1060px, 570px);
+  }
+  94%,
+  96% {
+    transform: translate(1120px, 576px);
+  }
+  97%,
+  100% {
+    transform: translate(980px, 600px);
+  }
+}
+@keyframes jogador-2 {
+  0% {
+    transform: translate(1060px, 720px);
+  }
+  60% {
+    transform: translate(1110px, 650px);
+  }
+  66% {
+    transform: translate(1128px, 642px);
+  }
+  74% {
+    transform: translate(1236px, 604px);
+  }
+  80%,
+  96% {
+    transform: translate(1268px, 600px);
+  }
+  97%,
+  100% {
+    transform: translate(1060px, 720px);
+  }
+}
+@keyframes zagueiro {
+  0%,
+  50% {
+    transform: translate(990px, 573px);
+  }
+  56% {
+    transform: translate(945px, 576px);
+  }
+  70%,
+  96% {
+    transform: translate(925px, 580px);
+  }
+  97%,
+  100% {
+    transform: translate(990px, 573px);
+  }
+}
+@keyframes carrinho {
+  0%,
+  50%,
+  97%,
+  100% {
+    transform: rotate(0);
+  }
+  56%,
+  94% {
+    transform: rotate(-62deg);
+  }
+}
+@keyframes mergulho {
+  0%,
+  75%,
+  97%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  80% {
+    transform: translate(-48px, -36px) rotate(-78deg);
+  }
+  88%,
+  95% {
+    transform: translate(-56px, 0) rotate(-90deg);
+  }
+}
+@keyframes comemora {
+  0%,
+  82%,
+  100% {
+    transform: translateY(0);
+  }
+  85% {
+    transform: translateY(-34px);
+  }
+  88% {
+    transform: translateY(0);
+  }
+  91% {
+    transform: translateY(-26px);
+  }
+  94% {
+    transform: translateY(0);
+  }
+}
+@keyframes bola-chao {
+  0% {
+    transform: translate(268px, 702px);
+  }
+  30% {
+    transform: translate(628px, 650px);
+  }
+  34% {
+    transform: translate(650px, 648px);
+  }
+  40% {
+    transform: translate(880px, 578px);
+  }
+  52% {
+    transform: translate(888px, 578px);
+  }
+  60% {
+    transform: translate(1030px, 566px);
+  }
+  66% {
+    transform: translate(1152px, 642px);
+  }
+  74% {
+    transform: translate(1262px, 604px);
+  }
+  82% {
+    transform: translate(1562px, 548px);
+  }
+  88%,
+  96% {
+    transform: translate(1572px, 556px);
+  }
+  97%,
+  100% {
+    transform: translate(268px, 702px);
+  }
+}
+@keyframes bola-altura {
+  0%,
+  34%,
+  52%,
+  60%,
+  74%,
+  92%,
+  100% {
+    transform: translateY(0);
+  }
+  37% {
+    transform: translateY(-16px);
+  }
+  56% {
+    transform: translateY(-140px);
+  }
+  78% {
+    transform: translateY(-80px);
+  }
+  82% {
+    transform: translateY(-62px);
+  }
+  88% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes sombra-bola {
+  0%,
+  52%,
+  60%,
+  74%,
+  92%,
+  100% {
+    transform: scale(1);
+  }
+  56% {
+    transform: scale(0.35);
+  }
+  78% {
+    transform: scale(0.5);
+  }
+}
+@keyframes rede {
+  0%,
+  81%,
+  94%,
+  100% {
+    transform: translateX(0) scaleX(1);
+  }
+  84% {
+    transform: translateX(10px) scaleX(1.08);
+  }
+  88% {
+    transform: translateX(4px) scaleX(1.03);
+  }
+}
+@keyframes golaco {
+  0%,
+  80% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  83% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  86%,
+  92% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  96%,
+  100% {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+@keyframes confete {
+  0%,
+  80% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0);
+  }
+  81% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0);
+  }
+  93% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .estadio * {
     animation: none !important;
   }
+}
+
+/* "Ver o lance": esconde o site e deixa o estádio em tela cheia */
+body.so-lance .estadio {
+  opacity: 1;
+}
+body.so-lance .topo,
+body.so-lance .abas,
+body.so-lance main,
+body.so-lance .rodape,
+body.so-lance .faixa-demo {
+  opacity: 0;
+  pointer-events: none;
+}
+.topo,
+.abas,
+main,
+.rodape,
+.faixa-demo {
+  transition: opacity 0.5s ease;
+}
+.sair-lance {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 5;
+  background: rgba(10, 15, 34, 0.75);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(6px);
+}
+.botao-lance {
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* cartões deixam o estádio aparecer de leve por trás */
@@ -1009,9 +1356,6 @@ dl.numeros dd {
 .galeria-foto.visivel {
   opacity: 1;
   transform: scale(1);
-}
-.estadio.com-galeria .gramado {
-  opacity: 0.45;
 }
 
 /* ---------- editor de figurinhas ---------- */
