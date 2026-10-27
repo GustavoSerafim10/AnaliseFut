@@ -8,7 +8,9 @@ import { AbaPromocoes } from './abas/AbaPromocoes';
 import { AbaStats } from './abas/AbaStats';
 import { AbaTabela } from './abas/AbaTabela';
 import { AbaUltimas } from './abas/AbaUltimas';
+import { Trio } from './componentes/Trio';
 import { derivar } from './dados';
+import { abaDoExemplo, ehExemplo, rascunhoExemplo } from './exemplo';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
 import {
   carregarBancaInicial,
@@ -37,10 +39,26 @@ type Aba =
 
 const chave = (a: Aba) => (a.id === 'odds' ? `odds:${a.casa}` : a.id);
 
+const DECISAO_CLASSE: Record<string, string> = {
+  BET: 'bet',
+  WATCHLIST: 'watch',
+  INVESTIGAR: 'investigar',
+};
+
 export function App() {
-  const [r, setR] = useState<Rascunho>(carregarRascunho);
-  const [aba, setAba] = useState<Aba>({ id: 'jogo' });
-  useEffect(() => salvarRascunho(r), [r]);
+  // #demo: jogo de exemplo, sem tocar no rascunho nem no histórico do aparelho
+  const [demo] = useState(ehExemplo);
+  const [r, setR] = useState<Rascunho>(() => (demo ? rascunhoExemplo() : carregarRascunho()));
+  const [aba, setAba] = useState<Aba>(() =>
+    demo ? ({ id: abaDoExemplo() } as Aba) : { id: 'jogo' },
+  );
+  useEffect(() => {
+    if (!demo) salvarRascunho(r);
+  }, [r, demo]);
+  const irPara = (hash: string) => {
+    location.hash = hash;
+    location.reload();
+  };
   const [historico, setHistoricoState] = useState<EntradaHistorico[]>(carregarHistorico);
   const [bancaInicial, setBancaInicialState] = useState<number | null>(carregarBancaInicial);
   const setBancaInicial = (v: number | null) => {
@@ -68,6 +86,10 @@ export function App() {
   };
 
   function salvarAnalise() {
+    if (demo) {
+      alert('Isto é só o jogo de exemplo: nada é salvo no histórico.');
+      return;
+    }
     const { lista, id } = salvarNoHistorico(historico, r, d);
     setHistorico(lista);
     setR((x) => ({ ...x, idHistorico: id }));
@@ -142,20 +164,44 @@ export function App() {
     }
   }
 
-  const props = { r, setR, d };
+  const props = { r, setR, d, abrirExemplo: () => irPara('#demo/analise') };
+  const decisao = d.v4?.decisao;
   return (
     <>
       <header className="topo">
-        <div>
-          <strong>
-            {r.jogo.casa && r.jogo.fora ? `${r.jogo.casa} × ${r.jogo.fora}` : 'Pricing Engine V4.0'}
-          </strong>
-          <span className="miudo"> · NO BET é o padrão</span>
+        <div className="marca-topo">
+          <Trio tamanho={30} />
+          <div>
+            <div className="nome-site">
+              {r.jogo.casa && r.jogo.fora ? (
+                <>
+                  {r.jogo.casa} <span className="x">×</span> {r.jogo.fora}
+                </>
+              ) : (
+                'Pricing Engine'
+              )}
+            </div>
+            <div className="sub-site">
+              {decisao ? (
+                <span className={`selo ${DECISAO_CLASSE[decisao] ?? 'nobet'}`}>{d.v4!.rotulo}</span>
+              ) : (
+                'V4.0 · NO BET é o padrão'
+              )}
+            </div>
+          </div>
         </div>
         <button className="discreto" onClick={novaAnalise}>
           Nova análise
         </button>
       </header>
+      {demo && (
+        <div className="faixa-demo">
+          ⚽ Jogo de exemplo (odds fictícias): nada aqui é salvo.{' '}
+          <button className="mini" onClick={() => irPara('')}>
+            sair do exemplo
+          </button>
+        </div>
+      )}
       <nav className="abas">
         {grupos.map((g, gi) => (
           <div key={gi} className="grupo-abas">
@@ -208,6 +254,13 @@ export function App() {
         {aba.id === 'promocoes' && <AbaPromocoes {...props} />}
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
       </main>
+      <footer className="rodape">
+        <Trio tamanho={22} nomes />
+        <p>
+          Ginga do R10, drible do Ney, visão do Messi.
+          <br />E a disciplina de quem só entra quando o preço paga.
+        </p>
+      </footer>
     </>
   );
 }

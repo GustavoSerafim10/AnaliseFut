@@ -6,6 +6,7 @@ import { AbaAnalise } from '../src/abas/AbaAnalise';
 import { AbaHistorico } from '../src/abas/AbaHistorico';
 import { AbaPromocoes } from '../src/abas/AbaPromocoes';
 import { derivar } from '../src/dados';
+import { rascunhoExemplo } from '../src/exemplo';
 import { rascunhoNovo, type Rascunho } from '../src/estado';
 import { salvarNoHistorico, travasDoHistorico } from '../src/historico';
 
@@ -67,5 +68,14 @@ describe('telas da V4.0', () => {
     expect(renderToString(createElement(AbaPromocoes, { r, setR: nada, d }))).toContain(
       'Odd turbinada',
     );
+  });
+});
+
+describe('jogo de exemplo (#demo)', () => {
+  it('mostra um BET de verdade da V4.0 contra a Pinnacle', () => {
+    const d = derivar(rascunhoExemplo());
+    expect(d.v4?.decisao).toBe('BET');
+    expect(d.v4?.melhor?.casaMelhorOdd).toBe('Superbet');
+    expect(d.v4?.referencia.nivel).toBe('R1');
   });
 });

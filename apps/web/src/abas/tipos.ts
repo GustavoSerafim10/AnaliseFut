@@ -6,6 +6,8 @@ export interface PropsAba {
   r: Rascunho;
   setR: Dispatch<SetStateAction<Rascunho>>;
   d: Derivado;
+  /** abre o jogo de exemplo (#demo) */
+  abrirExemplo?: () => void;
 }
 
 /** Helpers para adicionar/remover textos de prints de um grupo. */

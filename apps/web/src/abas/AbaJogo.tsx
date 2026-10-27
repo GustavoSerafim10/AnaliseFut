@@ -1,3 +1,4 @@
+import { Trio } from '../componentes/Trio';
 import type { Rascunho } from '../estado';
 import type { PropsAba } from './tipos';
 
@@ -29,14 +30,30 @@ const OPCOES: [keyof Rascunho['config'], string, string][] = [
   ],
 ];
 
-export function AbaJogo({ r, setR }: PropsAba) {
+export function AbaJogo({ r, setR, abrirExemplo }: PropsAba) {
   const jogo = (campo: keyof Rascunho['jogo'], v: string) =>
     setR((x) => ({ ...x, jogo: { ...x.jogo, [campo]: v } }));
   const config = <K extends keyof Rascunho['config']>(campo: K, v: Rascunho['config'][K]) =>
     setR((x) => ({ ...x, config: { ...x.config, [campo]: v } }));
+  const vazio = !r.jogo.casa && !r.jogo.fora;
 
   return (
     <section className="passo">
+      {vazio && (
+        <div className="vestiario">
+          <Trio tamanho={64} nomes />
+          <h2>Bora pro jogo?</h2>
+          <p>
+            Escala os times, manda os prints das estatísticas e das odds, e o motor diz se alguma
+            casa está pagando acima do preço justo. Sem preço, sem jogada: <strong>NO BET</strong>.
+          </p>
+          {abrirExemplo && (
+            <button className="primario" onClick={abrirExemplo}>
+              ⚽ Ver um jogo de exemplo
+            </button>
+          )}
+        </div>
+      )}
       <h2>Jogo</h2>
       <div className="grade2">
         <label>

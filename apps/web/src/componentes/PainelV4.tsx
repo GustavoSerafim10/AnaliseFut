@@ -10,6 +10,15 @@ const CLASSE: Record<ResultadoV4['decisao'], string> = {
   EXCLUIDO: 'nobet',
 };
 
+/** Só tempero: a decisão é o rótulo, e ele continua claro. */
+const FRASE: Record<ResultadoV4['decisao'], string> = {
+  BET: 'Bola no ângulo — mas só se a odd mínima segurar.',
+  WATCHLIST: 'Aquecendo no banco: falta um detalhe para entrar.',
+  INVESTIGAR: 'VAR chamado: bom demais para ser verdade, confere antes.',
+  NO_BET: 'Segura a bola. Sem preço, sem jogada.',
+  EXCLUIDO: 'Bola rolando: aqui é só pré-jogo.',
+};
+
 const FILTRO: Record<string, string> = {
   concorda: 'concorda ✓',
   neutro: 'neutro',
@@ -29,7 +38,10 @@ export function PainelV4({ r, setR, d }: PropsAba) {
   return (
     <>
       <div className={`decisao ${CLASSE[v.decisao]}`}>
-        <div className="rotulo">{v.rotulo}</div>
+        <div className="placar">
+          <div className="rotulo">{v.rotulo}</div>
+          <div className="frase">{FRASE[v.decisao]}</div>
+        </div>
         <ul>
           {v.motivos.map((x) => (
             <li key={x}>{x}</li>
