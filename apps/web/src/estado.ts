@@ -67,6 +67,8 @@ export interface Rascunho {
   explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
   banca: string;
+  /** V4.0: entrada motivada por notícia (escalação, lesão) → estratégia S2 */
+  noticia: boolean;
   /** id da entrada do histórico de onde veio (salvar de novo atualiza a mesma entrada) */
   idHistorico?: string;
 }
@@ -101,6 +103,7 @@ export function rascunhoNovo(): Rascunho {
     explicacaoDivergencia: '',
     redTeam: { argumentos: ['', '', ''], atacaPremissa: false, sobreviveu: false },
     banca: '',
+    noticia: false,
   };
 }
 

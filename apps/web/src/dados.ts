@@ -1,10 +1,15 @@
 /**
  * Tudo que o site mostra é DERIVADO do rascunho: textos lidos → parsers → cruzamento de
  * fontes → λ → DQ → motor → análise escrita. Nenhum número é decidido na tela.
+ * A decisão é da V4.0 (referência afiada × casa mole), que só precisa das odds; o motor
+ * V3.3 entra como apoio (filtro, nichos e previsão) quando há estatísticas.
  */
 import {
   analisarJogo,
+  analisarV4,
   avaliarDQ,
+  detectarMovimentos,
+  pesoModelo,
   calcularLambdaContagem,
   calcularLambdaModelo,
   gerarRelatorio,
@@ -17,6 +22,10 @@ import {
   type ResultadoLambdaContagem,
   type ResultadoAnalise,
   type ResultadoLambdaModelo,
+  type ResultadoV4,
+  type Atraso,
+  type Movimento,
+  type TravasBanca,
 } from '@pe/engine';
 import {
   avaliarImpactoDesfalques,
@@ -26,6 +35,7 @@ import {
   estatisticasContagem,
   estatisticasParaModelo,
   juntarLeiturasStats,
+  lerOddsCasa,
   lerClassificacao,
   lerDesfalques,
   lerEstatisticas,
@@ -60,14 +70,20 @@ export interface Derivado {
   destaques: string[];
   problemasOdds: ProblemaLinha[];
   errosOdds: number;
+  /** o que falta para a V4.0 (jogo + odds) */
+  pendenciasV4: string[];
+  /** o que falta para o motor de apoio V3.3 (estatísticas) */
   pendencias: string[];
+  v4: ResultadoV4 | null;
+  movimentos: Movimento[];
+  atrasos: Atraso[];
   resultado: ResultadoAnalise | null;
   relatorio: Relatorio | null;
 }
 
 const textos = (r: Rascunho, grupo: string) => (r.prints[grupo] ?? []).map((l) => l.texto);
 
-export function derivar(r: Rascunho): Derivado {
+export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   const nomes = { casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' };
   const temTimes = !!(r.jogo.casa && r.jogo.fora);
 
@@ -162,16 +178,17 @@ export function derivar(r: Rascunho): Derivado {
   const problemasOdds = checarSanidade(r.odds as LinhaOdd[]);
   const errosOdds = problemasOdds.filter((p) => p.nivel === 'erro').length;
 
-  const pendencias: string[] = [];
-  if (!temTimes) pendencias.push('Jogo: preencher mandante e visitante');
-  if (!r.jogo.hora) pendencias.push('Jogo: preencher a hora do início');
+  const pendenciasV4: string[] = [];
+  if (!temTimes) pendenciasV4.push('Jogo: preencher mandante e visitante');
+  if (!r.jogo.hora) pendenciasV4.push('Jogo: preencher a hora do início');
+  if (!r.odds.length) pendenciasV4.push('Odds: nenhuma odd lida ainda');
+  if (errosOdds) pendenciasV4.push(`Odds: ${errosOdds} erro(s) em vermelho para corrigir`);
+  const pendencias: string[] = [...pendenciasV4];
   for (const [t, m] of [
     ['casa', modeloCasa],
     ['fora', modeloFora],
   ] as const)
     if (!m.stats) pendencias.push(`Estatísticas de ${nomes[t]}: faltam ${m.faltando.join(', ')}`);
-  if (!r.odds.length) pendencias.push('Odds: nenhuma odd lida ainda');
-  if (errosOdds) pendencias.push(`Odds: ${errosOdds} erro(s) em vermelho para corrigir`);
 
   let resultado: ResultadoAnalise | null = null;
   let relatorio: Relatorio | null = null;
@@ -203,6 +220,55 @@ export function derivar(r: Rascunho): Derivado {
     });
   }
 
+  // V4.0: decisão contra a referência; o V3.3 entra como apoio quando há λ do modelo
+  let v4: ResultadoV4 | null = null;
+  if (!pendenciasV4.length) {
+    const argumentos = r.redTeam.argumentos.map((a) => a.trim()).filter(Boolean);
+    v4 = analisarV4({
+      jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
+      linhas: r.odds as LinhaOdd[],
+      ligaPrincipal: r.config.ligaTop,
+      escalacaoIncerta: r.config.escalacaoIncerta,
+      noticia: r.noticia,
+      fatoNovo: r.explicacaoDivergencia.trim() || undefined,
+      apoio: lambda
+        ? {
+            lambdas: resultado?.lambdaModelo.ajustado ?? lambda.lambdas,
+            contagens: lambdasContagem,
+            dq: dq.dq,
+            w: pesoModelo(dq.dq, {
+              mercadoMuitoLiquido: r.config.mercadoMuitoLiquido,
+              escalacaoIncerta: r.config.escalacaoIncerta,
+            }),
+            jogosMin:
+              modeloCasa.stats && modeloFora.stats
+                ? Math.min(modeloCasa.stats.jogos, modeloFora.stats.jogos)
+                : undefined,
+            priorNeutro: lambda.priorNeutro,
+            favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
+          }
+        : undefined,
+      redTeam: argumentos.length || r.redTeam.sobreviveu ? { ...r.redTeam, argumentos } : undefined,
+      banca: num(r.banca),
+      travas,
+    });
+  }
+
+  // movimento entre prints: cada print lido sozinho, com o seu horário
+  const versoes = r.casas.flatMap((casa) =>
+    (r.prints[`odds:${casa}`] ?? []).flatMap(
+      (p) =>
+        lerOddsCasa([p.texto], {
+          jogo: nomes,
+          data: r.jogo.data,
+          fuso: '-03:00',
+          casa,
+          horarioPadrao: p.capturadoEm,
+        }).linhas as LinhaOdd[],
+    ),
+  );
+  const { movimentos, atrasos } = detectarMovimentos(versoes, nomes);
+
   return {
     sofa,
     sup,
@@ -221,7 +287,11 @@ export function derivar(r: Rascunho): Derivado {
     destaques: destaquesComparativos(tabela, nomes),
     problemasOdds,
     errosOdds,
+    pendenciasV4,
     pendencias,
+    v4,
+    movimentos,
+    atrasos,
     resultado,
     relatorio,
   };

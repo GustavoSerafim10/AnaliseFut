@@ -1,8 +1,25 @@
-# Pricing Engine Web — protocolo V3.3
+# Pricing Engine Web — protocolo V4.0
 
 Ferramenta pessoal de análise pré-live: prints → conferência humana → motor determinístico →
 decisão (🟢 BET / 🟡 WATCHLIST / 🔍 INVESTIGAR / ⛔ NO BET). **NO BET é o padrão.**
 A leitura dos prints só extrai dados; **quem calcula é o código** (`packages/engine`).
+
+**V4.0 — referência afiada × casa mole.** O preço justo (P_true) vem da Pinnacle/Betfair sem
+margem (R1) ou da mediana de 4+ casas (R2). A entrada aparece quando uma casa de varejo (1win,
+Betano, Bet365…) paga acima desse preço com folga sobre o gate. O motor V3.3 continua como
+apoio: filtro (passo 6), preço de nichos sem referência (R3) e previsão. Só modelo (R4) nunca
+vira BET. O CLV contra o fechamento justo da referência é o termômetro principal.
+
+| Referência | EV mínimo | Kelly | Teto por aposta |
+|---|---|---|---|
+| R1 afiada, liga principal, ≤ 24 h | 2% | 1/4 | 2% |
+| R1 liga menor ou > 24 h | 3% | 1/4 | 2% |
+| R2 consenso de 4+ casas | 3,5% | 1/6 | 2% |
+| R3 modelo + consenso (nichos) | 5% | 1/8 | 1% |
+
+Odd > 4: +1 pp · odd > 8: +3 pp · escalação incerta: +1 pp · EV > 15%: INVESTIGAR.
+Banca: 6% por dia; drawdown 20% → Kelly pela metade; 30% → pausa de 7 dias; 5 perdas no dia
+→ dia encerrado.
 
 ## Comandos
 
@@ -36,8 +53,12 @@ packages/engine   motor V3.3 em TypeScript puro (sem UI, sem rede), testado com 
   src/sensibilidade.ts  cenários ROBUSTA / MODERADA / FRÁGIL (15)
   src/kelly.ts          Kelly fracionado, teto 2%/aposta e 5%/lote (21)
   src/varredura.ts      todos os mercados: top 5, descartados com motivo, 1 instrumento por tese (19)
-  src/decisao.ts        pipeline completo e decisão (22–23)
-  src/apuracao.ts       apuração depois do jogo (placar → ganho/perda/push) e CLV
+  src/decisao.ts        pipeline V3.3 completo e decisão (22–23) — hoje motor de apoio
+  src/v4.ts             protocolo V4.0: níveis R1–R4, EV contra a referência, gates, filtro, stake
+  src/banca.ts          travas da banca (drawdown, pausa, perdas no dia, teto diário)
+  src/movimento.ts      movimento de linha entre prints e atraso da casa mole
+  src/promocoes.ts      EV de odd turbinada, freebet, aposta sem risco e bônus com rollover
+  src/apuracao.ts       apuração depois do jogo (placar → ganho/perda/push), CLV justo e Brier
   test/                 testes, incluindo o lote de 21/10/2026 e as odds reais Villa × Viking
 ```
 
@@ -64,12 +85,20 @@ apps/web          site React + Vite (mobile-first)
   Se o print mostrar a marca de outra casa, a aba avisa. Use o formato de odd **decimal** (1.85).
 - `npm run ocr -- print.png` mostra o texto que o OCR lê de um print (útil para criar fixtures).
 
+### Referência (Pinnacle/Betfair)
+Crie uma aba de odds chamada **Pinnacle** ou **Betfair** e mande os prints dela **no mesmo
+minuto** dos prints da casa mole (até 10 min de diferença; acima disso o mercado não é
+comparado). Mande um print novo da referência perto do jogo: se ela se mexer e a casa mole
+não, a aba Análise mostra o **atraso**. Sem referência e com 4+ casas, vale o consenso (R2).
+
 ### Histórico
 Na aba Análise, "💾 Salvar no histórico" guarda o rascunho e congela a decisão do momento
 (depois do início o motor exclui o jogo, porque só analisa pré-live). Depois do jogo, na aba
 Histórico, registre o placar (o intervalo, escanteios e cartões são opcionais e só são necessários
-para apurar esses mercados) e, se tiver, a odd de fechamento. O balanço mostra as BETs e também
-todas as melhores entradas "no papel", para ver se os portões barram entradas boas ou ruins.
+para apurar esses mercados) e o **fechamento da referência** (lado apostado e, para tirar a
+margem, os outros lados). O balanço mostra o CLV por estratégia (S1–S4) com os marcos de 100 e
+300 apostas, as melhores entradas "no papel" e o Brier do modelo × mercado. A banca separada
+definida ali liga as travas e a stake em R$.
 O histórico fica no aparelho: **Exportar JSON** para backup ou para levar ao celular.
 
 ### Usar no celular
@@ -104,6 +133,24 @@ Convenções de `lado` por mercado: ver o comentário de `LinhaOdd` em `packages
 - Primeiro/último gol, 1º escanteio e mercados de escanteios/cartões do 1º tempo são apurados à mão.
 
 ## Escolhas de implementação a revisar
+
+### V4.0
+- **R3 só em nichos e ligas pequenas.** Em liga principal sem referência, o mercado principal
+  fica R4 (só previsão): com uma casa só, o modelo achava "valor" no azarão — a lição 3.
+- **Filtro do modelo:** discorda > 10 pp com fato novo → PASS; por viés conhecido (16.3 ou prior
+  neutro) → ignorado; sem fato e sem viés → stake pela metade (o protocolo não diz; escolha
+  conservadora).
+- **Ranking:** o candidato é o de maior folga sobre o próprio gate (R1 a 2% e R3 a 5% não
+  competem pelo EV cru). EV > 15% em qualquer mercado → INVESTIGAR.
+- **Betfair:** as odds back entram como referência com de-vig normal (o preço médio entre back e
+  lay ainda não é lido); quando a melhor odd é da Betfair, 6,5% de comissão sai do lucro.
+- **Red team e sensibilidade** só são exigidos no R3 (preço do modelo). No R1/R2 o preço é do
+  mercado; a DQ das estatísticas não entra no gate.
+- **Odd > 8** soma +3 pp no lugar do +1 pp de odd > 4 (não acumulam).
+- **Não implementado ainda:** teto de 3% em apostas correlacionadas (precisa do lote), lucro e
+  limites por casa (seção 9), checagem de horário entre casas no R2.
+
+### V3.3 (motor de apoio)
 
 - **Tese** de cada mercado é detectada automaticamente pela direção em que a aposta "torce":
   supremacia do mandante, visitante resiste, jogo aberto ou jogo fechado.

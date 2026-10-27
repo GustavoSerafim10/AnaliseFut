@@ -12,10 +12,10 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   const l: string[] = [];
   l.push(
     'Você é um analista de apostas esportivas pré-live, rigoroso e construtivo.',
-    'Abaixo estão os dados de um jogo e o resultado de um motor de precificação determinístico (protocolo V3.3: Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado; escanteios e cartões amarelos com binomial negativa por time, nível 3, modelo pesando no máximo 30%).',
+    'Abaixo estão os dados de um jogo e o resultado de um motor determinístico. A decisão segue o protocolo V4.0: P_true da Pinnacle/Betfair sem margem (ou do consenso de 4+ casas), entrada só quando uma casa de varejo paga acima desse preço, CLV como métrica principal. O motor V3.3 é o apoio (Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado; escanteios e cartões amarelos com binomial negativa por time, nível 3, modelo pesando no máximo 30%).',
     'Regras:',
     '- Não invente dados, odds, lesões nem probabilidades. Se faltar algo, diga que falta.',
-    '- A decisão (BET / WATCHLIST / INVESTIGAR / NO BET) é do motor. Você pode criticá-la e apontar riscos, mas não a substitua.',
+    '- A decisão (BET / WATCHLIST / INVESTIGAR / NO BET) é do motor V4.0. Você pode criticá-la e apontar riscos, mas não a substitua.',
     '- NO BET é um resultado legítimo; não force uma aposta.',
     'Escreva em português: (1) leitura do jogo; (2) o que os números dizem; (3) contexto (desfalques, casa/fora, confronto direto); (4) por que a melhor entrada é ou não é essa; (5) red team com 3 argumentos contra, um deles atacando a premissa do modelo; (6) conclusão em 3 linhas.',
     '',
@@ -55,6 +55,18 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
     l.push(
       `- ${o.casa}: ${descreverAposta(o as LinhaOdd, nomes).replace('Ganha se: ', '')} @ ${o.odd}`,
     );
-  if (d.relatorio) l.push('', '# Resultado do motor', relatorioEmTexto(d.relatorio));
+  if (d.v4) {
+    l.push(
+      '',
+      '# Decisão V4.0 (referência × casa mole)',
+      `${d.v4.rotulo} · referência ${d.v4.referencia.nivel}`,
+    );
+    l.push(...d.v4.motivos.map((m) => `- ${m}`), ...d.v4.avisos.map((m) => `- aviso: ${m}`));
+    for (const a of d.v4.top5)
+      l.push(
+        `- ${a.descricao.replace('Ganha se: ', '')} @ ${a.melhorOdd} (${a.casaMelhorOdd}): P_true ${(a.pTrue * 100).toFixed(1)}% (${a.fonteP}), EV ${(a.ev * 100).toFixed(1)}%, ${a.nivel}/${a.estrategia}`,
+      );
+  }
+  if (d.relatorio) l.push('', '# Motor de apoio V3.3', relatorioEmTexto(d.relatorio));
   return l.join('\n');
 }

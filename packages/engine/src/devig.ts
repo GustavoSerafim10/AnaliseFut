@@ -2,9 +2,10 @@
  * Seção 11 — margem e remoção da margem (de-vig).
  * Proporcional por padrão; método da potência quando há favorito < 1,40 ou azarão > 8,00
  * (o proporcional infla o azarão — lição 4 do Viking a 11,2).
+ * V4.0: no 1X2 da referência, método de Shin (a margem fica concentrada no azarão).
  */
 
-export type MetodoDevig = 'proporcional' | 'potencia';
+export type MetodoDevig = 'proporcional' | 'potencia' | 'shin';
 
 export const FAVORITO_POTENCIA = 1.4;
 export const AZARAO_POTENCIA = 8.0;
@@ -51,6 +52,31 @@ export function devigPotencia(odds: number[]): number[] {
   return probs.map((p) => p / soma);
 }
 
+/**
+ * Shin: supõe uma fração z de apostadores com informação privilegiada e acha z tal que
+ * Σ p_i = 1, com p_i = (√(z² + 4(1−z)·π_i²/S) − z) / (2(1−z)), π_i = 1/odd_i, S = Σπ_i.
+ */
+export function devigShin(odds: number[]): number[] {
+  validarOdds(odds);
+  const raw = odds.map((o) => 1 / o);
+  const S = raw.reduce((s, p) => s + p, 0);
+  if (S <= 1) return raw.map((p) => p / S);
+  const probs = (z: number) =>
+    raw.map((pi) => (Math.sqrt(z * z + (4 * (1 - z) * pi * pi) / S) - z) / (2 * (1 - z)));
+  const soma = (z: number) => probs(z).reduce((s, p) => s + p, 0) - 1;
+  // soma(0) = √S − 1 > 0 e decresce com z
+  let lo = 0;
+  let hi = 0.5;
+  for (let i = 0; i < 200; i++) {
+    const z = (lo + hi) / 2;
+    if (soma(z) > 0) lo = z;
+    else hi = z;
+  }
+  const p = probs((lo + hi) / 2);
+  const t = p.reduce((s, x) => s + x, 0);
+  return p.map((x) => x / t);
+}
+
 export function escolherMetodo(odds: number[]): MetodoDevig {
   return Math.min(...odds) < FAVORITO_POTENCIA || Math.max(...odds) > AZARAO_POTENCIA
     ? 'potencia'
@@ -67,6 +93,11 @@ export function removerMargem(
   odds: number[],
   metodo: MetodoDevig = escolherMetodo(odds),
 ): ResultadoDevig {
-  const probs = metodo === 'potencia' ? devigPotencia(odds) : devigProporcional(odds);
+  const probs =
+    metodo === 'potencia'
+      ? devigPotencia(odds)
+      : metodo === 'shin'
+        ? devigShin(odds)
+        : devigProporcional(odds);
   return { probs, metodo, margem: margem(odds) };
 }

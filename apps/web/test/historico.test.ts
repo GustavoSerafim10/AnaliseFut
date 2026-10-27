@@ -3,8 +3,12 @@ import { rascunhoNovo } from '../src/estado';
 import {
   apurar,
   balanco,
+  calibracao,
+  clvDe,
   exportarJson,
   importarJson,
+  marco,
+  travasDoHistorico,
   type EntradaHistorico,
   type ResumoAnalise,
 } from '../src/historico';
@@ -84,5 +88,47 @@ describe('histórico (Fase 4)', () => {
       erro: '1 entrada(s) inválida(s): nada foi importado',
     });
     expect('erro' in importarJson('[]', [])).toBe(true);
+  });
+});
+
+describe('histórico na V4.0', () => {
+  const comStake = (id: string, lucroPlacar: [number, number], stakeValor: number) => {
+    const e = entrada(id, 'BET', 2.0, lucroPlacar);
+    e.resumo.entrada!.stakeValor = stakeValor;
+    e.resumo.entrada!.estrategia = 'S1';
+    e.salvoEm = `2026-10-${id}T15:00:00-03:00`;
+    e.resultado!.registradoEm = `2026-10-${id}T22:00:00-03:00`;
+    return e;
+  };
+  it('travas da banca saem das apostas registradas', () => {
+    // duas derrotas de R$ 120 numa banca de R$ 1000: drawdown 24% → Kelly pela metade
+    const t = travasDoHistorico(
+      [comStake('20', [0, 1], 120), comStake('21', [0, 2], 120)],
+      1000,
+      '2026-10-22T10:00:00-03:00',
+    );
+    expect(t.bancaAtual).toBe(760);
+    expect(t.fatorKelly).toBe(0.5);
+  });
+  it('CLV contra o fechamento justo quando vêm os outros lados', () => {
+    const e = entrada('20', 'BET', 2.1, [2, 0]);
+    e.resultado!.oddFechamento = 1.95;
+    e.resultado!.fechamentoOutros = [1.95];
+    expect(clvDe(e)).toBeCloseTo(0.05, 10);
+  });
+  it('Brier do modelo × mercado em todo jogo com placar', () => {
+    const e = entrada('20', 'NO_BET', 2.0, [2, 0]);
+    e.resumo.previsao = {
+      modelo1x2: [0.5, 0.3, 0.2],
+      mercado1x2: [0.7, 0.2, 0.1],
+      over25Modelo: 0.4,
+      over25Mercado: 0.5,
+    };
+    const c = calibracao([e, entrada('21', 'NO_BET', 2.0)]);
+    expect(c.jogos).toBe(1);
+    expect(c.brier1x2!.mercado).toBeLessThan(c.brier1x2!.modelo);
+  });
+  it('marcos: cedo demais antes de 100 apostas com fechamento', () => {
+    expect(marco(balanco([]))).toContain('cedo demais');
   });
 });

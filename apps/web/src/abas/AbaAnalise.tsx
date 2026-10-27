@@ -2,6 +2,7 @@ import { NOME_ESTATISTICA, NOMES_TESE, relatorioEmTexto, type ResultadoAnalise }
 import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
+import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { PropsAba } from './tipos';
 
@@ -65,7 +66,9 @@ export function AbaAnalise({
   const setRt = (m: Partial<Rascunho['redTeam']>) =>
     setR((x) => ({ ...x, redTeam: { ...x.redTeam, ...m } }));
   const pedeRedTeam =
-    res?.gatilho === 'completar o red team' || rt.argumentos.some((a) => a.trim());
+    res?.gatilho === 'completar o red team' ||
+    d.v4?.gatilho === 'completar o red team' ||
+    rt.argumentos.some((a) => a.trim());
 
   const campos = CAMPOS_STATS.filter((c) => d.tabela[c.campo] || ESSENCIAIS.includes(c.campo));
 
@@ -119,10 +122,21 @@ export function AbaAnalise({
         ))}
       </div>
 
-      {d.pendencias.length > 0 && (
+      {d.pendenciasV4.length > 0 && (
         <div className="caixa alerta">
           <strong>Falta para analisar:</strong>
           <ul>
+            {d.pendenciasV4.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {!d.pendenciasV4.length && d.pendencias.length > 0 && (
+        <div className="caixa">
+          <strong>Motor de apoio (V3.3) desligado:</strong> sem ele não há filtro do modelo, preço
+          de nicho (R3) nem previsão.
+          <ul className="miudo">
             {d.pendencias.map((p) => (
               <li key={p}>{p}</li>
             ))}
@@ -130,47 +144,85 @@ export function AbaAnalise({
         </div>
       )}
 
+      <PainelV4 r={r} setR={setR} d={d} />
+      {(d.v4 || res) && (
+        <>
+          <div className="linha-acoes">
+            <button
+              className="primario"
+              onClick={() => {
+                onSalvar();
+                setCopiado(null);
+                setSalvo(true);
+              }}
+            >
+              💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
+            </button>
+          </div>
+          {salvo && (
+            <p className="dica">
+              Salvo ✓ Depois do jogo, registre o placar e o fechamento da referência na aba
+              Histórico.
+            </p>
+          )}
+          <label>
+            Banca atual (R$), usada se a banca separada não estiver definida no Histórico
+            <input
+              inputMode="decimal"
+              value={r.banca}
+              onChange={(e) => setR((x) => ({ ...x, banca: e.target.value }))}
+            />
+          </label>
+        </>
+      )}
+
       {res && rel && (
         <>
-          <div className={`decisao ${CLASSE[res.decisao]}`}>
-            <div className="rotulo">{res.rotulo}</div>
-            <p>{rel.resumo}</p>
-            {res.gatilho && <div className="gatilho">Gatilho: {res.gatilho}</div>}
-            <div className="miudo">
-              DQ {res.dq.efetiva} · Confidence {res.confianca} · Risco {res.risco}
+          <h3>Motor de apoio (V3.3)</h3>
+          <details className="caixa">
+            <summary>
+              Decisão do modelo sozinho: {res.rotulo} · DQ {res.dq.efetiva}
+            </summary>
+            <div className={`decisao ${CLASSE[res.decisao]}`}>
+              <div className="rotulo">{res.rotulo}</div>
+              <p>{rel.resumo}</p>
+              {res.gatilho && <div className="gatilho">Gatilho: {res.gatilho}</div>}
+              <div className="miudo">
+                DQ {res.dq.efetiva} · Confidence {res.confianca} · Risco {res.risco}
+              </div>
             </div>
-          </div>
 
-          {res.melhor && (
-            <div className="caixa">
-              <h3>Melhor entrada encontrada</h3>
-              <p>
-                <strong>{res.melhor.descricao.replace('Ganha se: ', '')}</strong>
-              </p>
-              <dl className="numeros">
-                <dt>Odd</dt>
-                <dd>
-                  {res.melhor.melhorOdd} ({res.melhor.casaMelhorOdd})
-                </dd>
-                <dt>Odd justa</dt>
-                <dd>{dec(res.melhor.oddJusta)}</dd>
-                <dt>Odd mínima p/ entrar</dt>
-                <dd>{dec(res.melhor.priceGate?.oddMinima)}</dd>
-                <dt>Probabilidade (final)</dt>
-                <dd>{pct(res.melhor.pFinal)}</dd>
-                <dt>EV</dt>
-                <dd>
-                  {pct(res.melhor.ev)} (mínimo {pct(res.melhor.evMinimo)})
-                </dd>
-                <dt>Stake</dt>
-                <dd>
-                  {res.melhor.stake
-                    ? `${pct(res.melhor.stake.fracaoBanca, 2)} da banca${res.melhor.stake.valor !== undefined ? ` = R$ ${res.melhor.stake.valor.toFixed(2)}` : ''}`
-                    : '—'}
-                </dd>
-              </dl>
-            </div>
-          )}
+            {res.melhor && (
+              <div className="caixa">
+                <h3>Melhor entrada encontrada</h3>
+                <p>
+                  <strong>{res.melhor.descricao.replace('Ganha se: ', '')}</strong>
+                </p>
+                <dl className="numeros">
+                  <dt>Odd</dt>
+                  <dd>
+                    {res.melhor.melhorOdd} ({res.melhor.casaMelhorOdd})
+                  </dd>
+                  <dt>Odd justa</dt>
+                  <dd>{dec(res.melhor.oddJusta)}</dd>
+                  <dt>Odd mínima p/ entrar</dt>
+                  <dd>{dec(res.melhor.priceGate?.oddMinima)}</dd>
+                  <dt>Probabilidade (final)</dt>
+                  <dd>{pct(res.melhor.pFinal)}</dd>
+                  <dt>EV</dt>
+                  <dd>
+                    {pct(res.melhor.ev)} (mínimo {pct(res.melhor.evMinimo)})
+                  </dd>
+                  <dt>Stake</dt>
+                  <dd>
+                    {res.melhor.stake
+                      ? `${pct(res.melhor.stake.fracaoBanca, 2)} da banca${res.melhor.stake.valor !== undefined ? ` = R$ ${res.melhor.stake.valor.toFixed(2)}` : ''}`
+                      : '—'}
+                  </dd>
+                </dl>
+              </div>
+            )}
+          </details>
 
           {pedeRedTeam && (
             <div className="caixa alerta">
@@ -238,35 +290,13 @@ export function AbaAnalise({
             >
               🤖 Copiar para o Claude
             </button>
-            <button
-              onClick={() => {
-                onSalvar();
-                setCopiado(null);
-                setSalvo(true);
-              }}
-            >
-              💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
-            </button>
           </div>
-          {salvo && (
-            <p className="dica">
-              Salvo ✓ Depois do jogo, registre o placar na aba Histórico para apurar.
-            </p>
-          )}
           {copiado && (
             <p className="dica">
               {copiado} Cole no chat do Claude para uma análise complementar (a decisão continua
               sendo a do motor).
             </p>
           )}
-          <label>
-            Banca atual (R$), para calcular o valor da stake
-            <input
-              inputMode="decimal"
-              value={r.banca}
-              onChange={(e) => setR((x) => ({ ...x, banca: e.target.value }))}
-            />
-          </label>
         </>
       )}
 

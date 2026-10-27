@@ -4,15 +4,19 @@ import { AbaFlashscore } from './abas/AbaFlashscore';
 import { AbaHistorico } from './abas/AbaHistorico';
 import { AbaJogo } from './abas/AbaJogo';
 import { AbaOdds } from './abas/AbaOdds';
+import { AbaPromocoes } from './abas/AbaPromocoes';
 import { AbaStats } from './abas/AbaStats';
 import { AbaTabela } from './abas/AbaTabela';
 import { AbaUltimas } from './abas/AbaUltimas';
 import { derivar } from './dados';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
 import {
+  carregarBancaInicial,
   carregarHistorico,
+  gravarBancaInicial,
   gravarHistorico,
   salvarNoHistorico,
+  travasDoHistorico,
   type EntradaHistorico,
 } from './historico';
 
@@ -26,7 +30,8 @@ type Aba =
         | 'tabela'
         | 'ultimas'
         | 'analise'
-        | 'historico';
+        | 'historico'
+        | 'promocoes';
     }
   | { id: 'odds'; casa: string };
 
@@ -36,8 +41,24 @@ export function App() {
   const [r, setR] = useState<Rascunho>(carregarRascunho);
   const [aba, setAba] = useState<Aba>({ id: 'jogo' });
   useEffect(() => salvarRascunho(r), [r]);
-  const d = useMemo(() => derivar(r), [r]);
   const [historico, setHistoricoState] = useState<EntradaHistorico[]>(carregarHistorico);
+  const [bancaInicial, setBancaInicialState] = useState<number | null>(carregarBancaInicial);
+  const setBancaInicial = (v: number | null) => {
+    setBancaInicialState(v);
+    gravarBancaInicial(v);
+  };
+  // travas da banca (V4.0 seção 6) pelas apostas registradas, sem contar a análise aberta
+  const travas = useMemo(
+    () =>
+      bancaInicial
+        ? travasDoHistorico(
+            historico.filter((e) => e.id !== r.idHistorico),
+            bancaInicial,
+          )
+        : undefined,
+    [historico, bancaInicial, r.idHistorico],
+  );
+  const d = useMemo(() => derivar(r, travas), [r, travas]);
   const [avisoHistorico, setAvisoHistorico] = useState<string | null>(null);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);
@@ -102,6 +123,7 @@ export function App() {
           rotulo: 'Histórico',
           marca: historico.length ? String(historico.length) : undefined,
         },
+        { aba: { id: 'promocoes' }, rotulo: 'Promoções' },
       ],
     },
   ];
@@ -126,7 +148,7 @@ export function App() {
       <header className="topo">
         <div>
           <strong>
-            {r.jogo.casa && r.jogo.fora ? `${r.jogo.casa} × ${r.jogo.fora}` : 'Pricing Engine V3.3'}
+            {r.jogo.casa && r.jogo.fora ? `${r.jogo.casa} × ${r.jogo.fora}` : 'Pricing Engine V4.0'}
           </strong>
           <span className="miudo"> · NO BET é o padrão</span>
         </div>
@@ -178,8 +200,12 @@ export function App() {
             historico={historico}
             setHistorico={setHistorico}
             abrir={abrirDoHistorico}
+            bancaInicial={bancaInicial}
+            setBancaInicial={setBancaInicial}
+            travas={travas ?? null}
           />
         )}
+        {aba.id === 'promocoes' && <AbaPromocoes {...props} />}
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
       </main>
     </>

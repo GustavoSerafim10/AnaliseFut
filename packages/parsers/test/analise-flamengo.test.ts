@@ -4,6 +4,7 @@
  */
 import {
   analisarJogo,
+  analisarV4,
   avaliarDQ,
   calcularLambdaContagem,
   calcularLambdaModelo,
@@ -132,5 +133,29 @@ describe('Flamengo × Atlético-MG — análise completa com prints reais', () =
         (x) => x.chave.startsWith('escanteios_total') && x.motivo.includes('sem estatísticas'),
       ),
     ).toBe(true);
+  });
+  it('V4.0 com só a 1win: mercado principal fica R4 (sem referência), cartões como nicho R3', () => {
+    const v4 = analisarV4({
+      jogo: { ...jogo, inicio: '2026-10-26T20:00:00-03:00' },
+      agora: '2026-10-26T16:30:00-03:00',
+      linhas: odds as LinhaOdd[],
+      ligaPrincipal: true,
+      apoio: {
+        lambdas: resultado.lambdaModelo.ajustado,
+        contagens: { cartoes: cartoes.lambdas },
+        dq: resultado.dq.efetiva,
+        w: resultado.w,
+        jogosMin: Math.min(mc.stats!.jogos, mf.stats!.jogos),
+        priorNeutro: true,
+      },
+      banca: 1000,
+    });
+    console.log(`\nV4.0: ${v4.rotulo} · ${v4.motivos.join(' · ')}`);
+    expect(v4.referencia.nivel).toBe('R3');
+    expect(v4.avaliadas.every((a) => a.nivelMercado === 3)).toBe(true);
+    expect(v4.descartados.some((d) => d.motivo.includes('liga principal sem referência'))).toBe(
+      true,
+    );
+    expect(v4.decisao).not.toBe('BET');
   });
 });

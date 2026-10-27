@@ -105,7 +105,15 @@ export function mediana(xs: number[]): number {
 
 const nomeCasa = (c: string) => c.trim().toLowerCase();
 
-export function precificar(linhas: LinhaOdd[]): ResultadoPrecificacao {
+export interface OpcoesPrecificacao {
+  /** de-vig dos mercados de 3 resultados (V4.0: 'shin'); padrão = regra da seção 11 */
+  devig3?: MetodoDevig;
+}
+
+export function precificar(
+  linhas: LinhaOdd[],
+  opcoes: OpcoesPrecificacao = {},
+): ResultadoPrecificacao {
   const descartes: DescartePreco[] = [];
   const grupos = new Map<string, Map<string, LinhaOdd>>();
 
@@ -164,7 +172,7 @@ export function precificar(linhas: LinhaOdd[]): ResultadoPrecificacao {
       descartarTodos('mercado incompleto: soma das probabilidades < 100%');
       continue;
     }
-    const r = removerMargem(odds);
+    const r = removerMargem(odds, odds.length === 3 ? opcoes.devig3 : undefined);
     ls.forEach((l, i) => add(l, { pJusta: r.probs[i], margem: r.margem, metodo: r.metodo }));
     if (m === '1X2') {
       const mapa: Record<string, number> = {};

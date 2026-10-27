@@ -3,6 +3,7 @@
  * pega bateu a de fechamento (CLV). Usa os MESMOS liquidadores do modelo.
  */
 import { NOME_ESTATISTICA } from './contagens';
+import { removerMargem } from './devig';
 import { criarLiquidador } from './mercados';
 import type { LinhaOdd } from './tipos';
 
@@ -85,4 +86,30 @@ export function apurarAposta(l: LinhaOdd, p: PlacarFinal): Apuracao {
 /** CLV: quanto a odd pega supera a de fechamento (> 0 = bateu o mercado). */
 export function clv(oddPega: number, oddFechamento: number): number {
   return oddPega / oddFechamento - 1;
+}
+
+/**
+ * CLV da V4.0: contra a odd de fechamento JUSTA da referência. Com as odds dos outros
+ * lados do mercado no fechamento, tira a margem (Shin em 3 lados, regra padrão em 2);
+ * sem elas, usa a odd crua (CLV subestimado pela margem).
+ */
+export function clvJusto(
+  oddPega: number,
+  fechamentoLado: number,
+  fechamentoOutros: number[] = [],
+): { clv: number; oddJustaFechamento: number; semMargem: boolean } {
+  if (!fechamentoOutros.length)
+    return {
+      clv: clv(oddPega, fechamentoLado),
+      oddJustaFechamento: fechamentoLado,
+      semMargem: false,
+    };
+  const odds = [fechamentoLado, ...fechamentoOutros];
+  const p = removerMargem(odds, odds.length === 3 ? 'shin' : undefined).probs[0];
+  return { clv: oddPega * p - 1, oddJustaFechamento: 1 / p, semMargem: true };
+}
+
+/** Brier de uma previsão de N resultados (soma dos quadrados; menor = melhor). */
+export function brier(probs: number[], indiceOcorrido: number): number {
+  return probs.reduce((s, p, i) => s + (p - (i === indiceOcorrido ? 1 : 0)) ** 2, 0);
 }
