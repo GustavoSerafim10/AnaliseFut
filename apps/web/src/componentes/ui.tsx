@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-const CAMINHOS: Record<string, ReactNode> = {
+const CAMINHOS = {
   bola: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -76,7 +76,11 @@ const CAMINHOS: Record<string, ReactNode> = {
       <path d="M12 11v6 M12 7.5h.01" />
     </>
   ),
-};
+  cerebro: (
+    <path d="M9 4a3 3 0 00-3 3 3 3 0 00-2 5 3 3 0 002 5 3 3 0 003 3h1V4z M15 4a3 3 0 013 3 3 3 0 012 5 3 3 0 01-2 5 3 3 0 01-3 3h-1V4z M10 9H8 M10 14H7 M14 9h2 M14 14h3" />
+  ),
+  mais: <path d="M12 5v14 M5 12h14" />,
+} satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof CAMINHOS;
 

@@ -49,25 +49,6 @@ type Aba =
 
 const chave = (a: Aba) => (a.id === 'odds' ? `odds:${a.casa}` : a.id);
 
-const ICONE_ABA: Partial<Record<Aba['id'], NomeIcone>> = {
-  jogo: 'bola',
-  sofascore: 'barras',
-  superscore: 'barras',
-  flashscore: 'barras',
-  tabela: 'barras',
-  ultimas: 'barras',
-  odds: 'mercado',
-  analise: 'alvo',
-  historico: 'historico',
-  promocoes: 'presente',
-};
-
-const DECISAO_CLASSE: Record<string, string> = {
-  BET: 'bet',
-  WATCHLIST: 'watch',
-  INVESTIGAR: 'investigar',
-};
-
 export function App() {
   // #demo: jogo de exemplo, sem tocar no rascunho nem no histórico do aparelho
   const [demo] = useState(ehExemplo);
@@ -173,6 +154,31 @@ export function App() {
     },
   ];
 
+  // seções do topo: Partida · Estatísticas · Mercado · Análise · Histórico · Promoções
+  const secoes: {
+    id: string;
+    rotulo: string;
+    icone: NomeIcone;
+    marca?: string;
+    abas: { aba: Aba; rotulo: string; marca?: string }[];
+  }[] = [
+    { id: 'partida', rotulo: 'Partida', icone: 'bola', abas: grupos[0].abas },
+    { id: 'estatisticas', rotulo: 'Estatísticas', icone: 'barras', abas: grupos[1].abas },
+    {
+      id: 'mercado',
+      rotulo: 'Mercado',
+      icone: 'mercado',
+      marca: r.odds.length ? String(r.odds.length) : undefined,
+      abas: grupos[2].abas,
+    },
+    { id: 'analise', rotulo: 'Análise', icone: 'modelo', abas: [grupos[3].abas[0]] },
+    { id: 'historico', rotulo: 'Histórico', icone: 'historico', abas: [grupos[3].abas[1]] },
+    { id: 'promocoes', rotulo: 'Promoções', icone: 'presente', abas: [grupos[3].abas[2]] },
+  ];
+  const secaoAtiva =
+    secoes.find((sec) => sec.abas.some((x) => chave(x.aba) === chave(aba))) ??
+    (aba.id === 'odds' ? secoes[2] : undefined);
+
   function novaCasa() {
     const nome = prompt('Nome da casa de apostas (ex.: Bet365, Betano, Superbet):')?.trim();
     if (!nome) return;
@@ -223,7 +229,6 @@ export function App() {
     setGaleria,
     verLance: () => setVerLance(true),
   };
-  const decisao = d.v4?.decisao;
   const temJogo = !!(r.jogo.casa || r.jogo.fora);
   const mostraMatchCenter = temJogo && aba.id !== 'historico' && aba.id !== 'promocoes';
   return (
@@ -240,20 +245,53 @@ export function App() {
       )}
       <header className="topo">
         <div className="marca-topo">
-          <svg className="logo" viewBox="0 0 40 40" aria-hidden="true">
-            <path d="M6 30 L16 8 H34 L30 17 H22 L18 26 H26 L24 31 H10 Z" />
+          <svg className="logo" viewBox="0 0 48 40" aria-hidden="true">
+            <path className="logo-a" d="M10 4 H40 L36 14 H20 L12 36 H2 Z" />
+            <path className="logo-b" d="M22 17 H44 L38 30 H28 L25 38 H16 Z" />
           </svg>
           <div className="nome-site">Pricing Engine</div>
           <span className="pilula-versao">PRÉ-LIVE • V4.0</span>
-          {decisao && (
-            <span className={`selo ${DECISAO_CLASSE[decisao] ?? 'nobet'}`}>
-              {decisao.replace('_', ' ')}
-            </span>
-          )}
         </div>
-        <button className="discreto" onClick={novaAnalise}>
-          Nova análise
-        </button>
+        <nav className="nav-principal" aria-label="Seções">
+          {secoes.map((s) => (
+            <button
+              key={s.id}
+              className={s.id === secaoAtiva?.id ? 'ativo' : ''}
+              aria-current={s.id === secaoAtiva?.id ? 'page' : undefined}
+              onClick={() => s.abas[0] && setAba(s.abas[0].aba)}
+            >
+              <Icone nome={s.icone} tamanho={18} />
+              {s.rotulo}
+              {s.marca && <span className="marca">{s.marca}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="topo-direita">
+          <div className="selo-marca">
+            <Icone nome="cerebro" tamanho={30} />
+            <div>
+              <strong>Inteligência</strong>
+              <strong>de dados esportivos</strong>
+              <small>Mais dados. Melhores decisões.</small>
+            </div>
+          </div>
+          <button
+            className="icone-botao"
+            title="Nova análise"
+            aria-label="Nova análise"
+            onClick={novaAnalise}
+          >
+            <Icone nome="mais" tamanho={18} />
+          </button>
+          <button
+            className="icone-botao"
+            title="Parâmetros do jogo e do modelo"
+            aria-label="Parâmetros do jogo e do modelo"
+            onClick={() => setAba({ id: 'jogo' })}
+          >
+            <Icone nome="engrenagem" tamanho={18} />
+          </button>
+        </div>
       </header>
       {demo && (
         <div className="faixa-demo">
@@ -263,30 +301,26 @@ export function App() {
           </button>
         </div>
       )}
-      <nav className="abas" aria-label="Seções">
-        {grupos.map((g, gi) => (
-          <div key={gi} className="grupo-abas">
-            {g.titulo && <span className="titulo-grupo">{g.titulo}</span>}
-            {g.abas.map(({ aba: a, rotulo, marca }) => (
-              <button
-                key={chave(a)}
-                className={chave(a) === chave(aba) ? 'ativo' : ''}
-                aria-current={chave(a) === chave(aba) ? 'page' : undefined}
-                onClick={() => setAba(a)}
-              >
-                {ICONE_ABA[a.id] && <Icone nome={ICONE_ABA[a.id]!} tamanho={16} />}
-                {rotulo}
-                {marca && <span className="marca">{marca}</span>}
-              </button>
-            ))}
-            {g.titulo === 'Odds' && (
-              <button className="discreto" onClick={novaCasa}>
-                + casa
-              </button>
-            )}
-          </div>
-        ))}
-      </nav>
+      {secaoAtiva && (secaoAtiva.abas.length > 1 || secaoAtiva.id === 'mercado') && (
+        <nav className="sub-abas" aria-label={secaoAtiva.rotulo}>
+          {secaoAtiva.abas.map(({ aba: a, rotulo, marca }) => (
+            <button
+              key={chave(a)}
+              className={chave(a) === chave(aba) ? 'ativo' : ''}
+              aria-current={chave(a) === chave(aba) ? 'page' : undefined}
+              onClick={() => setAba(a)}
+            >
+              {rotulo}
+              {marca && <span className="marca">{marca}</span>}
+            </button>
+          ))}
+          {secaoAtiva.id === 'mercado' && (
+            <button className="discreto" onClick={novaCasa}>
+              + casa
+            </button>
+          )}
+        </nav>
+      )}
       {mostraMatchCenter && <MatchCenter r={r} d={d} />}
       <main key={chave(aba)} className="conteudo-aba">
         {aba.id === 'jogo' && <AbaJogo {...props} />}

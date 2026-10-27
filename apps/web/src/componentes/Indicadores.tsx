@@ -143,16 +143,6 @@ export function Indicadores({ d }: { d: Derivado }) {
           ? 'estatísticas consolidadas'
           : 'sem estatísticas'}
       </Card>
-      <Card
-        icone="alvo"
-        titulo="Status"
-        destaque={d.v4 ? d.v4.decisao.replace('_', ' ') : 'pendente'}
-        tom={d.v4?.decisao === 'BET' ? 'ok' : 'amarelo'}
-      >
-        {d.pendenciasV4.length
-          ? `${d.pendenciasV4.length} pendência(s)`
-          : `${d.v4?.avaliadas.length ?? 0} mercados avaliados`}
-      </Card>
     </div>
   );
 }

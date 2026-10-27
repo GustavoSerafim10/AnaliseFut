@@ -84,21 +84,41 @@ export function CentroDecisao({ d }: { d: Derivado }) {
         <Icone nome="alvo" /> Decisão final
         <span className="painel-sub">{NOMES_REFERENCIA[v.referencia.nivel]}</span>
       </div>
-      <div className="decisao-corpo">
-        <div className="decisao-selo" aria-hidden="true">
-          <Icone nome={e.icone} tamanho={56} />
+      <div className="decisao-duas">
+        <div className="decisao-corpo">
+          <div className="decisao-selo" aria-hidden="true">
+            <Icone nome={e.icone} tamanho={56} />
+          </div>
+          <div className="decisao-texto">
+            <div className="decisao-titulo">{e.titulo}</div>
+            <div className="decisao-frase">{e.frase}</div>
+            {v.gatilho && <div className="decisao-gatilho">{v.gatilho}</div>}
+          </div>
         </div>
-        <div className="decisao-texto">
-          <div className="decisao-titulo">{e.titulo}</div>
-          <div className="decisao-frase">{e.frase}</div>
-          {v.gatilho && <div className="decisao-gatilho">{v.gatilho}</div>}
+        <div className="decisao-analise">
+          <div className="painel-sub-titulo">
+            <span className="meia-lua" aria-hidden="true" /> Análise
+          </div>
+          <ul className="decisao-motivos">
+            {v.motivos.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+          <div className="decisao-nota">
+            <Icone nome="info" tamanho={15} />
+            {v.decisao === 'NO_BET'
+              ? 'Paciência também é estratégia.'
+              : v.decisao === 'BET'
+                ? 'Só entre se a odd mínima segurar.'
+                : 'Conferir antes de qualquer entrada.'}
+          </div>
         </div>
       </div>
 
       {m && (
         <dl className="decisao-numeros">
           <div className="dn-largo">
-            <dt>Mercado</dt>
+            <dt>Mercado avaliado</dt>
             <dd>{m.descricao.replace('Ganha se: ', '')}</dd>
           </div>
           <div>
@@ -168,22 +188,6 @@ export function CentroDecisao({ d }: { d: Derivado }) {
           )}
         </dl>
       )}
-
-      <div className="decisao-analise">
-        <div className="painel-sub-titulo">
-          <Icone nome="info" tamanho={15} /> Justificativa
-        </div>
-        <ul className="decisao-motivos">
-          {v.motivos.map((x) => (
-            <li key={x}>{x}</li>
-          ))}
-        </ul>
-        {v.decisao === 'NO_BET' && (
-          <div className="decisao-nota">
-            <Icone nome="escudo" tamanho={15} /> Paciência também é estratégia: NO BET é o padrão.
-          </div>
-        )}
-      </div>
 
       {alertas.length > 0 && (
         <ul className="decisao-alertas">

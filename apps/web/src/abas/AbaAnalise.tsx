@@ -113,7 +113,19 @@ export function AbaAnalise({
 
   return (
     <section className="passo">
-      <h2>Análise</h2>
+      <Indicadores d={d} />
+      <div className="grade-analise">
+        <div className="coluna">
+          <CentroDecisao d={d} />
+          <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
+        </div>
+        <div className="coluna">
+          <ComparativoOdds d={d} />
+          <Auditoria r={r} d={d} />
+        </div>
+      </div>
+
+      <h3>Situação dos dados</h3>
       <p className="dica">
         Esta aba se atualiza sozinha: cada print, texto ou correção nas outras abas recalcula tudo
         na hora.
@@ -125,18 +137,6 @@ export function AbaAnalise({
             {s.detalhe && <small> {s.detalhe}</small>}
           </span>
         ))}
-      </div>
-
-      <Indicadores d={d} />
-      <div className="grade-analise">
-        <div className="coluna">
-          <CentroDecisao d={d} />
-          <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
-        </div>
-        <div className="coluna">
-          <ComparativoOdds d={d} />
-          <Auditoria r={r} d={d} />
-        </div>
       </div>
 
       {!d.pendenciasV4.length && d.pendencias.length > 0 && (
