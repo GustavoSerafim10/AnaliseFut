@@ -8,7 +8,16 @@ import { AbaPromocoes } from './abas/AbaPromocoes';
 import { AbaStats } from './abas/AbaStats';
 import { AbaTabela } from './abas/AbaTabela';
 import { AbaUltimas } from './abas/AbaUltimas';
+import { Estadio } from './componentes/Estadio';
+import { GaleriaFundo } from './componentes/GaleriaFundo';
 import { Trio } from './componentes/Trio';
+import {
+  carregarFigurinhas,
+  carregarGaleria,
+  gravarFigurinhas,
+  gravarGaleria,
+  type Figurinhas,
+} from './figurinhas';
 import { derivar } from './dados';
 import { abaDoExemplo, ehExemplo, rascunhoExemplo } from './exemplo';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
@@ -164,10 +173,37 @@ export function App() {
     }
   }
 
-  const props = { r, setR, d, abrirExemplo: () => irPara('#demo/analise') };
+  const [figurinhas, setFigurinhasState] = useState<Figurinhas>(carregarFigurinhas);
+  const setFigurinhas = (f: Figurinhas) => {
+    setFigurinhasState(f);
+    if (!gravarFigurinhas(f))
+      alert('Não consegui guardar a foto neste aparelho (armazenamento cheio ou aba privada).');
+  };
+
+  const [galeria, setGaleriaState] = useState<string[]>(carregarGaleria);
+  const setGaleria = (g: string[]) => {
+    if (!gravarGaleria(g)) {
+      alert('Não coube no armazenamento deste aparelho: tire alguma foto da galeria.');
+      return;
+    }
+    setGaleriaState(g);
+  };
+
+  const props = {
+    r,
+    setR,
+    d,
+    abrirExemplo: () => irPara('#demo/analise'),
+    figurinhas,
+    setFigurinhas,
+    galeria,
+    setGaleria,
+  };
   const decisao = d.v4?.decisao;
   return (
     <>
+      <GaleriaFundo fotos={galeria} />
+      <Estadio fotos={figurinhas} comGaleria={galeria.length > 0} />
       <header className="topo">
         <div className="marca-topo">
           <Trio tamanho={30} />

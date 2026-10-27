@@ -1,3 +1,4 @@
+import { EditorFigurinhas } from '../componentes/Figurinhas';
 import { Trio } from '../componentes/Trio';
 import type { Rascunho } from '../estado';
 import type { PropsAba } from './tipos';
@@ -30,7 +31,15 @@ const OPCOES: [keyof Rascunho['config'], string, string][] = [
   ],
 ];
 
-export function AbaJogo({ r, setR, abrirExemplo }: PropsAba) {
+export function AbaJogo({
+  r,
+  setR,
+  abrirExemplo,
+  figurinhas,
+  setFigurinhas,
+  galeria,
+  setGaleria,
+}: PropsAba) {
   const jogo = (campo: keyof Rascunho['jogo'], v: string) =>
     setR((x) => ({ ...x, jogo: { ...x.jogo, [campo]: v } }));
   const config = <K extends keyof Rascunho['config']>(campo: K, v: Rascunho['config'][K]) =>
@@ -53,6 +62,14 @@ export function AbaJogo({ r, setR, abrirExemplo }: PropsAba) {
             </button>
           )}
         </div>
+      )}
+      {figurinhas && setFigurinhas && galeria && setGaleria && (
+        <EditorFigurinhas
+          figurinhas={figurinhas}
+          setFigurinhas={setFigurinhas}
+          galeria={galeria}
+          setGaleria={setGaleria}
+        />
       )}
       <h2>Jogo</h2>
       <div className="grade2">

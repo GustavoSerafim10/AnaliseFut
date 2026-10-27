@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { Derivado } from '../dados';
 import type { Leitura, Rascunho } from '../estado';
+import type { Figurinhas } from '../figurinhas';
 
 export interface PropsAba {
   r: Rascunho;
@@ -8,6 +9,11 @@ export interface PropsAba {
   d: Derivado;
   /** abre o jogo de exemplo (#demo) */
   abrirExemplo?: () => void;
+  /** fotos escolhidas no aparelho para os três jogadores (só locais) */
+  figurinhas?: Figurinhas;
+  setFigurinhas?: (f: Figurinhas) => void;
+  galeria?: string[];
+  setGaleria?: (g: string[]) => void;
 }
 
 /** Helpers para adicionar/remover textos de prints de um grupo. */

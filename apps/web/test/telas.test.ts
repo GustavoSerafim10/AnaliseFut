@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { AbaAnalise } from '../src/abas/AbaAnalise';
 import { AbaHistorico } from '../src/abas/AbaHistorico';
 import { AbaPromocoes } from '../src/abas/AbaPromocoes';
+import { Estadio } from '../src/componentes/Estadio';
+import { EditorFigurinhas } from '../src/componentes/Figurinhas';
 import { derivar } from '../src/dados';
 import { rascunhoExemplo } from '../src/exemplo';
 import { rascunhoNovo, type Rascunho } from '../src/estado';
@@ -77,5 +79,29 @@ describe('jogo de exemplo (#demo)', () => {
     expect(d.v4?.decisao).toBe('BET');
     expect(d.v4?.melhor?.casaMelhorOdd).toBe('Superbet');
     expect(d.v4?.referencia.nivel).toBe('R1');
+  });
+});
+
+describe('estádio animado e figurinhas', () => {
+  it('rosto vira a foto escolhida no aparelho; sem foto, cabeça estilizada', () => {
+    const foto = 'data:image/jpeg;base64,AAAA';
+    const com = renderToString(
+      createElement(Estadio, { fotos: [foto, null, null], comGaleria: true }),
+    );
+    expect(com).toContain(foto);
+    expect(com).toContain('com-galeria');
+    expect(renderToString(createElement(Estadio, {}))).not.toContain('<image');
+  });
+  it('editor de figurinhas renderiza os três espaços e a galeria', () => {
+    const html = renderToString(
+      createElement(EditorFigurinhas, {
+        figurinhas: [null, null, null],
+        setFigurinhas: nada,
+        galeria: [],
+        setGaleria: nada,
+      }),
+    );
+    expect(html).toContain('NEY');
+    expect(html).toContain('Galeria de fundo');
   });
 });

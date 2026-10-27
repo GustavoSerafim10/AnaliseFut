@@ -1,6 +1,6 @@
 /* =========================================================================
    Tema "Camisa 10": canarinho do R10, blaugrana do Ney, celeste do Messi.
-   Escuro = noite de estádio · claro = tarde de gramado. Cores só por token.
+   Sempre escuro: noite de estádio, com o lance animado no fundo. Cores só por token.
    ========================================================================= */
 :root {
   --canarinho: #ffd60a;
@@ -10,51 +10,24 @@
   --celeste: #75aadb;
   --ouro: #e0a800;
 
-  --fundo: #f2f6ee;
-  --cartao: #ffffff;
-  --cartao-2: #f7f9fc;
-  --texto: #10172e;
-  --suave: #5b6683;
-  --borda: #dde3ec;
-  --primaria: #004d98;
-  --sobre-primaria: #ffffff;
-  --destaque: #c98f00;
-  --ok: #0f8a3c;
-  --ok-fundo: #e9f8ee;
-  --alerta: #a86b00;
-  --alerta-fundo: #fff6dc;
-  --erro: #c8102e;
-  --erro-fundo: #fdecee;
-  --azul-fundo: #e8f0fb;
-  --sombra: 0 1px 2px rgba(16, 23, 46, 0.06), 0 6px 18px rgba(16, 23, 46, 0.06);
-  --listra: rgba(0, 156, 59, 0.045);
-  --brilho: rgba(255, 214, 10, 0.18);
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fundo: #090e1d;
-    --cartao: #111a31;
-    --cartao-2: #16213d;
-    --texto: #eef2ff;
-    --suave: #9aa6c4;
-    --borda: #24304f;
-    --primaria: #ffcc29;
-    --sobre-primaria: #1a1300;
-    --destaque: #ffcc29;
-    --ok: #34d17a;
-    --ok-fundo: #0e2a1c;
-    --alerta: #ffb020;
-    --alerta-fundo: #30240a;
-    --erro: #ff6b7a;
-    --erro-fundo: #35121d;
-    --azul-fundo: #10244a;
-    --sombra: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.25);
-    --listra: rgba(255, 255, 255, 0.022);
-    --brilho: rgba(255, 204, 41, 0.12);
-    color-scheme: dark;
-  }
+  --fundo: #1b2438;
+  --cartao: rgba(39, 50, 77, 0.8);
+  --cartao-2: #2c3854;
+  --texto: #f1f4fb;
+  --suave: #b4bed6;
+  --borda: #3d4a6b;
+  --primaria: #ffcc29;
+  --sobre-primaria: #1a1300;
+  --destaque: #ffcc29;
+  --ok: #34d17a;
+  --ok-fundo: #1e3f33;
+  --alerta: #ffb020;
+  --alerta-fundo: #45391c;
+  --erro: #ff7d8a;
+  --erro-fundo: #4a2433;
+  --azul-fundo: #24395f;
+  --sombra: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
 }
 
 * {
@@ -64,10 +37,7 @@
 body {
   margin: 0;
   color: var(--texto);
-  background:
-    radial-gradient(ellipse 90% 380px at 50% -60px, var(--brilho), transparent 70%),
-    repeating-linear-gradient(90deg, var(--listra) 0 64px, transparent 64px 128px), var(--fundo);
-  background-attachment: fixed;
+  background: var(--fundo);
   font:
     15px/1.5 'Inter',
     system-ui,
@@ -797,4 +767,312 @@ dl.numeros dd {
 }
 .rodape p {
   margin: 6px 0 0;
+}
+
+/* ---------- estádio: o lance animado no fundo ---------- */
+.estadio {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 78vh;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.75;
+}
+.estadio .linhas {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 2;
+}
+.estadio .trave {
+  fill: none;
+  stroke: #e9eef7;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.estadio .rede line {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+}
+.estadio .rede {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: rede 6s infinite;
+}
+.estadio .sombra-jogador {
+  fill: rgba(0, 0, 0, 0.45);
+}
+.estadio .perna {
+  stroke: #1b2333;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.estadio .chuteira {
+  stroke: #f5f7fa;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.estadio .calcao {
+  fill: #f3f5f9;
+}
+.estadio .braco {
+  stroke: #5b4636;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.estadio .cabeca {
+  fill: #5b4636;
+}
+.estadio .numero {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 14px;
+}
+.estadio .corpo {
+  animation: corrida 0.5s ease-in-out infinite alternate;
+}
+.estadio .chute {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.estadio .chute-0 {
+  animation: chute-0 6s infinite;
+}
+.estadio .chute-1 {
+  animation: chute-1 6s infinite;
+}
+.estadio .chute-2 {
+  animation: chute-2 6s infinite;
+}
+.estadio .bola {
+  fill: #fff;
+  animation: bola 6s infinite;
+}
+.estadio .bola path {
+  fill: #1b2333;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: gira 0.4s linear infinite;
+}
+.estadio .gol-texto {
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 56px;
+  letter-spacing: 3px;
+  fill: var(--canarinho);
+  opacity: 0;
+  animation: grito 6s infinite;
+}
+
+@keyframes corrida {
+  to {
+    transform: translateY(-2px);
+  }
+}
+/* R10 toca (0–4%) → Ney domina e toca (34–38%) → Messi bate (64–68%) → rede (78–88%) */
+@keyframes bola {
+  0%,
+  4% {
+    transform: translate(186px, 329px);
+    opacity: 1;
+  }
+  24% {
+    transform: translate(399px, 261px);
+  }
+  34% {
+    transform: translate(404px, 263px);
+  }
+  56% {
+    transform: translate(600px, 321px);
+  }
+  66% {
+    transform: translate(604px, 320px);
+  }
+  78% {
+    transform: translate(812px, 272px);
+  }
+  88% {
+    transform: translate(818px, 280px);
+    opacity: 1;
+  }
+  93% {
+    transform: translate(818px, 280px);
+    opacity: 0;
+  }
+  94% {
+    transform: translate(186px, 329px);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(186px, 329px);
+    opacity: 1;
+  }
+}
+@keyframes chute-0 {
+  0%,
+  6%,
+  100% {
+    transform: rotate(0);
+  }
+  2% {
+    transform: rotate(-55deg);
+  }
+}
+@keyframes chute-1 {
+  0%,
+  33%,
+  40%,
+  100% {
+    transform: rotate(0);
+  }
+  36% {
+    transform: rotate(-50deg);
+  }
+}
+@keyframes chute-2 {
+  0%,
+  63%,
+  70%,
+  100% {
+    transform: rotate(0);
+  }
+  66% {
+    transform: rotate(-70deg);
+  }
+}
+@keyframes rede {
+  0%,
+  77%,
+  92%,
+  100% {
+    transform: scaleX(1);
+  }
+  80% {
+    transform: scaleX(1.25);
+  }
+  84% {
+    transform: scaleX(1.1);
+  }
+}
+@keyframes grito {
+  0%,
+  78%,
+  97%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  82%,
+  92% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+}
+@keyframes gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .estadio * {
+    animation: none !important;
+  }
+}
+
+/* cartões deixam o estádio aparecer de leve por trás */
+.caixa,
+.decisao,
+.cartao-odd,
+.vestiario {
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- galeria de fundo (fotos do aparelho) ---------- */
+.galeria-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+.galeria-foto {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 25%;
+  opacity: 0;
+  transform: scale(1.06);
+  transition:
+    opacity 1.6s ease,
+    transform 8s ease-out;
+  filter: saturate(1.05) brightness(0.72);
+}
+.galeria-foto.visivel {
+  opacity: 1;
+  transform: scale(1);
+}
+.estadio.com-galeria .gramado {
+  opacity: 0.45;
+}
+
+/* ---------- editor de figurinhas ---------- */
+.figurinhas .slots {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.figurinhas .slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.foto-slot {
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  border-radius: 50%;
+  border: 3px solid;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--cartao-2);
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 30px;
+  color: var(--suave);
+}
+.foto-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.galeria-miniaturas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.miniatura {
+  position: relative;
+  width: 84px;
+  height: 60px;
+  margin: 0;
+  border-radius: 8px;
+  background: var(--cartao-2) center / cover;
+  border: 1px solid var(--borda);
+}
+.miniatura button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-height: 22px;
+  padding: 0 6px;
+}
+.miniatura.adicionar {
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  color: var(--destaque);
+  border-style: dashed;
+  cursor: pointer;
 }
