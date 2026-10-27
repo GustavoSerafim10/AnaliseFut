@@ -35,8 +35,15 @@ async function copiar(texto: string, aviso: (m: string) => void) {
   }
 }
 
-export function AbaAnalise({ r, setR, d }: PropsAba) {
+export function AbaAnalise({
+  r,
+  setR,
+  d,
+  onSalvar,
+  salvoNoHistorico,
+}: PropsAba & { onSalvar: () => void; salvoNoHistorico: boolean }) {
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [salvo, setSalvo] = useState(false);
   const res = d.resultado;
   const rel = d.relatorio;
   const nome = (t: 'casa' | 'fora') => r.jogo[t] || (t === 'casa' ? 'Mandante' : 'Visitante');
@@ -231,7 +238,21 @@ export function AbaAnalise({ r, setR, d }: PropsAba) {
             >
               🤖 Copiar para o Claude
             </button>
+            <button
+              onClick={() => {
+                onSalvar();
+                setCopiado(null);
+                setSalvo(true);
+              }}
+            >
+              💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
+            </button>
           </div>
+          {salvo && (
+            <p className="dica">
+              Salvo ✓ Depois do jogo, registre o placar na aba Histórico para apurar.
+            </p>
+          )}
           {copiado && (
             <p className="dica">
               {copiado} Cole no chat do Claude para uma análise complementar (a decisão continua

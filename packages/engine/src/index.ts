@@ -16,3 +16,4 @@ export * from './varredura';
 export * from './decisao';
 export * from './dataQuality';
 export * from './relatorio';
+export * from './apuracao';

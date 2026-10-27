@@ -523,3 +523,43 @@ main {
 .situacao .opcional {
   color: var(--suave);
 }
+
+/* histórico */
+dd.positivo {
+  color: var(--ok);
+  font-weight: 600;
+}
+dd.negativo {
+  color: var(--erro);
+  font-weight: 600;
+}
+.selo {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--erro);
+}
+.selo.bet {
+  border-color: var(--ok);
+  background: var(--ok-fundo);
+}
+.selo.watch {
+  border-color: var(--alerta);
+  background: var(--alerta-fundo);
+}
+.selo.investigar {
+  border-color: var(--primaria);
+  background: var(--azul-fundo);
+}
+label.botao {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--borda);
+  background: var(--cartao);
+  cursor: pointer;
+  min-height: 40px;
+}

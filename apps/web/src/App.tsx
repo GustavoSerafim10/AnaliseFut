@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AbaAnalise } from './abas/AbaAnalise';
 import { AbaFlashscore } from './abas/AbaFlashscore';
+import { AbaHistorico } from './abas/AbaHistorico';
 import { AbaJogo } from './abas/AbaJogo';
 import { AbaOdds } from './abas/AbaOdds';
 import { AbaStats } from './abas/AbaStats';
@@ -8,9 +9,25 @@ import { AbaTabela } from './abas/AbaTabela';
 import { AbaUltimas } from './abas/AbaUltimas';
 import { derivar } from './dados';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
+import {
+  carregarHistorico,
+  gravarHistorico,
+  salvarNoHistorico,
+  type EntradaHistorico,
+} from './historico';
 
 type Aba =
-  | { id: 'jogo' | 'sofascore' | 'superscore' | 'flashscore' | 'tabela' | 'ultimas' | 'analise' }
+  | {
+      id:
+        | 'jogo'
+        | 'sofascore'
+        | 'superscore'
+        | 'flashscore'
+        | 'tabela'
+        | 'ultimas'
+        | 'analise'
+        | 'historico';
+    }
   | { id: 'odds'; casa: string };
 
 const chave = (a: Aba) => (a.id === 'odds' ? `odds:${a.casa}` : a.id);
@@ -20,6 +37,29 @@ export function App() {
   const [aba, setAba] = useState<Aba>({ id: 'jogo' });
   useEffect(() => salvarRascunho(r), [r]);
   const d = useMemo(() => derivar(r), [r]);
+  const [historico, setHistoricoState] = useState<EntradaHistorico[]>(carregarHistorico);
+  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(null);
+  const setHistorico = (h: EntradaHistorico[]) => {
+    setHistoricoState(h);
+    setAvisoHistorico(
+      gravarHistorico(h) ? null : 'Não consegui gravar o histórico neste aparelho: exporte o JSON.',
+    );
+  };
+
+  function salvarAnalise() {
+    const { lista, id } = salvarNoHistorico(historico, r, d);
+    setHistorico(lista);
+    setR((x) => ({ ...x, idHistorico: id }));
+  }
+
+  function abrirDoHistorico(salvo: Rascunho) {
+    if (
+      !confirm('Abrir esta análise? O rascunho atual será substituído (salve-o antes se quiser).')
+    )
+      return;
+    setR({ ...rascunhoNovo(), ...salvo, config: { ...rascunhoNovo().config, ...salvo.config } });
+    setAba({ id: 'analise' });
+  }
 
   const contagem = (g: string) => (r.prints[g] ?? []).length;
   const grupos: { titulo: string; abas: { aba: Aba; rotulo: string; marca?: string }[] }[] = [
@@ -53,7 +93,17 @@ export function App() {
         return { aba: { id: 'odds', casa } as Aba, rotulo: casa, marca: n ? String(n) : undefined };
       }),
     },
-    { titulo: '', abas: [{ aba: { id: 'analise' }, rotulo: 'Análise ▶' }] },
+    {
+      titulo: '',
+      abas: [
+        { aba: { id: 'analise' }, rotulo: 'Análise ▶' },
+        {
+          aba: { id: 'historico' },
+          rotulo: 'Histórico',
+          marca: historico.length ? String(historico.length) : undefined,
+        },
+      ],
+    },
   ];
 
   function novaCasa() {
@@ -116,7 +166,21 @@ export function App() {
         {aba.id === 'odds' && r.casas.includes(aba.casa) && (
           <AbaOdds key={aba.casa} {...props} casa={aba.casa} />
         )}
-        {aba.id === 'analise' && <AbaAnalise {...props} />}
+        {aba.id === 'analise' && (
+          <AbaAnalise
+            {...props}
+            onSalvar={salvarAnalise}
+            salvoNoHistorico={!!historico.find((e) => e.id === r.idHistorico)}
+          />
+        )}
+        {aba.id === 'historico' && (
+          <AbaHistorico
+            historico={historico}
+            setHistorico={setHistorico}
+            abrir={abrirDoHistorico}
+          />
+        )}
+        {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
       </main>
     </>
   );

@@ -1,7 +1,7 @@
 /**
  * Estado da análise em edição. Guardamos o TEXTO lido de cada print (não a imagem):
  * tudo o mais é recalculado a partir dele, então corrigir o leitor corrige análises antigas.
- * Fica no localStorage do aparelho só como conveniência; histórico de verdade é a Fase 4.
+ * Fica no localStorage do aparelho só como conveniência; o histórico fica em historico.ts.
  */
 import type { OddLine } from '@pe/schemas';
 
@@ -67,6 +67,8 @@ export interface Rascunho {
   explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
   banca: string;
+  /** id da entrada do histórico de onde veio (salvar de novo atualiza a mesma entrada) */
+  idHistorico?: string;
 }
 
 export function rascunhoNovo(): Rascunho {
