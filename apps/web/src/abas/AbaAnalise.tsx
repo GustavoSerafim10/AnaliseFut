@@ -1,4 +1,4 @@
-import { NOMES_TESE, relatorioEmTexto, type ResultadoAnalise } from '@pe/engine';
+import { NOME_ESTATISTICA, NOMES_TESE, relatorioEmTexto, type ResultadoAnalise } from '@pe/engine';
 import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
@@ -22,6 +22,8 @@ const ESSENCIAIS: CampoStat[] = [
   'chutesNoAlvo',
   'grandesChances',
   'defesasGoleiro',
+  'escanteios',
+  'cartoesAmarelos',
 ];
 
 async function copiar(texto: string, aviso: (m: string) => void) {
@@ -369,6 +371,32 @@ export function AbaAnalise({ r, setR, d }: PropsAba) {
             </ul>
           </>
         )}
+        {(['escanteios', 'cartoes'] as const).map((e) => {
+          const c = d.contagens[e];
+          return (
+            <div key={e}>
+              <p>
+                λ de {NOME_ESTATISTICA[e]} (nível 3):{' '}
+                {c ? (
+                  <>
+                    <strong>{dec(c.lambdas.casa)}</strong> × <strong>{dec(c.lambdas.fora)}</strong>
+                  </>
+                ) : (
+                  <span className="miudo">
+                    sem o dado dos dois times: esses mercados ficam só como informação
+                  </span>
+                )}
+              </p>
+              {c && (
+                <ul className="miudo">
+                  {c.declaracoes.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
         <label>
           Fato concreto que justifica discordar do mercado (opcional)
           <input
@@ -399,7 +427,10 @@ export function AbaAnalise({ r, setR, d }: PropsAba) {
                   <tr key={a.chave}>
                     <td>
                       {a.descricao.replace('Ganha se: ', '')}
-                      <div className="miudo">{NOMES_TESE[a.tese]}</div>
+                      <div className="miudo">
+                        {NOMES_TESE[a.tese]}
+                        {a.nivel === 3 && ' · nível 3 (modelo pesa até 30%)'}
+                      </div>
                     </td>
                     <td>
                       {a.melhorOdd}

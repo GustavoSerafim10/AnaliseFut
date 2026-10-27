@@ -14,7 +14,7 @@ import {
 } from './gates';
 import { calcularStake, type Stake } from './kelly';
 import { ajustarLambdaMercado, observacoesParaLambda, type LambdaMercado } from './lambdaMarket';
-import { criarModelo, FRACAO_1T } from './mercados';
+import { criarModelo, FRACAO_1T, type LambdasContagem } from './mercados';
 import {
   placaresMaisProvaveis,
   probabilidades1X2,
@@ -67,6 +67,8 @@ export interface EntradaAnalise {
   agora?: string;
   dq: DQ;
   lambdaModelo: Lambdas;
+  /** λ de escanteios/cartões (nível 3); sem eles esses mercados são só informação */
+  lambdasContagem?: LambdasContagem;
   linhas: LinhaOdd[];
   rho?: number;
   fracao1T?: number;
@@ -97,6 +99,7 @@ export interface ResultadoAnalise {
   w: number | null;
   lambdaMercado: LambdaMercado | null;
   lambdaModelo: { original: Lambdas; ajustado: Lambdas; ajustes: string[] };
+  lambdasContagem: LambdasContagem;
   previsao: Previsao | null;
   varredura: ResultadoVarredura | null;
   melhor: MelhorEntrada | null;
@@ -194,6 +197,7 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
     w: null,
     lambdaMercado: null,
     lambdaModelo: { original: e.lambdaModelo, ajustado: e.lambdaModelo, ajustes: [] },
+    lambdasContagem: e.lambdasContagem ?? {},
     previsao: null,
     varredura: null,
     melhor: null,
@@ -235,7 +239,7 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
   const aj = ajustarLambdaModelo(e.lambdaModelo, lambdaMercado, ctx);
   avisos.push(...aj.alertas);
 
-  const modelo = criarModelo(aj.lambdas, rho, fracao1T);
+  const modelo = criarModelo(aj.lambdas, rho, fracao1T, e.lambdasContagem);
   const w = pesoModelo(dq, {
     mercadoMuitoLiquido: ctx.mercadoMuitoLiquido,
     escalacaoIncerta: ctx.escalacaoIncerta,
@@ -265,6 +269,7 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
     w,
     lambdaMercado,
     lambdaModelo: { original: e.lambdaModelo, ajustado: aj.lambdas, ajustes: aj.ajustes },
+    lambdasContagem: e.lambdasContagem ?? {},
     previsao,
     varredura,
     melhor: extra.melhor ?? null,
@@ -301,6 +306,7 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
     escalacaoIncerta: ctx.escalacaoIncerta,
     modelosDivergentes: ctx.modelosDivergentes,
     lambdaLargo: ctx.lambdaLargo,
+    nivel3: c.nivel === 3,
     odd: c.melhorOdd,
   };
   const evMin = evMinimo(dq, flagsGate);
@@ -311,13 +317,14 @@ export function analisarJogo(e: EntradaAnalise): ResultadoAnalise {
     rho,
     fracao1T,
     pMercado: c.pMercado,
-    w: w ?? 0,
+    w: c.w ?? 0,
     odd: c.melhorOdd,
+    contagens: e.lambdasContagem,
   });
   const pg =
-    evMin !== null && w !== null
+    evMin !== null && c.w !== null
       ? priceGate({
-          w,
+          w: c.w,
           pModeloInferior: sens.pModeloInferior,
           pMercado: c.pMercado,
           evMinimo: evMin,

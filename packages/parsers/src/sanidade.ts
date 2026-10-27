@@ -18,6 +18,14 @@ const LADOS: Partial<Record<TipoMercado, number>> = {
   total_time: 2,
   ambas: 2,
   par_impar: 2,
+  escanteios_total: 2,
+  escanteios_time: 2,
+  escanteios_ah: 2,
+  escanteios_1x2: 3,
+  cartoes_total: 2,
+  cartoes_time: 2,
+  cartoes_ah: 2,
+  cartoes_1x2: 3,
 };
 
 const PRECISA_LINHA: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
@@ -25,6 +33,23 @@ const PRECISA_LINHA: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'total',
   'total_time',
   'AH_europeu',
+  'escanteios_total',
+  'escanteios_time',
+  'escanteios_ah',
+  'cartoes_total',
+  'cartoes_time',
+  'cartoes_ah',
+]);
+const POR_TIME: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
+  'total_time',
+  'escanteios_time',
+  'cartoes_time',
+]);
+const TOTAIS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
+  'total',
+  'escanteios_total',
+  'cartoes_total',
+  ...POR_TIME,
 ]);
 
 export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
@@ -37,7 +62,7 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
       add(i, 'erro', `odd fora da faixa 1,01–100: ${l.odd}`);
     if (PRECISA_LINHA.has(l.mercado) && (l.linha === undefined || !Number.isFinite(l.linha)))
       add(i, 'erro', 'linha obrigatória neste mercado');
-    if (l.mercado === 'total_time' && !l.time) add(i, 'erro', 'informar de qual time é o total');
+    if (POR_TIME.has(l.mercado) && !l.time) add(i, 'erro', 'informar de qual time é o total');
     if (!l.horarioColeta) add(i, 'alerta', 'sem horário de coleta: não serve para o price gate');
   });
 
@@ -56,7 +81,7 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
         add(
           i,
           'alerta',
-          m === 'AH'
+          m === 'AH' || m === 'escanteios_ah' || m === 'cartoes_ah'
             ? 'AH sem o outro lado (conferir sinal da linha)'
             : 'mercado sem todos os lados',
         ),
@@ -77,7 +102,7 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
   // ordem das linhas: over sobe com a linha, under desce
   const series = new Map<string, number[]>();
   linhas.forEach((l, i) => {
-    if ((l.mercado !== 'total' && l.mercado !== 'total_time') || l.linha === undefined) return;
+    if (!TOTAIS.has(l.mercado) || l.linha === undefined) return;
     const k = `${l.casa.toLowerCase()}#${l.mercado}#${l.periodo}#${l.time ?? '-'}#${normalizarLado(l.lado)}`;
     series.set(k, [...(series.get(k) ?? []), i]);
   });

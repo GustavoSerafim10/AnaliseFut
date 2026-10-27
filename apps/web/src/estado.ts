@@ -52,6 +52,8 @@ export interface Rascunho {
     mercadoMuitoLiquido: boolean;
     mediaGols: string;
     mando: string;
+    mediaEscanteios: string;
+    mediaCartoes: string;
   };
   /** textos de OCR por grupo: sofascore, superscore, classificacao, desfalques, ultimas, odds:<casa> */
   prints: Record<string, Leitura[]>;
@@ -84,6 +86,8 @@ export function rascunhoNovo(): Rascunho {
       mercadoMuitoLiquido: false,
       mediaGols: '1.30',
       mando: '1.12',
+      mediaEscanteios: '5.0',
+      mediaCartoes: '2.2',
     },
     prints: {},
     flashscore: '',

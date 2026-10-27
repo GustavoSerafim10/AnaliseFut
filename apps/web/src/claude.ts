@@ -12,7 +12,7 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   const l: string[] = [];
   l.push(
     'Você é um analista de apostas esportivas pré-live, rigoroso e construtivo.',
-    'Abaixo estão os dados de um jogo e o resultado de um motor de precificação determinístico (protocolo V3.3: Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado).',
+    'Abaixo estão os dados de um jogo e o resultado de um motor de precificação determinístico (protocolo V3.3: Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado; escanteios e cartões amarelos com binomial negativa por time, nível 3, modelo pesando no máximo 30%).',
     'Regras:',
     '- Não invente dados, odds, lesões nem probabilidades. Se faltar algo, diga que falta.',
     '- A decisão (BET / WATCHLIST / INVESTIGAR / NO BET) é do motor. Você pode criticá-la e apontar riscos, mas não a substitua.',

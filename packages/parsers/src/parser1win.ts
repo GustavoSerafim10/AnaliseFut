@@ -48,6 +48,8 @@ const COM_LINHA: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'escanteios_total',
   'escanteios_time',
   'escanteios_ah',
+  'cartoes_total',
+  'cartoes_time',
   'cartoes_ah',
 ]);
 
@@ -55,6 +57,7 @@ const COM_LINHA: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
 const ORDEM_PADRAO: Partial<Record<TipoMercado, string[]>> = {
   '1X2': ['1', 'X', '2'],
   escanteios_1x2: ['1', 'X', '2'],
+  cartoes_1x2: ['1', 'X', '2'],
   DC: ['1X', '12', 'X2'],
   DNB: ['1', '2'],
   primeiro_gol: ['casa', 'fora', 'nenhum'],
@@ -86,13 +89,85 @@ export function normalizar1win(texto: string): string {
   );
 }
 
-/** A 1win sempre mostra a odd com ponto ("8.0", "21.0"): sem ponto = ponto perdido. */
-function lerOdd(tok: string): { odd: number; corrigida: boolean } | null {
+type OddLida = { odd: number; corrigida: boolean; alternativa?: number };
+
+/**
+ * A 1win sempre mostra a odd com ponto ("8.0", "21.0"): sem ponto = ponto perdido.
+ * A leitura padrão põe o ponto depois do 1º dígito ("112" → 1.12); a alternativa, depois do
+ * 2º ("11" → 11.0, "215" → 21.5). Quem escolhe é a margem do mercado (resolverAmbiguas).
+ */
+function lerOdd(tok: string): OddLida | null {
   const n = lerNumero(tok);
   if (n === null) return null;
   if (tok.includes('.') || tok.length < 2) return { odd: n, corrigida: false };
   const limpo = tok.replace(/[^\d]/g, '');
-  return { odd: Number(`${limpo[0]}.${limpo.slice(1)}`), corrigida: true };
+  const alternativa =
+    limpo.length === 2 ? Number(limpo) : Number(`${limpo.slice(0, 2)}.${limpo.slice(2)}`);
+  return { odd: Number(`${limpo[0]}.${limpo.slice(1)}`), corrigida: true, alternativa };
+}
+
+/** Margem plausível de um mercado completo (casas nunca dão menos de 2%). */
+const MARGEM_MIN = 0.02;
+const MARGEM_MAX = 0.3;
+const MARGEM_TIPICA = 0.08;
+const LADOS_DO_MERCADO: Partial<Record<TipoMercado, number>> = {
+  '1X2': 3,
+  escanteios_1x2: 3,
+  cartoes_1x2: 3,
+  DNB: 2,
+  AH: 2,
+  total: 2,
+  total_time: 2,
+  ambas: 2,
+  escanteios_total: 2,
+  escanteios_time: 2,
+  escanteios_ah: 2,
+  cartoes_total: 2,
+  cartoes_time: 2,
+  cartoes_ah: 2,
+};
+const HANDICAPS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
+  'AH',
+  'escanteios_ah',
+  'cartoes_ah',
+]);
+
+/**
+ * Odds com ponto perdido têm duas leituras: fica a combinação que deixa a margem do mercado
+ * plausível (2–30%, a mais perto de 8%). Ex.: escanteios "112 11 51" → 1.12 / 11.0 / 5.1.
+ * Sem combinação plausível, fica a leitura padrão (e a sanidade acusa a margem).
+ */
+function resolverAmbiguas(linhas: OddLine[], alternativas: Map<OddLine, number>): void {
+  const grupos = new Map<string, OddLine[]>();
+  for (const l of linhas) {
+    const linhaGrupo =
+      l.linha === undefined
+        ? '-'
+        : HANDICAPS.has(l.mercado) && l.lado === 'fora'
+          ? -l.linha
+          : l.linha;
+    const k = [l.mercado, l.periodo, l.time ?? '-', linhaGrupo].join('|');
+    grupos.set(k, [...(grupos.get(k) ?? []), l]);
+  }
+  for (const g of grupos.values()) {
+    const ambiguas = g.filter((l) => alternativas.has(l));
+    if (!ambiguas.length || g.length !== LADOS_DO_MERCADO[g[0].mercado]) continue;
+    let melhor: { margem: number; escolha: number } | null = null;
+    for (let escolha = 0; escolha < 1 << ambiguas.length; escolha++) {
+      const odd = (l: OddLine) => {
+        const i = ambiguas.indexOf(l);
+        return i >= 0 && escolha & (1 << i) ? alternativas.get(l)! : l.odd;
+      };
+      const margem = g.reduce((s, l) => s + 1 / odd(l), 0) - 1;
+      if (margem < MARGEM_MIN || margem > MARGEM_MAX) continue;
+      if (!melhor || Math.abs(margem - MARGEM_TIPICA) < Math.abs(melhor.margem - MARGEM_TIPICA))
+        melhor = { margem, escolha };
+    }
+    const escolha = melhor?.escolha ?? 0;
+    ambiguas.forEach((l, i) => {
+      if (escolha & (1 << i)) l.odd = alternativas.get(l)!;
+    });
+  }
 }
 
 function ladoTotal(rotulo: string): 'over' | 'under' | null {
@@ -128,7 +203,9 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
     case 'total':
     case 'total_time':
     case 'escanteios_total':
-    case 'escanteios_time': {
+    case 'escanteios_time':
+    case 'cartoes_total':
+    case 'cartoes_time': {
       const lado = ladoTotal(rotulo);
       return lado ? { lado, time: ctx.time } : null;
     }
@@ -145,6 +222,7 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
     }
     case '1X2':
     case 'escanteios_1x2':
+    case 'cartoes_1x2':
       return comoLado(ladoResultado(rotulo, jogo, true));
     case 'DNB':
       return comoLado(ladoResultado(rotulo, jogo, false));
@@ -191,6 +269,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   const naoReconhecidas: string[] = [];
   const linhas: OddLine[] = [];
   let ignoradas = 0;
+  const alternativas = new Map<OddLine, number>();
   if (!doPrint && ctx.horarioPadrao)
     avisos.push('horário da barra de status ilegível: usado o horário do arquivo do print');
   if (!horarioColeta)
@@ -202,20 +281,22 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   const orfas: string[] = [];
   const lidasPorMercado: ResultadoParser['lidasPorMercado'] = [];
 
-  const emitir = (lado: Lado, odd: number, corrigida: boolean, linha?: number) => {
+  const emitir = (lado: Lado, o: OddLida, linha?: number) => {
     if (!mercado) return;
-    linhas.push({
+    const nova: OddLine = {
       casa,
       mercado: mercado.mercado,
       periodo: mercado.periodo,
       lado: lado.lado,
       time: lado.time,
       linha,
-      odd,
+      odd: o.odd,
       horarioColeta,
       fonte: 'ocr',
-      confianca: corrigida ? CONFIANCA_CORRIGIDA : CONFIANCA_OCR,
-    });
+      confianca: o.corrigida ? CONFIANCA_CORRIGIDA : CONFIANCA_OCR,
+    };
+    linhas.push(nova);
+    if (o.alternativa !== undefined && o.alternativa > 1) alternativas.set(nova, o.alternativa);
   };
 
   for (const bruta of linhasTexto) {
@@ -257,7 +338,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       const L = Number(tabela[1]);
       for (const [i, lado] of colunas.entries()) {
         const o = lerOdd(tabela[i + 2]);
-        if (o) emitir({ lado, time: mercado.time }, o.odd, o.corrigida, L);
+        if (o) emitir({ lado, time: mercado.time }, o, L);
       }
       continue;
     }
@@ -280,7 +361,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       }
       tokens.forEach((tok, i) => {
         const o = lerOdd(tok);
-        if (o && o.odd > 1) emitir({ lado: lados[i] }, o.odd, o.corrigida);
+        if (o && o.odd > 1) emitir({ lado: lados[i] }, o);
       });
       rotulosPendentes = null;
       continue;
@@ -307,7 +388,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       const lado = interpretarLado(mercado, rotulo.join(' '), ctx.jogo);
       const o = lerOdd(tok);
       if (lado && o && o.odd > 1) {
-        emitir(lado, o.odd, o.corrigida, precisaLinha ? linha : undefined);
+        emitir(lado, o, precisaLinha ? linha : undefined);
         emitiu = true;
       }
       rotulo = [];
@@ -316,6 +397,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     if (!emitiu) naoReconhecidas.push(bruta);
   }
 
+  resolverAmbiguas(linhas, alternativas);
   if (linhas.length === 0 && !orfas.length) avisos.push('nenhuma odd reconhecida neste print');
   return { linhas, horarioColeta, avisos, naoReconhecidas, ignoradas, orfas, lidasPorMercado };
 }

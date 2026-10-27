@@ -28,6 +28,7 @@ export type CampoStat =
   | 'grandesChancesMarcadas'
   | 'grandesChancesPerdidas'
   | 'escanteios'
+  | 'escanteiosContra'
   | 'impedimentos'
   | 'faltas'
   | 'faltasSofridas'
@@ -177,6 +178,13 @@ export const CAMPOS_STATS: DefCampo[] = [
     re: /chances criadas|chances de go/,
     formato: 'decimal1',
     faixa: [0, 8],
+  },
+  {
+    campo: 'escanteiosContra',
+    rotulo: 'Escanteios cedidos',
+    re: /escanteios (contra|sofridos|cedidos|concedidos)/,
+    formato: 'decimal1',
+    faixa: [0, 15],
   },
   {
     campo: 'escanteios',

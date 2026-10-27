@@ -3,12 +3,14 @@
  * P_final e EV, ou o motivo explícito do descarte. Agrupa por tese (1 instrumento por tese).
  */
 import { descreverAposta } from './descricao';
-import { blend, oddJusta } from './gates';
+import type { Estatistica } from './contagens';
+import { blend, oddJusta, W_MAX_NIVEL3 } from './gates';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
   criarModelo,
   distribuicaoModelo,
+  faltaNoModelo,
   type Liquidador,
   type ModeloPlacar,
 } from './mercados';
@@ -17,20 +19,30 @@ import type { LinhaOdd, NomesTimes } from './tipos';
 
 export const MARGEM_MAXIMA = 0.1;
 
-export type IdTese = 'casa_domina' | 'fora_resiste' | 'jogo_aberto' | 'jogo_fechado';
+type EixoTese = 'casa' | 'fora' | 'mais' | 'menos';
+export type IdTese =
+  'casa_domina' | 'fora_resiste' | 'jogo_aberto' | 'jogo_fechado' | `${Estatistica}_${EixoTese}`;
 
 export const NOMES_TESE: Record<IdTese, string> = {
   casa_domina: 'Mandante domina (supremacia da casa)',
   fora_resiste: 'Favorito da casa não vence com folga / visitante resiste',
   jogo_aberto: 'Jogo aberto (mais gols)',
   jogo_fechado: 'Jogo fechado (menos gols)',
+  escanteios_casa: 'Mandante com mais escanteios que o visitante',
+  escanteios_fora: 'Visitante equilibra os escanteios',
+  escanteios_mais: 'Muitos escanteios',
+  escanteios_menos: 'Poucos escanteios',
+  cartoes_casa: 'Mandante mais faltoso (mais cartões)',
+  cartoes_fora: 'Visitante mais faltoso (mais cartões)',
+  cartoes_mais: 'Jogo com muitos cartões',
+  cartoes_menos: 'Jogo com poucos cartões',
 };
 
 export interface Avaliacao {
   chave: string;
   linha: LinhaOdd;
   descricao: string;
-  nivel: 1 | 2;
+  nivel: 1 | 2 | 3;
   margem: number;
   metodoDevig: string;
   pMercado: number;
@@ -77,23 +89,26 @@ export interface ResultadoVarredura {
  * supremacia S = λc − λf e ao total T = λc + λf. Eixo dominante decide (empate → supremacia).
  */
 export function teseDe(liq: Liquidador, m: ModeloPlacar): IdTese {
-  const { casa, fora } = m.lambdas;
+  // nível 3: mesma ideia, nos λ da estatística (escanteios/cartões) em vez dos de gols
+  const estat =
+    liq.tipo === 'contagem' || liq.tipo === 'primeira_contagem' ? liq.estatistica : null;
+  const { casa, fora } = estat ? m.contagens[estat]! : m.lambdas;
   const S = casa - fora;
   const T = casa + fora;
   const h = 0.1;
-  const p = (s: number, t: number) =>
-    probEfetiva(
-      distribuicaoModelo(
-        liq,
-        criarModelo(
-          { casa: Math.max(0.01, (t + s) / 2), fora: Math.max(0.01, (t - s) / 2) },
-          m.rho,
-          m.fracao1T,
-        ),
-      ),
-    );
+  const p = (s: number, t: number) => {
+    const l = { casa: Math.max(0.01, (t + s) / 2), fora: Math.max(0.01, (t - s) / 2) };
+    const mod = estat
+      ? criarModelo(m.lambdas, m.rho, m.fracao1T, { ...m.contagens, [estat]: l })
+      : criarModelo(l, m.rho, m.fracao1T);
+    return probEfetiva(distribuicaoModelo(liq, mod));
+  };
   const dS = p(S + h, T) - p(S - h, T);
   const dT = p(S, T + h) - p(S, T - h);
+  if (estat) {
+    if (Math.abs(dS) >= Math.abs(dT)) return dS >= 0 ? `${estat}_casa` : `${estat}_fora`;
+    return dT >= 0 ? `${estat}_mais` : `${estat}_menos`;
+  }
   if (Math.abs(dS) >= Math.abs(dT)) return dS >= 0 ? 'casa_domina' : 'fora_resiste';
   return dT >= 0 ? 'jogo_aberto' : 'jogo_fechado';
 }
@@ -113,6 +128,8 @@ export function varrerMercados(
     motivo: d.motivo,
   }));
   const avaliadas: Avaliacao[] = [];
+  // nível 3 (escanteios/cartões): o modelo pesa no máximo 0,30 no blend (seção 12)
+  const w3 = w === null ? null : Math.min(w, W_MAX_NIVEL3);
 
   for (const s of precos.selecoes) {
     const descricao = descreverAposta(s.linha, nomes);
@@ -127,10 +144,22 @@ export function varrerMercados(
       });
       continue;
     }
+    const falta = faltaNoModelo(r.liq, modelo);
+    if (falta) {
+      descartados.push({
+        chave: s.chave,
+        descricao,
+        motivo: falta,
+        margem: s.margem,
+        pMercado: s.pMercado,
+      });
+      continue;
+    }
     const d = distribuicaoModelo(r.liq, modelo);
     const pModelo = probEfetiva(d);
     const emRisco = fracaoEmRisco(d);
-    const pFinal = w === null ? s.pMercado : blend(pModelo, s.pMercado, w);
+    const wSel = r.nivel === 3 ? w3 : w;
+    const pFinal = wSel === null ? s.pMercado : blend(pModelo, s.pMercado, wSel);
     const ev = emRisco * (pFinal * s.melhor.odd - 1);
 
     if (s.margem > MARGEM_MAXIMA) {
@@ -156,7 +185,7 @@ export function varrerMercados(
       pMercado: s.pMercado,
       pModelo,
       pFinal,
-      w,
+      w: wSel,
       oddJusta: oddJusta(pFinal),
       melhorOdd: s.melhor.odd,
       casaMelhorOdd: s.melhor.casa,
@@ -186,6 +215,8 @@ export function varrerMercados(
   const avisosLado: string[] = [];
   const porGrupo = new Map<string, Avaliacao[]>();
   for (const a of avaliadas) {
+    // nível 3 não tem λ de mercado para comparar: a sanidade da margem cobre a leitura
+    if (a.nivel === 3) continue;
     const g = chaveGrupo(a.linha);
     porGrupo.set(g, [...(porGrupo.get(g) ?? []), a]);
   }

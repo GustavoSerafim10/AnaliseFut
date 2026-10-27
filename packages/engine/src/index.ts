@@ -2,6 +2,7 @@ export * from './tipos';
 export * from './poisson';
 export * from './devig';
 export * from './liquidacao';
+export * from './contagens';
 export * from './mercados';
 export * from './descricao';
 export * from './precificacao';

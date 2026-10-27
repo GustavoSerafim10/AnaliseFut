@@ -18,7 +18,11 @@ async function preprocessar(arq) {
   let p = sharp(arq).grayscale();
   if (channels[0].mean < 128) p = p.negate({ alpha: false });
   const escala = Math.max(1, Math.min(3, Math.round(3000 / width)));
-  return p.resize({ width: width * escala, kernel: 'lanczos3' }).threshold(160).png().toBuffer();
+  return p
+    .resize({ width: width * escala, kernel: 'lanczos3' })
+    .threshold(160)
+    .png()
+    .toBuffer();
 }
 
 const worker = await createWorker(['por', 'eng']);

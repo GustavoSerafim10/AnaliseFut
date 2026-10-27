@@ -1,8 +1,14 @@
 /**
  * Seções 10 e 19 — como cada mercado é liquidado a partir do placar, e a probabilidade
- * do modelo para qualquer seleção (nível 1: placar final · nível 2: por tempo/sequência).
- * Nível 3 (escanteios, cartões, chutes) só com modelo próprio → Fase 5.
+ * do modelo para qualquer seleção (nível 1: placar final · nível 2: por tempo/sequência ·
+ * nível 3: escanteios e cartões, com modelo de contagem próprio em contagens.ts).
  */
+import {
+  FRACAO_1T_CONTAGEM,
+  matrizContagem,
+  NOME_ESTATISTICA,
+  type Estatistica,
+} from './contagens';
 import {
   distribuicaoVazia,
   liquidarLinha,
@@ -21,10 +27,30 @@ export const MERCADOS_NIVEL3: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'escanteios_ah',
   'escanteios_1x2',
   'primeiro_escanteio',
+  'cartoes_total',
+  'cartoes_time',
+  'cartoes_1x2',
   'cartoes_ah',
   'chutes_ah',
   'impedimentos_ah',
 ]);
+
+/** Mercado de contagem → estatística e mercado de gols que se liquida igual. */
+const EQUIVALENTE_NIVEL3: Partial<Record<TipoMercado, [Estatistica, TipoMercado]>> = {
+  escanteios_total: ['escanteios', 'total'],
+  escanteios_time: ['escanteios', 'total_time'],
+  escanteios_ah: ['escanteios', 'AH'],
+  escanteios_1x2: ['escanteios', '1X2'],
+  cartoes_total: ['cartoes', 'total'],
+  cartoes_time: ['cartoes', 'total_time'],
+  cartoes_ah: ['cartoes', 'AH'],
+  cartoes_1x2: ['cartoes', '1X2'],
+};
+
+export function estatisticaDoMercado(m: TipoMercado): Estatistica | null {
+  if (m === 'primeiro_escanteio') return 'escanteios';
+  return EQUIVALENTE_NIVEL3[m]?.[0] ?? null;
+}
 
 type Res1X2 = '1' | 'x' | '2';
 const res = (c: number, f: number): Res1X2 => (c > f ? '1' : c < f ? '2' : 'x');
@@ -33,10 +59,17 @@ const binario = (ganhou: boolean) => (ganhou ? 1 : -1);
 export type Liquidador =
   | { tipo: 'placar'; periodo: Periodo; fn: (c: number, f: number) => number }
   | { tipo: 'tempos'; fn: (c1: number, f1: number, c2: number, f2: number) => number }
-  | { tipo: 'sequencia'; lado: 'casa' | 'fora' | 'nenhum' };
+  | { tipo: 'sequencia'; lado: 'casa' | 'fora' | 'nenhum' }
+  | {
+      tipo: 'contagem';
+      estatistica: Estatistica;
+      periodo: Periodo;
+      fn: (c: number, f: number) => number;
+    }
+  | { tipo: 'primeira_contagem'; estatistica: Estatistica; lado: 'casa' | 'fora' | 'nenhum' };
 
 export type ResultadoLiquidador =
-  { ok: true; liq: Liquidador; nivel: 1 | 2 } | { ok: false; motivo: string; nivel: 1 | 2 | 3 };
+  { ok: true; liq: Liquidador; nivel: 1 | 2 | 3 } | { ok: false; motivo: string; nivel: 1 | 2 | 3 };
 
 export function normalizarLado(lado: string): string {
   return lado.trim().toLowerCase().replace(/\s+/g, '');
@@ -150,15 +183,40 @@ function liquidadorPlacar(l: LinhaOdd): ((c: number, f: number) => number) | str
   }
 }
 
-export function criarLiquidador(l: LinhaOdd): ResultadoLiquidador {
-  if (MERCADOS_NIVEL3.has(l.mercado)) {
+function liquidadorNivel3(l: LinhaOdd): ResultadoLiquidador {
+  const lado = normalizarLado(l.lado);
+  if (l.mercado === 'primeiro_escanteio') {
+    if (lado !== 'casa' && lado !== 'fora' && lado !== 'nenhum')
+      return { ok: false, nivel: 3, motivo: `lado inválido (casa/fora/nenhum): ${l.lado}` };
+    if (l.periodo !== 'FT')
+      return { ok: false, nivel: 3, motivo: 'primeiro escanteio só no jogo todo' };
+    return {
+      ok: true,
+      nivel: 3,
+      liq: { tipo: 'primeira_contagem', estatistica: 'escanteios', lado },
+    };
+  }
+  const eq = EQUIVALENTE_NIVEL3[l.mercado];
+  if (!eq)
     return {
       ok: false,
       nivel: 3,
-      motivo:
-        'nível 3 sem modelo próprio ainda (escanteios/cartões/chutes → Fase 5): só informação',
+      motivo: 'nível 3 sem modelo próprio (chutes/impedimentos): só informação',
     };
-  }
+  const [estatistica, mercado] = eq;
+  if (l.periodo === '2T')
+    return {
+      ok: false,
+      nivel: 3,
+      motivo: `${NOME_ESTATISTICA[estatistica]} do 2º tempo sem modelo`,
+    };
+  const fn = liquidadorPlacar({ ...l, mercado });
+  if (typeof fn === 'string') return { ok: false, nivel: 3, motivo: fn };
+  return { ok: true, nivel: 3, liq: { tipo: 'contagem', estatistica, periodo: l.periodo, fn } };
+}
+
+export function criarLiquidador(l: LinhaOdd): ResultadoLiquidador {
+  if (MERCADOS_NIVEL3.has(l.mercado)) return liquidadorNivel3(l);
   const lado = normalizarLado(l.lado);
 
   if (l.mercado === 'intervalo_final') {
@@ -207,28 +265,44 @@ export function criarLiquidador(l: LinhaOdd): ResultadoLiquidador {
   };
 }
 
+export type LambdasContagem = Partial<Record<Estatistica, Lambdas>>;
+
 /** Matrizes do modelo, calculadas sob demanda. */
 export interface ModeloPlacar {
   readonly lambdas: Lambdas;
   readonly rho: number;
   readonly fracao1T: number;
+  /** λ de escanteios/cartões (nível 3); ausente = sem modelo para essa estatística */
+  readonly contagens: LambdasContagem;
   readonly ft: MatrizPlacar;
   readonly t1: MatrizPlacar;
   readonly t2: MatrizPlacar;
+  contagem(e: Estatistica, periodo: 'FT' | '1T'): MatrizPlacar | null;
 }
 
 export function criarModelo(
   lambdas: Lambdas,
   rho: number = RHO_PADRAO,
   fracao1T: number = FRACAO_1T,
+  contagens: LambdasContagem = {},
 ): ModeloPlacar {
   let ft: MatrizPlacar | undefined;
   let t1: MatrizPlacar | undefined;
   let t2: MatrizPlacar | undefined;
+  const matrizes = new Map<string, MatrizPlacar>();
   return {
     lambdas,
     rho,
     fracao1T,
+    contagens,
+    contagem(e, periodo) {
+      const l = contagens[e];
+      if (!l) return null;
+      const k = `${e}|${periodo}`;
+      if (!matrizes.has(k))
+        matrizes.set(k, matrizContagem(e, l, periodo === '1T' ? FRACAO_1T_CONTAGEM[e] : 1));
+      return matrizes.get(k)!;
+    },
     get ft() {
       return (ft ??= matrizPlacares(lambdas.casa, lambdas.fora, rho));
     },
@@ -252,8 +326,37 @@ export function criarModelo(
   };
 }
 
+/** Motivo para o modelo NÃO conseguir avaliar a seleção (falta λ de escanteios/cartões). */
+export function faltaNoModelo(liq: Liquidador, m: ModeloPlacar): string | null {
+  if (liq.tipo !== 'contagem' && liq.tipo !== 'primeira_contagem') return null;
+  return m.contagens[liq.estatistica]
+    ? null
+    : `sem estatísticas de ${NOME_ESTATISTICA[liq.estatistica]} dos dois times para o modelo nível 3`;
+}
+
 export function distribuicaoModelo(liq: Liquidador, m: ModeloPlacar): DistribuicaoResultado {
   const d = distribuicaoVazia();
+  if (liq.tipo === 'contagem' || liq.tipo === 'primeira_contagem') {
+    const periodo = liq.tipo === 'contagem' && liq.periodo === '1T' ? '1T' : 'FT';
+    const mat = m.contagem(liq.estatistica, periodo);
+    if (!mat) throw new Error(faltaNoModelo(liq, m) ?? 'sem modelo');
+    if (liq.tipo === 'contagem') {
+      mat.forEach((linha, i) => linha.forEach((p, j) => somarResultado(d, liq.fn(i, j), p)));
+      return d;
+    }
+    // quem bate o 1º escanteio: proporcional aos λ; sem escanteio no jogo, devolve
+    const p0 = mat[0][0];
+    const { casa, fora } = m.contagens[liq.estatistica]!;
+    if (liq.lado === 'nenhum') {
+      d.ganho = p0;
+      d.perda = 1 - p0;
+    } else {
+      d.ganho = ((1 - p0) * (liq.lado === 'casa' ? casa : fora)) / (casa + fora);
+      d.push = p0;
+      d.perda = 1 - p0 - d.ganho;
+    }
+    return d;
+  }
   if (liq.tipo === 'placar') {
     const mat = liq.periodo === 'FT' ? m.ft : liq.periodo === '1T' ? m.t1 : m.t2;
     mat.forEach((linha, i) => linha.forEach((p, j) => somarResultado(d, liq.fn(i, j), p)));

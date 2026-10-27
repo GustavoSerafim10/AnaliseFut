@@ -21,6 +21,15 @@ const LADOS: Partial<Record<TipoMercado, string[]>> = {
   marcar_2_tempos: ['sim', 'nao'],
   primeiro_gol: ['casa', 'fora', 'nenhum'],
   ultimo_gol: ['casa', 'fora', 'nenhum'],
+  escanteios_total: ['over', 'under'],
+  escanteios_time: ['over', 'under'],
+  escanteios_ah: ['casa', 'fora'],
+  escanteios_1x2: ['1', 'X', '2'],
+  primeiro_escanteio: ['casa', 'fora', 'nenhum'],
+  cartoes_total: ['over', 'under'],
+  cartoes_time: ['over', 'under'],
+  cartoes_ah: ['casa', 'fora'],
+  cartoes_1x2: ['1', 'X', '2'],
 };
 
 const hhmm = (iso?: string) => (iso ? iso.slice(11, 16) : '');

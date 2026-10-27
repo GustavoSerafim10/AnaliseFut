@@ -5,6 +5,7 @@
 import {
   analisarJogo,
   avaliarDQ,
+  calcularLambdaContagem,
   calcularLambdaModelo,
   gerarRelatorio,
   relatorioEmTexto,
@@ -15,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import {
   consolidar,
   destaquesComparativos,
+  estatisticasContagem,
   estatisticasParaModelo,
   juntarLinhas,
   lerDesfalques,
@@ -42,6 +44,13 @@ const tabela = consolidar({ sofascore: sofa, superscore: sup }, { 'golsMarcados.
 const mc = estatisticasParaModelo(tabela, 'casa');
 const mf = estatisticasParaModelo(tabela, 'fora');
 const lambda = calcularLambdaModelo(mc.stats!, mf.stats!);
+// nível 3: cartões lidos dos dois times; escanteios do Flamengo ficaram ilegíveis ("ss")
+const cartoes = calcularLambdaContagem(
+  'cartoes',
+  estatisticasContagem(tabela, 'casa', 'cartoes')!,
+  estatisticasContagem(tabela, 'fora', 'cartoes')!,
+);
+const semEscanteios = estatisticasContagem(tabela, 'casa', 'escanteios');
 const desfalques = lerDesfalques(fx('superscore-desfalques.txt'), jogo).desfalques;
 const flash = lerTextoFlashscore(
   `Notícias da partida e forma atual
@@ -81,6 +90,7 @@ const resultado = analisarJogo({
   agora: '2026-10-26T16:30:00-03:00',
   dq: dq.dq,
   lambdaModelo: lambda.lambdas,
+  lambdasContagem: { cartoes: cartoes.lambdas },
   linhas: odds as LinhaOdd[],
   contexto: { priorNeutro: true },
   banca: 1000,
@@ -110,5 +120,17 @@ describe('Flamengo × Atlético-MG — análise completa com prints reais', () =
     expect(resultado.melhor?.tese).toBe('fora_resiste');
     // odds lidas corretamente não geram falso alarme de lado invertido
     expect(resultado.avisos.filter((a) => a.includes('invertido'))).toEqual([]);
+  });
+  it('nível 3: cartões entram no modelo; escanteios sem o dado dos dois times ficam de fora', () => {
+    expect(semEscanteios).toBeNull();
+    const v = resultado.varredura!;
+    const cartoesAvaliados = v.avaliadas.filter((a) => a.linha.mercado.startsWith('cartoes'));
+    expect(cartoesAvaliados.length).toBeGreaterThan(0);
+    expect(cartoesAvaliados.every((a) => a.nivel === 3 && a.w !== null && a.w <= 0.3)).toBe(true);
+    expect(
+      v.descartados.some(
+        (x) => x.chave.startsWith('escanteios_total') && x.motivo.includes('sem estatísticas'),
+      ),
+    ).toBe(true);
   });
 });

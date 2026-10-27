@@ -22,7 +22,11 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
     'outro',
   ],
   [/cart(ao|oes).*handicap|handicap.*cart(ao|oes)/, 'cartoes_ah'],
-  [/cart(ao|oes)|amarelo|vermelho/, 'outro'],
+  // só cartões AMARELOS têm modelo; primeiro cartão e dupla chance de cartões não
+  [/primeiro cartao|(dupla|hipotese).*cart|cart.*(dupla|hipotese)|vermelho/, 'outro'],
+  [/cart(ao|oes) amarelos?.*resultado|resultado.*cart(ao|oes) amarelos?/, 'cartoes_1x2'],
+  [/total.*cart(ao|oes) amarelos?|cart(ao|oes) amarelos?.*total/, 'cartoes_total'],
+  [/cart(ao|oes)|amarelo/, 'outro'],
   [/primeiro escanteio|1o escanteio|primeiro canto/, 'primeiro_escanteio'],
   [/handicap de escanteios|escanteios?.*handicap|cantos?.*handicap/, 'escanteios_ah'],
   [/escanteios?.*resultado|cantos?.*resultado/, 'escanteios_1x2'],
@@ -78,15 +82,25 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
   if (ehBarraDeAbas(t)) return null;
   const periodo = detectarPeriodo(t);
 
-  // "Aston Villa total", "Escanteios. CR Flamengo total"
-  if (/\btotal\b/.test(t) && !/cart(ao|oes)|amarelo/.test(t)) {
+  // "Aston Villa total", "Escanteios. CR Flamengo total", "Cartões amarelos. CR Flamengo total"
+  if (/\btotal\b/.test(t)) {
     const time = reconhecerTime(
-      t.replace(/escanteios?|cantos?|total|individual|de gols|do time|da equipe/g, ' '),
+      t.replace(
+        /escanteios?|cantos?|cart(ao|oes)|amarelos?|total|individual|de gols|do time|da equipe/g,
+        ' ',
+      ),
       jogo,
     );
+    const cartoes = /cart(ao|oes)|amarelo/.test(t);
     if (time)
       return {
-        mercado: /escanteio|canto/.test(t) ? 'escanteios_time' : 'total_time',
+        mercado: /escanteio|canto/.test(t)
+          ? 'escanteios_time'
+          : cartoes
+            ? /amarelo/.test(t)
+              ? 'cartoes_time'
+              : 'outro'
+            : 'total_time',
         periodo,
         time,
       };

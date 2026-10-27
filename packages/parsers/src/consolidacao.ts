@@ -3,7 +3,7 @@
  * divergência > 15% destacada, valor escolhido declarado, e montagem das estatísticas
  * que entram no λ do modelo.
  */
-import type { EstatisticasTime, Time } from '@pe/engine';
+import type { Estatistica, EstatisticasTime, StatsContagem, Time } from '@pe/engine';
 import {
   CAMPOS_STATS,
   DEF_CAMPO,
@@ -165,6 +165,19 @@ export function estatisticasParaModelo(t: TabelaConsolidada, time: Time): Estati
     declaracoes,
     faltando,
   };
+}
+
+/** Escanteios a favor (e cedidos) ou cartões amarelos por jogo, para o modelo nível 3. */
+export function estatisticasContagem(
+  t: TabelaConsolidada,
+  time: Time,
+  estatistica: Estatistica,
+): StatsContagem | null {
+  const jogos = val(t, 'partidas', time);
+  const favor = val(t, estatistica === 'escanteios' ? 'escanteios' : 'cartoesAmarelos', time);
+  if (!jogos || favor === undefined) return null;
+  const contra = estatistica === 'escanteios' ? val(t, 'escanteiosContra', time) : undefined;
+  return { jogos, favor, contra };
 }
 
 /** Frases comparativas para a análise escrita. */

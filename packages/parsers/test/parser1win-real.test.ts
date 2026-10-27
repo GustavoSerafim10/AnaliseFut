@@ -86,6 +86,22 @@ describe('1win — prints reais', () => {
     expect(odd({ mercado: 'escanteios_time', time: 'casa', linha: 7.5, lado: 'over' })).toEqual([
       2.02,
     ]);
+    expect(odd({ mercado: 'escanteios_ah', periodo: '1T', lado: 'casa', linha: -2.5 })).toEqual([
+      2.13,
+    ]);
+  });
+  it('ponto perdido com duas leituras: a margem decide ("112 11 51" → 1.12 / 11.0 / 5.1)', () => {
+    expect(odd({ mercado: 'escanteios_1x2', lado: '1' })).toEqual([1.12]);
+    expect(odd({ mercado: 'escanteios_1x2', lado: 'X' })).toEqual([11]);
+    expect(odd({ mercado: 'escanteios_1x2', lado: '2' })).toEqual([5.1]);
+    // "21" no total de cartões continua 2.1 (21.0 deixaria a margem negativa)
+    expect(odd({ mercado: 'cartoes_total', linha: 3.5, lado: 'under' })).toEqual([2.1]);
+  });
+  it('cartões amarelos: total e resultado viram mercados de cartões, nunca de gols', () => {
+    expect(odd({ mercado: 'cartoes_total', linha: 4.5, lado: 'over' })).toEqual([2.52]);
+    expect(odd({ mercado: 'cartoes_1x2', lado: '1' })).toEqual([3.15]);
+    expect(odd({ mercado: 'cartoes_1x2', lado: '2' })).toEqual([1.85]);
+    expect(odd({ mercado: 'total', linha: 4.5, lado: 'over' })).not.toContain(2.52);
   });
   it('usa o horário do arquivo quando a barra de status é ilegível', () => {
     expect(leituras[0].horarioColeta).toBe('2026-10-26T16:13:00-03:00');
@@ -105,7 +121,7 @@ describe('1win — prints reais', () => {
     expect(r.linhas.some((l) => l.mercado === 'AH')).toBe(false);
     expect(r.orfas.length).toBeGreaterThan(10);
   });
-  it('cartões e "vencer a partir de desvantagem" são ignorados de propósito', () => {
+  it('primeiro cartão, dupla chance de cartões, red card e "vencer a partir de desvantagem" são ignorados de propósito', () => {
     expect(leituras[7].ignoradas).toBeGreaterThan(0);
     // "Vencer a partir de desvantagem" (34.0) e "red card: Sim 3.36" não podem virar outro mercado
     expect(linhas.some((l) => l.odd === 34.0)).toBe(false);

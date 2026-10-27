@@ -69,6 +69,9 @@ const LADOS_ESPERADOS: Partial<Record<TipoMercado, number>> = {
   chutes_ah: 2,
   impedimentos_ah: 2,
   escanteios_1x2: 3,
+  cartoes_total: 2,
+  cartoes_time: 2,
+  cartoes_1x2: 3,
 };
 
 export const LIMITE_OUTLIER = 0.03;

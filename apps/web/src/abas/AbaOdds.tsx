@@ -7,7 +7,22 @@ import { UploadPrints } from '../componentes/UploadPrints';
 import { FUSO, type Leitura } from '../estado';
 import type { PropsAba } from './tipos';
 
-const ORDEM_MERCADO: TipoMercado[] = ['1X2', 'DC', 'DNB', 'AH', 'total', 'total_time', 'ambas'];
+const ORDEM_MERCADO: TipoMercado[] = [
+  '1X2',
+  'DC',
+  'DNB',
+  'AH',
+  'total',
+  'total_time',
+  'ambas',
+  'escanteios_total',
+  'escanteios_time',
+  'escanteios_ah',
+  'escanteios_1x2',
+  'cartoes_total',
+  'cartoes_time',
+  'cartoes_1x2',
+];
 
 export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const [json, setJson] = useState('');
@@ -106,8 +121,8 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
 
       {leitura.ignoradas > 0 && (
         <p className="dica">
-          {leitura.ignoradas} linhas de mercados sem modelo (cartões, vitória antecipada, vencer de
-          virada…) foram ignoradas de propósito.
+          {leitura.ignoradas} linhas de mercados sem modelo (primeiro cartão, vitória antecipada,
+          vencer de virada…) foram ignoradas de propósito.
         </p>
       )}
       {leitura.naoReconhecidas.length > 0 && (

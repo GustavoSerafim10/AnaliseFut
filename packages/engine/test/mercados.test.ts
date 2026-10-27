@@ -139,10 +139,12 @@ describe('mercados derivados da matriz', () => {
     );
     expect(s).toBeCloseTo(1, 10);
   });
-  it('nível 3 e mercados sem modelo são recusados com motivo', () => {
+  it('nível 3: escanteios têm liquidador; chutes e mercados sem modelo são recusados', () => {
     const r = criarLiquidador(L({ mercado: 'escanteios_total', lado: 'over', linha: 9.5 }));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.nivel).toBe(3);
+    expect(r.ok).toBe(true);
+    expect(r.nivel).toBe(3);
+    const chutes = criarLiquidador(L({ mercado: 'chutes_ah', lado: 'casa', linha: -1.5 }));
+    expect(chutes.ok).toBe(false);
     expect(criarLiquidador(L({ mercado: 'outro', lado: 'x' })).ok).toBe(false);
   });
 });

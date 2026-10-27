@@ -98,9 +98,26 @@ export function AbaJogo({ r, setR }: PropsAba) {
               onChange={(e) => config('mando', e.target.value)}
             />
           </label>
+          <label>
+            Média de escanteios por time na liga
+            <input
+              inputMode="decimal"
+              value={r.config.mediaEscanteios}
+              onChange={(e) => config('mediaEscanteios', e.target.value)}
+            />
+          </label>
+          <label>
+            Média de cartões amarelos por time na liga
+            <input
+              inputMode="decimal"
+              value={r.config.mediaCartoes}
+              onChange={(e) => config('mediaCartoes', e.target.value)}
+            />
+          </label>
         </div>
         <p className="dica">
-          Padrão do protocolo: 1,30 gols por time e mando 1,12 (1,00 em campo neutro).
+          Padrão do protocolo: 1,30 gols por time e mando 1,12 (1,00 em campo neutro). Escanteios
+          (5,0) e cartões (2,2) por time servem de base para os mercados de nível 3.
         </p>
       </details>
     </section>

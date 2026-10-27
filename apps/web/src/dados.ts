@@ -5,12 +5,16 @@
 import {
   analisarJogo,
   avaliarDQ,
+  calcularLambdaContagem,
   calcularLambdaModelo,
   gerarRelatorio,
   type AjusteLambda,
   type DQ,
+  type Estatistica,
+  type LambdasContagem,
   type LinhaOdd,
   type Relatorio,
+  type ResultadoLambdaContagem,
   type ResultadoAnalise,
   type ResultadoLambdaModelo,
 } from '@pe/engine';
@@ -19,6 +23,7 @@ import {
   checarSanidade,
   consolidar,
   destaquesComparativos,
+  estatisticasContagem,
   estatisticasParaModelo,
   juntarLeiturasStats,
   lerClassificacao,
@@ -43,6 +48,8 @@ export interface Derivado {
   modeloCasa: EstatisticasModelo;
   modeloFora: EstatisticasModelo;
   lambda: ResultadoLambdaModelo | null;
+  /** λ de escanteios/cartões (nível 3), quando os dois times têm o dado */
+  contagens: Partial<Record<Estatistica, ResultadoLambdaContagem>>;
   desfalques: Desfalque[];
   avisosDesfalques: string[];
   impacto: Record<'casa' | 'fora', ImpactoSugerido>;
@@ -119,6 +126,18 @@ export function derivar(r: Rascunho): Derivado {
     });
   }
 
+  // nível 3: escanteios e cartões amarelos, só com o dado dos dois times
+  const contagens: Derivado['contagens'] = {};
+  const mediaContagem = { escanteios: r.config.mediaEscanteios, cartoes: r.config.mediaCartoes };
+  for (const e of ['escanteios', 'cartoes'] as const) {
+    const c = estatisticasContagem(tabela, 'casa', e);
+    const f = estatisticasContagem(tabela, 'fora', e);
+    if (c && f) contagens[e] = calcularLambdaContagem(e, c, f, { media: num(mediaContagem[e]) });
+  }
+  const lambdasContagem: LambdasContagem = Object.fromEntries(
+    Object.entries(contagens).map(([e, x]) => [e, x.lambdas]),
+  );
+
   const desfalquesConhecidos =
     desfalques.length > 0 || !!flash?.trechos.some((t) => t.categoria === 'desfalques');
   const fontesStats = [
@@ -162,6 +181,7 @@ export function derivar(r: Rascunho): Derivado {
       jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
       dq: dq.dq,
       lambdaModelo: lambda.lambdas,
+      lambdasContagem,
       linhas: r.odds as LinhaOdd[],
       contexto: {
         favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
@@ -190,6 +210,7 @@ export function derivar(r: Rascunho): Derivado {
     modeloCasa,
     modeloFora,
     lambda,
+    contagens,
     desfalques,
     avisosDesfalques: desf.flatMap((d) => d.avisos),
     impacto,
