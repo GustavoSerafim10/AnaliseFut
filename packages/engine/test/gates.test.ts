@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { ajustarLambdaModelo } from '../src/ajustesLambda';
 import { blend, evMinimo, pesoModelo, priceGate } from '../src/gates';
 import { calcularStake, fracaoKelly, kellyCheio, limitarLote } from '../src/kelly';
-import { calcularLambdaModelo, classificarDesfalque, pesoAmostra } from '../src/lambdaModelo';
+import {
+  calcularLambdaModelo,
+  classificarDesfalque,
+  FATOR_CHUTE_NO_ALVO,
+  FATOR_GRANDE_CHANCE,
+  pesoAmostra,
+  producaoOfensiva,
+} from '../src/lambdaModelo';
 import { criarLiquidador } from '../src/mercados';
 import { analisarSensibilidade } from '../src/sensibilidade';
 
@@ -120,6 +127,32 @@ describe('λ do modelo (9.2)', () => {
     expect(r.lambdas.casa).toBeCloseTo(1.3 * 1.12, 10);
     expect(r.lambdas.fora).toBeCloseTo(1.3 / 1.12, 10);
     expect(r.priorNeutro).toBe(true);
+  });
+  it('sem xG: grandes chances entram com o fator de conversão', () => {
+    const s = { jogos: 10, golsPro: 2.0, golsContra: 1.0 };
+    expect(producaoOfensiva({ ...s, grandesChances: 3.4 }).valor).toBeCloseTo(
+      0.5 * 2 + 0.5 * 0.53 * 3.4,
+      10,
+    );
+    expect(producaoOfensiva({ ...s, chutesNoAlvo: 5.7, grandesChances: 3.4 }).valor).toBeCloseTo(
+      0.5 * 2 + 0.25 * 0.32 * 5.7 + 0.25 * 0.53 * 3.4,
+      10,
+    );
+    // com xG as grandes chances não entram (o xG já as contém)
+    expect(producaoOfensiva({ ...s, xg: 1.8, grandesChances: 3.4 }).metodo).toBe(
+      '65% xG + 35% gols',
+    );
+  });
+  it('calibração do fator: xG ÷ grandes chances dos prints reais fica perto de 0,53', () => {
+    // SuperScore "Média", Flamengo × Atlético-MG (26/10/2026): [xG, grandes chances]
+    const reais: [number, number][] = [
+      [1.8, 3.4],
+      [1.4, 2.6],
+    ];
+    const media = reais.reduce((s, [xg, gc]) => s + xg / gc, 0) / reais.length;
+    expect(Math.abs(media - FATOR_GRANDE_CHANCE)).toBeLessThan(0.02);
+    // o fator de chutes no alvo também confere com o xG lido: 1,8/5,7 e 1,4/5,0
+    expect(Math.abs((1.8 / 5.7 + 1.4 / 5.0) / 2 - FATOR_CHUTE_NO_ALVO)).toBeLessThan(0.03);
   });
   it('matchup limitado a ±8% e desfalque classificado', () => {
     const medio = { jogos: 10, golsPro: 1.3, golsContra: 1.3 };

@@ -142,6 +142,7 @@ export function estatisticasParaModelo(t: TabelaConsolidada, time: Time): Estati
 
   const xg = val(t, 'xg', time);
   const chutesNoAlvo = val(t, 'chutesNoAlvo', time);
+  const grandesChances = val(t, 'grandesChances', time);
   const defesas = val(t, 'defesasGoleiro', time);
   let chutesNoAlvoContra: number | undefined;
   if (defesas !== undefined) {
@@ -152,7 +153,15 @@ export function estatisticasParaModelo(t: TabelaConsolidada, time: Time): Estati
   }
   if (xg === undefined) faltando.push('xG');
   return {
-    stats: { jogos, golsPro, golsContra, xg, chutesNoAlvo, chutesNoAlvoContra },
+    stats: {
+      jogos,
+      golsPro,
+      golsContra,
+      xg,
+      chutesNoAlvo,
+      chutesNoAlvoContra,
+      grandesChances,
+    },
     declaracoes,
     faltando,
   };

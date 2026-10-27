@@ -7,6 +7,13 @@ import type { Lambdas, Time } from './tipos';
 export const MANDO_PADRAO = 1.12;
 export const MEDIA_GOLS_PADRAO = 1.3;
 export const FATOR_CHUTE_NO_ALVO = 0.32;
+/**
+ * xG por grande chance criada (todas as finalizações do time, não só a da grande chance).
+ * Calibrado com os prints reais do SuperScore (Média), Flamengo × Atlético-MG 26/10/2026:
+ * 1,8 xG / 3,4 grandes chances = 0,53 e 1,4 / 2,6 = 0,54. Amostra de 2 times: recalibrar
+ * com cada jogo que trouxer xG e grandes chances (ver teste "calibração do fator").
+ */
+export const FATOR_GRANDE_CHANCE = 0.53;
 export const LIMITE_MATCHUP = 0.08;
 export const FAIXA_LAMBDA = 0.1;
 
@@ -18,6 +25,8 @@ export interface EstatisticasTime {
   xg?: number;
   chutesNoAlvo?: number;
   chutesNoAlvoContra?: number;
+  /** grandes chances criadas por jogo */
+  grandesChances?: number;
 }
 
 export interface PriorTime {
@@ -57,10 +66,24 @@ export interface ResultadoLambdaModelo {
 export function producaoOfensiva(s: EstatisticasTime): { valor: number; metodo: string } {
   if (s.xg !== undefined)
     return { valor: 0.65 * s.xg + 0.35 * s.golsPro, metodo: '65% xG + 35% gols' };
+  const gc = s.grandesChances;
+  if (s.chutesNoAlvo !== undefined && gc !== undefined)
+    return {
+      valor:
+        0.5 * s.golsPro +
+        0.25 * FATOR_CHUTE_NO_ALVO * s.chutesNoAlvo +
+        0.25 * FATOR_GRANDE_CHANCE * gc,
+      metodo: 'sem xG: 50% gols + 25% (0,32 × chutes no alvo) + 25% (0,53 × grandes chances)',
+    };
   if (s.chutesNoAlvo !== undefined)
     return {
       valor: 0.5 * s.golsPro + 0.5 * FATOR_CHUTE_NO_ALVO * s.chutesNoAlvo,
       metodo: 'sem xG: 50% gols + 50% (0,32 × chutes no alvo)',
+    };
+  if (gc !== undefined)
+    return {
+      valor: 0.5 * s.golsPro + 0.5 * FATOR_GRANDE_CHANCE * gc,
+      metodo: 'sem xG: 50% gols + 50% (0,53 × grandes chances)',
     };
   return { valor: s.golsPro, metodo: 'só gols (sem xG e sem chutes no alvo — limitação)' };
 }

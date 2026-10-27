@@ -20,6 +20,7 @@ const ESSENCIAIS: CampoStat[] = [
   'golsSofridos',
   'xg',
   'chutesNoAlvo',
+  'grandesChances',
   'defesasGoleiro',
 ];
 
