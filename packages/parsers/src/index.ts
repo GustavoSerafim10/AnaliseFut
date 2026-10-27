@@ -1,7 +1,12 @@
 import { chaveSelecao, type LinhaOdd } from '@pe/engine';
 import type { OddLine } from '@pe/schemas';
-import { detectarFonte, type FonteDetectada } from './fonte';
-import { parse1win, type ContextoParser, type ResultadoParser } from './parser1win';
+import { detectarCasa, detectarFonte, type FonteDetectada } from './fonte';
+import {
+  parse1win,
+  parse1winVarios,
+  type ContextoParser,
+  type ResultadoParser,
+} from './parser1win';
 
 export * from './texto';
 export * from './times';
@@ -16,6 +21,31 @@ export * from './consolidacao';
 export interface LeituraPrint extends ResultadoParser {
   fonte: FonteDetectada;
   reconhecido: boolean;
+}
+
+export interface ContextoCasa extends ContextoParser {
+  /** horário do arquivo de cada print, na mesma ordem dos textos */
+  horariosPadrao?: (string | undefined)[];
+}
+
+/**
+ * Todos os prints de UMA casa de apostas → odds. O layout "título do mercado + rótulo [linha]
+ * odd" é o mesmo leitor para toda casa; o nome da casa vem da aba. Se o print mostrar a marca
+ * de outra casa, avisa (odd lançada na casa errada estraga o consenso e a melhor odd).
+ */
+export function lerOddsCasa(textos: string[], ctx: ContextoCasa): ResultadoParser {
+  const r = parse1winVarios(textos, ctx);
+  const casa = (ctx.casa ?? '1win').trim().toLowerCase();
+  const outras = new Set(
+    textos
+      .map(detectarCasa)
+      .filter(
+        (c): c is string => !!c && c.toLowerCase() !== casa && !casa.includes(c.toLowerCase()),
+      ),
+  );
+  for (const c of outras)
+    r.avisos.push(`há print com a marca da ${c}: confira se ele é mesmo da ${ctx.casa}`);
+  return r;
 }
 
 /** Texto do OCR → odds. Layout desconhecido = aviso, nunca valor inventado. */

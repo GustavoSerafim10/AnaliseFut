@@ -1,6 +1,8 @@
 /**
  * Dicionário de sinônimos: título do mercado no print → tipo de mercado do motor.
- * Calibrado com prints reais da 1win. Para uma casa nova, basta acrescentar padrões aqui.
+ * Calibrado com prints reais da 1win; os nomes usados por Bet365, Betano, Superbet e Pinnacle
+ * (em português) entram pelo formato público dessas casas, ainda sem prints reais.
+ * Para uma casa nova, basta acrescentar padrões aqui.
  */
 import type { NomesTimes, Periodo, Time, TipoMercado } from '@pe/engine';
 import { semAcento } from './texto';
@@ -34,9 +36,12 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [/chutes|finalizac|impediment|laterais|tiros de meta/, 'outro'],
   [/resultado correto|placar (exato|correto)|resultado exato/, 'placar_exato'],
   [/intervalo ?\/ ?final|intervalo final|ht ?\/ ?ft/, 'intervalo_final'],
-  [/dupla (chance|hipotese)|hipotese dupla|double chance/, 'DC'],
-  [/empate anula|draw no bet|\bdnb\b/, 'DNB'],
-  [/ambos (os times )?marca|ambas (as equipes )?marca|\bbtts\b|both teams/, 'ambas'],
+  [/dupla (chance|hipotese)|(chance|hipotese) dupla|double chance/, 'DC'],
+  [/empate anula|empate devolve|draw no bet|\bdnb\b/, 'DNB'],
+  [
+    /ambos (os )?(times )?marca|ambas (as )?(equipes )?marca|\bbtts\b|both teams|gol de ambos/,
+    'ambas',
+  ],
   [/marcar em ambos os tempos/, 'marcar_2_tempos'],
   [/vencer sem sofrer/, 'vencer_sem_sofrer'],
   [/primeiro gol|marcar o primeiro|marca primeiro/, 'primeiro_gol'],
@@ -45,11 +50,11 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [/handicap( asiatico)?/, 'AH'],
   [/par ?\/ ?impar|impar ?\/ ?par|par ou impar/, 'par_impar'],
   [
-    /resultado do tempo regulamentar|resultado (final|do jogo)|\b1x2\b|vencedor (da partida|do jogo)|^resultado$/,
+    /resultado do tempo regulamentar|resultado (final|do jogo|da partida)|\b1x2\b|vencedor (da partida|do jogo|do encontro)|money ?line|^resultado$/,
     '1X2',
   ],
   [
-    /total de gols|gols mais ?\/ ?menos|over ?\/ ?under|mais ?\/ ?menos|^total\b|\btotal\b/,
+    /total de gols|gols mais ?\/ ?menos|gols \+ ?\/ ?-|over ?\/ ?under|mais ?\/ ?menos|acima ?\/ ?abaixo|^total\b|\btotal\b/,
     'total',
   ],
 ];

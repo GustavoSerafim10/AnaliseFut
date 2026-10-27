@@ -22,6 +22,27 @@ const PISTAS: Record<
   },
 };
 
+/** Marca de cada casa de apostas no print (logo, rodapé, endereço). */
+const MARCAS_CASAS: [string, RegExp][] = [
+  ['1win', /\b1\s?win\b/],
+  ['Bet365', /\bbet\s?365\b/],
+  ['Betano', /\bbetano\b/],
+  ['Superbet', /\bsuperbet\b/],
+  ['Pinnacle', /\bpinnacle\b/],
+  ['Betfair', /\bbetfair\b/],
+  ['Sportingbet', /\bsportingbet\b/],
+  ['KTO', /\bkto\b/],
+  ['EstrelaBet', /\bestrela\s?bet\b/],
+  ['Novibet', /\bnovibet\b/],
+  ['Esportes da Sorte', /esportes da sorte/],
+];
+
+/** Casa de apostas cujo nome aparece no print, ou null. */
+export function detectarCasa(texto: string): string | null {
+  const t = semAcento(texto);
+  return MARCAS_CASAS.find(([, re]) => re.test(t))?.[0] ?? null;
+}
+
 export function detectarFonte(texto: string): { fonte: FonteDetectada; pontos: number } {
   const t = semAcento(texto);
   let melhor: FonteDetectada = 'desconhecida';

@@ -1,5 +1,5 @@
 import { chaveSelecao, type LinhaOdd, type TipoMercado } from '@pe/engine';
-import { juntarLinhas, parse1winVarios } from '@pe/parsers';
+import { juntarLinhas, lerOddsCasa } from '@pe/parsers';
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
@@ -33,7 +33,7 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const daCasa = r.odds.map((l, i) => ({ l, i })).filter(({ l }) => l.casa === casa);
   // todos os prints da casa lidos juntos: blocos sem título herdam o mercado pela linha repetida
   const lerTodos = (prints: Leitura[]) =>
-    parse1winVarios(
+    lerOddsCasa(
       prints.map((p) => p.texto),
       {
         jogo: nomes,
@@ -119,6 +119,13 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         }
       />
 
+      {leitura.avisos
+        .filter((a) => !a.startsWith('horário'))
+        .map((a) => (
+          <div key={a} className="caixa alerta">
+            {a}
+          </div>
+        ))}
       {leitura.ignoradas > 0 && (
         <p className="dica">
           {leitura.ignoradas} linhas de mercados sem modelo (primeiro cartão, vitória antecipada,

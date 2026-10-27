@@ -1,5 +1,7 @@
 /**
- * Parser do layout da 1win, calibrado com prints reais (Flamengo × Atlético-MG, 26/10/2026):
+ * Leitor de odds por título de mercado + "rótulo [linha] odd". Serve para qualquer casa com
+ * esse layout (Bet365, Betano, Superbet, Pinnacle…); calibrado com prints reais da 1win
+ * (Flamengo × Atlético-MG, 26/10/2026):
  *   Total                                   ← título do mercado
  *   Abaixo De 2.5 2.4 | Acima De 2.5 1.58   ← "rótulo [linha] odd" na mesma linha
  *   CR Flamengo Empate Atlético-MG          ← rótulos numa linha…
@@ -71,6 +73,8 @@ const CONFIANCA_CORRIGIDA = 0.45;
 export function normalizar1win(texto: string): string {
   return (
     normalizarTexto(texto)
+      // "+1.5" / "+ 1.5" (Pinnacle, Bet365): o sinal grudado ou solto antes da linha
+      .replace(/([ \t]|^)\+[ \t]+(\d)/gm, '$1+$2')
       // "AcimaDel5" / "AcimaDe25" / "AcimaDe?2.0" → "Acima De 1.5"; linha de total tem 1 casa decimal
       .replace(
         /\b(abaixo|acima)[ \t]*de[ \t]*\??([l\d][\dl]*(?:\.\d+)?)/gi,
@@ -228,7 +232,14 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
       return comoLado(ladoResultado(rotulo, jogo, false));
     case 'DC': {
       const r = semAcento(rotulo).replace(/\s/g, '');
-      return /^(1x|12|x2)$/.test(r) ? { lado: r.toUpperCase() } : null;
+      if (/^(1x|12|x2)$/.test(r)) return { lado: r.toUpperCase() };
+      // "Flamengo ou Empate", "Flamengo/Atlético-MG", "Empate ou Atlético-MG"
+      const partes = semAcento(rotulo).split(/\s+ou\s+|\s*\/\s*/);
+      if (partes.length !== 2) return null;
+      const r1x2 = partes.map((p) => ladoResultado(p, jogo, true));
+      if (r1x2.some((x) => !x) || r1x2[0] === r1x2[1]) return null;
+      const lado = ['1', 'X', '2'].filter((x) => r1x2.includes(x)).join('');
+      return { lado };
     }
     case 'ambas':
       return comoLado(ladoSimNao(rotulo));
@@ -266,6 +277,10 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   const doPrint = horarioDoTexto(linhasTexto, ctx);
   const horarioColeta = doPrint ?? ctx.horarioPadrao;
   const avisos: string[] = [];
+  if (/(^|\s)\d{1,2}\/\d{1,2}(\s|$)/m.test(texto) && !/\d\.\d/.test(texto))
+    avisos.push(
+      'odds parecem fracionárias (ex.: 5/4): mude a casa para o formato decimal e envie de novo',
+    );
   const naoReconhecidas: string[] = [];
   const linhas: OddLine[] = [];
   let ignoradas = 0;
@@ -304,8 +319,10 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
     if (!temNumeroDecimal(bruta) && !/^[\d\s.]+$/.test(bruta)) {
       const t = semAcento(bruta);
-      // cabeçalho de tabela "Abaixo De | Acima De" / "Menos | Mais"
-      if (mercado && /abaixo|menos|under/.test(t) && /acima|mais|over/.test(t)) {
+      // cabeçalho de tabela "Abaixo De | Acima De" / "Menos | Mais" — só essas palavras
+      // ("Gols Mais/Menos" é título de mercado, não cabeçalho)
+      const soColunas = !t.replace(/abaixo|acima|menos|mais|under|over|\bde\b|[|/\s]/g, '');
+      if (mercado && soColunas && /abaixo|menos|under/.test(t) && /acima|mais|over/.test(t)) {
         colunas =
           t.search(/abaixo|menos|under/) < t.search(/acima|mais|over/)
             ? ['under', 'over']
@@ -344,6 +361,30 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     }
 
     const tokens = bruta.split(/[\s|]+/).filter(Boolean);
+
+    // handicap em colunas por time, só números: "-1.5 1.85 +1.5 2.01" (Bet365, Pinnacle)
+    if (
+      HANDICAPS.has(mercado.mercado) &&
+      tokens.length === 4 &&
+      tokens.every((t) => lerNumero(t) !== null)
+    ) {
+      const [l1, , l2] = tokens.map((t) => lerNumero(t) as number);
+      const o1 = lerOdd(tokens[1]);
+      const o2 = lerOdd(tokens[3]);
+      if (Math.abs(l1 + l2) < 1e-9 && o1 && o2 && o1.odd > 1 && o2.odd > 1) {
+        let primeiro: 'casa' | 'fora' = 'casa';
+        if (rotulosPendentes) {
+          const t = semAcento(rotulosPendentes);
+          const pc = t.search(new RegExp(semAcento(ctx.jogo.casa).split(/\s+/)[0]));
+          const pf = t.search(new RegExp(semAcento(ctx.jogo.fora).split(/[\s-]+/)[0]));
+          if (pc >= 0 && pf >= 0 && pf < pc) primeiro = 'fora';
+        }
+        const segundo = primeiro === 'casa' ? 'fora' : 'casa';
+        emitir({ lado: primeiro }, o1, l1);
+        emitir({ lado: segundo }, o2, l2);
+        continue;
+      }
+    }
 
     // só odds, com os rótulos na linha de cima: usa a ordem padrão do mercado
     const ordem = ORDEM_PADRAO[mercado.mercado];
