@@ -14,6 +14,8 @@ export interface PropsAba {
   setFigurinhas?: (f: Figurinhas) => void;
   galeria?: string[];
   setGaleria?: (g: string[]) => void;
+  /** abre o modo estádio (animação em tela cheia) */
+  verLance?: () => void;
 }
 
 /** Helpers para adicionar/remover textos de prints de um grupo. */

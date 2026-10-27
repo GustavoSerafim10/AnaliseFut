@@ -77,6 +77,8 @@ export interface Derivado {
   v4: ResultadoV4 | null;
   movimentos: Movimento[];
   atrasos: Atraso[];
+  /** travas da banca recebidas do histórico (só repassadas para a tela) */
+  travas?: TravasBanca;
   resultado: ResultadoAnalise | null;
   relatorio: Relatorio | null;
 }
@@ -292,6 +294,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     v4,
     movimentos,
     atrasos,
+    travas,
     resultado,
     relatorio,
   };

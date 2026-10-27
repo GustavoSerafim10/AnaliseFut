@@ -1,5 +1,5 @@
 import { EditorFigurinhas } from '../componentes/Figurinhas';
-import { Trio } from '../componentes/Trio';
+import { Icone } from '../componentes/ui';
 import type { Rascunho } from '../estado';
 import type { PropsAba } from './tipos';
 
@@ -39,6 +39,7 @@ export function AbaJogo({
   setFigurinhas,
   galeria,
   setGaleria,
+  verLance,
 }: PropsAba) {
   const jogo = (campo: keyof Rascunho['jogo'], v: string) =>
     setR((x) => ({ ...x, jogo: { ...x.jogo, [campo]: v } }));
@@ -49,27 +50,20 @@ export function AbaJogo({
   return (
     <section className="passo">
       {vazio && (
-        <div className="vestiario">
-          <Trio tamanho={64} nomes />
-          <h2>Bora pro jogo?</h2>
+        <div className="intro">
+          <div className="intro-rotulo">Inteligência de preço pré-live</div>
+          <h2>Comece pela partida</h2>
           <p>
-            Escala os times, manda os prints das estatísticas e das odds, e o motor diz se alguma
-            casa está pagando acima do preço justo. Sem preço, sem jogada: <strong>NO BET</strong>.
+            Cadastre o jogo, envie os prints das estatísticas e das odds. O motor compara cada casa
+            com o preço justo da referência e só aponta entrada quando o preço paga com folga. Sem
+            preço, <strong>NO BET</strong>.
           </p>
           {abrirExemplo && (
             <button className="primario" onClick={abrirExemplo}>
-              ⚽ Ver um jogo de exemplo
+              <Icone nome="bola" /> Ver um jogo de exemplo
             </button>
           )}
         </div>
-      )}
-      {figurinhas && setFigurinhas && galeria && setGaleria && (
-        <EditorFigurinhas
-          figurinhas={figurinhas}
-          setFigurinhas={setFigurinhas}
-          galeria={galeria}
-          setGaleria={setGaleria}
-        />
       )}
       <h2>Jogo</h2>
       <div className="grade2">
@@ -153,6 +147,27 @@ export function AbaJogo({
           Padrão do protocolo: 1,30 gols por time e mando 1,12 (1,00 em campo neutro). Escanteios
           (5,0) e cartões (2,2) por time servem de base para os mercados de nível 3.
         </p>
+      </details>
+
+      <details className="caixa">
+        <summary>Modo estádio (animação e figurinhas)</summary>
+        <p className="dica">
+          A tabela 10 → 11 → 10 com chapéu e golaço, em tela cheia. Pura diversão: não mexe na
+          análise.
+        </p>
+        {verLance && (
+          <button className="primario" onClick={verLance}>
+            ▶ Ver o lance
+          </button>
+        )}
+        {figurinhas && setFigurinhas && galeria && setGaleria && (
+          <EditorFigurinhas
+            figurinhas={figurinhas}
+            setFigurinhas={setFigurinhas}
+            galeria={galeria}
+            setGaleria={setGaleria}
+          />
+        )}
       </details>
     </section>
   );

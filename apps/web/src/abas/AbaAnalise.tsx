@@ -2,6 +2,11 @@ import { NOME_ESTATISTICA, NOMES_TESE, relatorioEmTexto, type ResultadoAnalise }
 import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
+import { Auditoria } from '../componentes/Auditoria';
+import { CentroDecisao } from '../componentes/CentroDecisao';
+import { ComparativoOdds } from '../componentes/ComparativoOdds';
+import { Distribuicao } from '../componentes/Distribuicao';
+import { Indicadores } from '../componentes/Indicadores';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { PropsAba } from './tipos';
@@ -122,16 +127,18 @@ export function AbaAnalise({
         ))}
       </div>
 
-      {d.pendenciasV4.length > 0 && (
-        <div className="caixa alerta">
-          <strong>Falta para analisar:</strong>
-          <ul>
-            {d.pendenciasV4.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
+      <Indicadores d={d} />
+      <div className="grade-analise">
+        <div className="coluna">
+          <CentroDecisao d={d} />
+          <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
         </div>
-      )}
+        <div className="coluna">
+          <ComparativoOdds d={d} />
+          <Auditoria r={r} d={d} />
+        </div>
+      </div>
+
       {!d.pendenciasV4.length && d.pendencias.length > 0 && (
         <div className="caixa">
           <strong>Motor de apoio (V3.3) desligado:</strong> sem ele não há filtro do modelo, preço

@@ -10,7 +10,8 @@ import { AbaTabela } from './abas/AbaTabela';
 import { AbaUltimas } from './abas/AbaUltimas';
 import { Estadio } from './componentes/Estadio';
 import { GaleriaFundo } from './componentes/GaleriaFundo';
-import { Trio } from './componentes/Trio';
+import { MatchCenter } from './componentes/MatchCenter';
+import { Icone, type NomeIcone } from './componentes/ui';
 import {
   carregarFigurinhas,
   carregarGaleria,
@@ -47,6 +48,19 @@ type Aba =
   | { id: 'odds'; casa: string };
 
 const chave = (a: Aba) => (a.id === 'odds' ? `odds:${a.casa}` : a.id);
+
+const ICONE_ABA: Partial<Record<Aba['id'], NomeIcone>> = {
+  jogo: 'bola',
+  sofascore: 'barras',
+  superscore: 'barras',
+  flashscore: 'barras',
+  tabela: 'barras',
+  ultimas: 'barras',
+  odds: 'mercado',
+  analise: 'alvo',
+  historico: 'historico',
+  promocoes: 'presente',
+};
 
 const DECISAO_CLASSE: Record<string, string> = {
   BET: 'bet',
@@ -148,7 +162,7 @@ export function App() {
     {
       titulo: '',
       abas: [
-        { aba: { id: 'analise' }, rotulo: 'Análise ▶' },
+        { aba: { id: 'analise' }, rotulo: 'Análise' },
         {
           aba: { id: 'historico' },
           rotulo: 'Histórico',
@@ -207,57 +221,49 @@ export function App() {
     setFigurinhas,
     galeria,
     setGaleria,
+    verLance: () => setVerLance(true),
   };
   const decisao = d.v4?.decisao;
+  const temJogo = !!(r.jogo.casa || r.jogo.fora);
+  const mostraMatchCenter = temJogo && aba.id !== 'historico' && aba.id !== 'promocoes';
   return (
     <>
-      <GaleriaFundo fotos={galeria} />
-      <Estadio fotos={figurinhas} comGaleria={galeria.length > 0} />
+      <div className="ambiente" aria-hidden="true" />
+      {verLance && (
+        <>
+          <GaleriaFundo fotos={galeria} />
+          <Estadio fotos={figurinhas} comGaleria={galeria.length > 0} />
+          <button className="sair-lance" onClick={() => setVerLance(false)}>
+            ✕ Voltar para a análise
+          </button>
+        </>
+      )}
       <header className="topo">
         <div className="marca-topo">
-          <Trio tamanho={30} />
-          <div>
-            <div className="nome-site">
-              {r.jogo.casa && r.jogo.fora ? (
-                <>
-                  {r.jogo.casa} <span className="x">×</span> {r.jogo.fora}
-                </>
-              ) : (
-                'Pricing Engine'
-              )}
-            </div>
-            <div className="sub-site">
-              {decisao ? (
-                <span className={`selo ${DECISAO_CLASSE[decisao] ?? 'nobet'}`}>{d.v4!.rotulo}</span>
-              ) : (
-                'V4.0 · NO BET é o padrão'
-              )}
-            </div>
-          </div>
+          <svg className="logo" viewBox="0 0 40 40" aria-hidden="true">
+            <path d="M6 30 L16 8 H34 L30 17 H22 L18 26 H26 L24 31 H10 Z" />
+          </svg>
+          <div className="nome-site">Pricing Engine</div>
+          <span className="pilula-versao">PRÉ-LIVE • V4.0</span>
+          {decisao && (
+            <span className={`selo ${DECISAO_CLASSE[decisao] ?? 'nobet'}`}>
+              {decisao.replace('_', ' ')}
+            </span>
+          )}
         </div>
-        <div className="linha-acoes" style={{ margin: 0, flexWrap: 'nowrap' }}>
-          <button className="mini botao-lance" onClick={() => setVerLance(true)}>
-            ▶ Ver o lance
-          </button>
-          <button className="discreto" onClick={novaAnalise}>
-            Nova análise
-          </button>
-        </div>
-      </header>
-      {verLance && (
-        <button className="sair-lance" onClick={() => setVerLance(false)}>
-          ✕ Voltar para a análise
+        <button className="discreto" onClick={novaAnalise}>
+          Nova análise
         </button>
-      )}
+      </header>
       {demo && (
         <div className="faixa-demo">
-          ⚽ Jogo de exemplo (odds fictícias): nada aqui é salvo.{' '}
+          Jogo de exemplo (odds fictícias): nada aqui é salvo.{' '}
           <button className="mini" onClick={() => irPara('')}>
             sair do exemplo
           </button>
         </div>
       )}
-      <nav className="abas">
+      <nav className="abas" aria-label="Seções">
         {grupos.map((g, gi) => (
           <div key={gi} className="grupo-abas">
             {g.titulo && <span className="titulo-grupo">{g.titulo}</span>}
@@ -265,8 +271,10 @@ export function App() {
               <button
                 key={chave(a)}
                 className={chave(a) === chave(aba) ? 'ativo' : ''}
+                aria-current={chave(a) === chave(aba) ? 'page' : undefined}
                 onClick={() => setAba(a)}
               >
+                {ICONE_ABA[a.id] && <Icone nome={ICONE_ABA[a.id]!} tamanho={16} />}
                 {rotulo}
                 {marca && <span className="marca">{marca}</span>}
               </button>
@@ -279,7 +287,8 @@ export function App() {
           </div>
         ))}
       </nav>
-      <main>
+      {mostraMatchCenter && <MatchCenter r={r} d={d} />}
+      <main key={chave(aba)} className="conteudo-aba">
         {aba.id === 'jogo' && <AbaJogo {...props} />}
         {aba.id === 'sofascore' && <AbaStats {...props} fonte="sofascore" />}
         {aba.id === 'superscore' && <AbaStats {...props} fonte="superscore" />}
@@ -310,11 +319,7 @@ export function App() {
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
       </main>
       <footer className="rodape">
-        <Trio tamanho={22} nomes />
-        <p>
-          Ginga do R10, drible do Ney, visão do Messi.
-          <br />E a disciplina de quem só entra quando o preço paga.
-        </p>
+        Pricing Engine V4.0 · referência afiada × casa mole · NO BET é o padrão
       </footer>
     </>
   );
