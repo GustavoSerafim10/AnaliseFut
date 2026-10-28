@@ -106,9 +106,11 @@ export function AbaAnalise({
     { nome: 'Últimas partidas', ok: nUltimas > 0, obrigatorio: false },
     {
       nome: 'Odds',
-      ok: r.odds.length > 0 && !d.errosOdds,
+      ok: d.oddsValidas.length > 0,
       obrigatorio: true,
-      detalhe: r.odds.length ? `${r.odds.length} · ${r.casas.length} casa(s)` : '',
+      detalhe: r.odds.length
+        ? `${r.odds.length} · ${r.casas.length} casa(s)${d.errosOdds ? ` · ${d.errosOdds} com erro fora` : ''}`
+        : '',
     },
   ];
 
@@ -329,7 +331,18 @@ export function AbaAnalise({
                 <td>{DEF_CAMPO[c.campo].rotulo}</td>
                 {(['casa', 'fora'] as const).map((t) => {
                   const v = d.tabela[c.campo]?.[t];
-                  const duvida = !!v && (v.divergente || v.avisos.length > 0);
+                  // vermelho só para o que pede conferência: sites divergem, ou aviso de leitura
+                  // que não seja rotina (ponto decimal reposto); os dois sites concordando, ou
+                  // valor corrigido à mão, não é dúvida
+                  const concordam =
+                    v?.porFonte.sofascore !== undefined &&
+                    v?.porFonte.superscore !== undefined &&
+                    !v.divergente;
+                  const duvida =
+                    !!v &&
+                    v.fonte !== 'manual' &&
+                    (v.divergente ||
+                      (!concordam && v.avisos.some((a) => !/ponto decimal perdido/.test(a))));
                   return (
                     <td
                       key={t}

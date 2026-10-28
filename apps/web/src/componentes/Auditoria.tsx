@@ -45,11 +45,19 @@ export function etapasDoPipeline(r: Rascunho, d: Derivado): Etapa[] {
   return [
     {
       nome: 'Contexto',
-      estado: !temJogo || d.errosOdds ? 'falha' : r.odds.length ? 'ok' : 'pendente',
+      estado: !temJogo
+        ? 'falha'
+        : !r.odds.length
+          ? 'pendente'
+          : !d.oddsValidas.length
+            ? 'falha'
+            : d.errosOdds
+              ? 'alerta'
+              : 'ok',
       detalhe: !temJogo
         ? 'faltam times ou hora'
         : d.errosOdds
-          ? `${d.errosOdds} erro(s) de leitura`
+          ? `${d.errosOdds} odd(s) com erro fora da análise`
           : r.odds.length
             ? quando(coleta) || `${r.odds.length} odds`
             : 'nenhuma odd lida',

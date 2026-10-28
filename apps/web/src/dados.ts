@@ -94,6 +94,8 @@ export interface Derivado {
   destaques: string[];
   problemasOdds: ProblemaLinha[];
   errosOdds: number;
+  /** odds que entram no motor: as lidas menos as com erro (as com erro ficam de fora, não travam) */
+  oddsValidas: LinhaOdd[];
   /** o que falta para a V4.0 (jogo + odds) */
   pendenciasV4: string[];
   /** o que falta para o motor de apoio V3.3 (estatísticas) */
@@ -214,12 +216,18 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
 
   const problemasOdds = checarSanidade(r.odds as LinhaOdd[]);
   const errosOdds = problemasOdds.filter((p) => p.nivel === 'erro').length;
+  // uma linha com erro de leitura sai da análise; as outras seguem (antes 9 erros em 120 travavam tudo)
+  const comErro = new Set(problemasOdds.filter((p) => p.nivel === 'erro').map((p) => p.indice));
+  const oddsValidas = (r.odds as LinhaOdd[]).filter((_, i) => !comErro.has(i));
 
   const pendenciasV4: string[] = [];
   if (!temTimes) pendenciasV4.push('Jogo: preencher mandante e visitante');
   if (!r.jogo.hora) pendenciasV4.push('Jogo: preencher a hora do início');
   if (!r.odds.length) pendenciasV4.push('Odds: nenhuma odd lida ainda');
-  if (errosOdds) pendenciasV4.push(`Odds: ${errosOdds} erro(s) em vermelho para corrigir`);
+  if (r.odds.length && !oddsValidas.length)
+    pendenciasV4.push(
+      `Odds: todas as ${r.odds.length} com erro em vermelho; corrija na aba Mercado`,
+    );
   const pendencias: string[] = [...pendenciasV4];
   for (const [t, m] of [
     ['casa', modeloCasa],
@@ -236,7 +244,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       dq: dq.dq,
       lambdaModelo: lambda.lambdas,
       lambdasContagem,
-      linhas: r.odds as LinhaOdd[],
+      linhas: oddsValidas,
       contexto: {
         favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
         escalacaoIncerta,
@@ -263,7 +271,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     const argumentos = r.redTeam.argumentos.map((a) => a.trim()).filter(Boolean);
     v4 = analisarV4({
       jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
-      linhas: r.odds as LinhaOdd[],
+      linhas: oddsValidas,
       ligaPrincipal: r.config.ligaTop,
       escalacaoIncerta,
       noticia: r.noticia,
@@ -325,6 +333,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     destaques: destaquesComparativos(tabela, nomes),
     problemasOdds,
     errosOdds,
+    oddsValidas,
     pendenciasV4,
     pendencias,
     v4,

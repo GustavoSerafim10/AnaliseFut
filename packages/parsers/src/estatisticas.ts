@@ -627,6 +627,9 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       else avisos.push(`"${bruto}": só um valor legível, não dá para saber de qual time`);
     }
     if (!esq && !dir) continue;
+    // mesmo nome, outra métrica: "Bolas longas certas" do SuperScore (4,4) não é a do SofaScore
+    // (16,3 por jogo); fica em "outros" para não virar divergência falsa
+    if (fonte === 'superscore' && def?.campo === 'bolasLongas') def = null;
     filas.push({ bruto, rotulo: rot.txt, def, esq, dir, avisoPosicao });
   }
 

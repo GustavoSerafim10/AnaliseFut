@@ -93,7 +93,13 @@ export function AbaJogo({
         ? `${r.odds.length} odds · ${r.casas.length} casa(s)`
         : 'Referência + casa onde vai apostar',
       icone: 'mercado',
-      estado: d.errosOdds ? 'erro' : r.odds.length ? 'ok' : 'pendente',
+      estado: !r.odds.length
+        ? 'pendente'
+        : !d.oddsValidas.length
+          ? 'erro'
+          : d.errosOdds
+            ? 'parcial'
+            : 'ok',
       ir: abrir && (() => abrir('odds')),
     },
     {
