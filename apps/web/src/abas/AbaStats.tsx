@@ -36,7 +36,11 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         {...acoesPrints(setR, fonte)}
       />
 
-      <RaioX d={d} nomes={{ casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' }} />
+      <RaioX
+        d={d}
+        nomes={{ casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' }}
+        correcoes={Object.keys(r.correcoes).length}
+      />
 
       {leitura && (
         <>
@@ -45,6 +49,7 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
               ⚠️ {a}
             </div>
           ))}
+          <h3>O que o {info.titulo} leu (só este site)</h3>
           <div className="tabela-rolavel">
             <table>
               <thead>

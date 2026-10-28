@@ -97,7 +97,24 @@ function Radar({
   );
 }
 
-export function RaioX({ d, nomes }: { d: Derivado; nomes: Record<Time, string> }) {
+export function RaioX({
+  d,
+  nomes,
+  correcoes = 0,
+}: {
+  d: Derivado;
+  nomes: Record<Time, string>;
+  /** quantos valores você corrigiu à mão (entram por cima das fontes) */
+  correcoes?: number;
+}) {
+  // de onde vieram os números: o Raio-X é o mesmo em todas as abas (é o que entra no modelo)
+  const origem = [
+    d.sofa &&
+      Object.keys(d.sofa.campos).length &&
+      `SofaScore (${Object.keys(d.sofa.campos).length})`,
+    d.sup && Object.keys(d.sup.campos).length && `SuperScore (${Object.keys(d.sup.campos).length})`,
+    correcoes > 0 && `${correcoes} correção(ões) à mão`,
+  ].filter(Boolean);
   // gols por jogo: o mesmo número que entra no λ (total ÷ partidas, ou o "por jogo" lido)
   const doModelo: Partial<Record<CampoStat, Record<Time, number | undefined>>> = {
     golsPorJogo: { casa: d.modeloCasa.stats?.golsPro, fora: d.modeloFora.stats?.golsPro },
@@ -175,7 +192,11 @@ export function RaioX({ d, nomes }: { d: Derivado; nomes: Record<Time, string> }
                 );
               })}
             </ul>
-            <p className="miudo">Valores consolidados das fontes lidas (e das suas correções).</p>
+            <p className="miudo">
+              Consolidado de todas as fontes: {origem.join(' + ') || 'nenhuma'}. É o mesmo em todas
+              as abas e é o que entra no modelo; o que cada site leu sozinho fica na tabela da aba
+              dele.
+            </p>
           </div>
         )}
 
