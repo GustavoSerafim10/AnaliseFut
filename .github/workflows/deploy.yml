@@ -11,6 +11,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -40,5 +41,19 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Se o Pages estiver em "Deploy from a branch", o GitHub roda o Jekyll dele no mesmo push
+      # e publica o README; quem termina por último fica no ar. Espera ele acabar e publica
+      # depois (o certo é Settings → Pages → Source = GitHub Actions, aí ele nem roda).
+      - name: Espera o deploy automático do GitHub (Jekyll) terminar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 30); do
+            n=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=${{ github.sha }}" \
+              --jq '[.workflow_runs[] | select(.name == "pages build and deployment" and .status != "completed")] | length')
+            echo "Jekyll em andamento: $n"
+            [ "$n" = "0" ] && break
+            sleep 10
+          done
       - id: deployment
         uses: actions/deploy-pages@v4
