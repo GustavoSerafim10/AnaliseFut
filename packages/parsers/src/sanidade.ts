@@ -45,6 +45,14 @@ const POR_TIME: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'escanteios_time',
   'cartoes_time',
 ]);
+/** maior linha que existe de verdade (gols): acima disso é OCR ("1,5" → "13,5") */
+const LINHA_MAXIMA: Partial<Record<TipoMercado, number>> = {
+  total: 7.5,
+  total_time: 5.5,
+  AH: 4,
+  AH_europeu: 4,
+};
+
 const TOTAIS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'total',
   'escanteios_total',
@@ -64,6 +72,10 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
       add(i, 'erro', 'linha obrigatória neste mercado');
     if (POR_TIME.has(l.mercado) && !l.time) add(i, 'erro', 'informar de qual time é o total');
     if (!l.horarioColeta) add(i, 'alerta', 'sem horário de coleta: não serve para o price gate');
+    // linha de gols impossível: "1,5" lido como "13,5"
+    const max = LINHA_MAXIMA[l.mercado];
+    if (max !== undefined && l.linha !== undefined && Math.abs(l.linha) > max)
+      add(i, 'erro', `linha ${l.linha} impossível neste mercado (máx. ±${max}): lida errado?`);
   });
 
   // margem por casa + mercado
@@ -111,6 +123,22 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
         normalizarLado(l.lado) === lado,
     );
   for (const casa of new Set(linhas.map((l) => l.casa.toLowerCase()))) {
+    // "sem gol" é sempre o menos provável dos três: time com odd ≥ a dele é odd trocada
+    // (São Paulo "@ 13" para marcar primeiro era a odd de sem gol)
+    const pn = odd(casa, 'primeiro_gol', 'nenhum');
+    for (const lado of ['casa', 'fora'])
+      for (const mercado of ['primeiro_gol', 'ultimo_gol']) {
+        const i = odd(casa, mercado, lado);
+        const n = mercado === 'primeiro_gol' ? pn : odd(casa, mercado, 'nenhum');
+        if (i >= 0 && n >= 0 && linhas[i].odd >= linhas[n].odd)
+          [i, n].forEach((k) =>
+            add(
+              k,
+              'erro',
+              `${mercado === 'primeiro_gol' ? 'primeiro' : 'último'} gol: ${lado} @ ${linhas[i].odd} não pode pagar o mesmo ou mais que "sem gol" @ ${linhas[n].odd}: odd trocada na leitura?`,
+            ),
+          );
+      }
     const [c1, c2] = [odd(casa, '1X2', '1'), odd(casa, '1X2', '2')];
     const [p1, p2] = [odd(casa, 'primeiro_gol', 'casa'), odd(casa, 'primeiro_gol', 'fora')];
     if ([c1, c2, p1, p2].some((i) => i < 0)) continue;

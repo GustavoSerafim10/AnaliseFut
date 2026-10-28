@@ -6,6 +6,7 @@ import {
   detectarFonte,
   detectarTituloMercado,
   juntarLinhas,
+  lerEstatisticas,
   lerPrint,
   parse1win,
   reconhecerTime,
@@ -186,5 +187,46 @@ describe('sanidade: primeiro gol contra o favorito do 1X2', () => {
       l('primeiro_gol', 'nenhum', 13),
     ]);
     expect(p.some((x) => x.mensagem.includes('primeiro gol'))).toBe(false);
+  });
+});
+
+describe('sanidade: odds e linhas impossíveis (Bahia × São Paulo)', () => {
+  const l = (mercado: string, lado: string, odd: number, extra: Partial<LinhaOdd> = {}): LinhaOdd =>
+    ({
+      casa: '1win',
+      mercado,
+      periodo: 'FT',
+      lado,
+      odd,
+      horarioColeta: '2026-10-28T16:13:00-03:00',
+      ...extra,
+    }) as LinhaOdd;
+  it('primeiro gol "fora @ 13" com "sem gol @ 13": odd trocada, mesmo sem 1X2 lido', () => {
+    const p = checarSanidade([
+      l('primeiro_gol', 'casa', 1.62),
+      l('primeiro_gol', 'fora', 13),
+      l('primeiro_gol', 'nenhum', 13),
+    ]);
+    const erros = p.filter((x) => x.nivel === 'erro' && x.mensagem.includes('sem gol'));
+    expect(new Set(erros.map((e) => e.indice))).toEqual(new Set([1, 2]));
+  });
+  it('"menos de 13,5 gols" de um time é linha impossível', () => {
+    const p = checarSanidade([
+      l('total_time', 'under', 1.97, { linha: 13.5, time: 'casa' }),
+      l('total_time', 'over', 1.8, { linha: 13.5, time: 'casa' }),
+    ]);
+    expect(p.filter((x) => x.mensagem.includes('impossível')).map((x) => x.indice)).toEqual([0, 1]);
+  });
+});
+
+describe('médias da temporada impossíveis são descartadas', () => {
+  it('gols sofridos por jogo 0,3 e defesas 0,4 (OCR) ficam vazios', () => {
+    const c = lerEstatisticas(
+      'Bahia São Paulo\nGols sofridos por jogo 0.3 1.1\nDefesas por jogo 0.4 2.6',
+      'sofascore',
+      { casa: 'Bahia', fora: 'São Paulo' },
+    ).campos;
+    expect(c.golsSofridosPorJogo).toMatchObject({ casa: undefined, fora: 1.1 });
+    expect(c.defesasGoleiro).toMatchObject({ casa: undefined, fora: 2.6 });
   });
 });

@@ -69,7 +69,7 @@ export const CAMPOS_STATS: DefCampo[] = [
     rotulo: 'Gols sofridos por jogo',
     re: /gols sofridos por/,
     formato: 'decimal1',
-    faixa: [0, 5],
+    faixa: [0.4, 4],
   },
   {
     campo: 'golsMarcados',
@@ -91,7 +91,7 @@ export const CAMPOS_STATS: DefCampo[] = [
     // só o rótulo exato: "Gols <lixo do OCR>" não pode virar média de gols
     re: /gols por (partida|jogo)|^gols$/,
     formato: 'decimal1',
-    faixa: [0, 5],
+    faixa: [0.4, 4],
   },
   // média de xG na temporada abaixo de 0,2 não existe: é OCR ("0", "1" sem ponto)
   { campo: 'xgot', rotulo: 'xGOT', re: /xgot|xcot/, formato: 'decimal1', faixa: [0.2, 4] },
@@ -247,7 +247,7 @@ export const CAMPOS_STATS: DefCampo[] = [
     rotulo: 'Defesas do goleiro por jogo',
     re: /defesas/,
     formato: 'decimal1',
-    faixa: [0, 10],
+    faixa: [1, 8],
   },
   {
     campo: 'assistencias',
