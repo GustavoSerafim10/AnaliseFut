@@ -228,6 +228,11 @@ export function App() {
     galeria,
     setGaleria,
     verLance: () => setVerLance(true),
+    abrir: (id: 'sofascore' | 'tabela' | 'odds' | 'analise') => {
+      if (id !== 'odds') setAba({ id });
+      else if (r.casas[0]) setAba({ id: 'odds', casa: r.casas[0] });
+      else novaCasa();
+    },
   };
   const temJogo = !!(r.jogo.casa || r.jogo.fora);
   const mostraMatchCenter = temJogo && aba.id !== 'historico' && aba.id !== 'promocoes';

@@ -16,6 +16,8 @@ export interface PropsAba {
   setGaleria?: (g: string[]) => void;
   /** abre o modo estádio (animação em tela cheia) */
   verLance?: () => void;
+  /** vai para outra aba ("odds" abre a primeira casa, ou pede uma) */
+  abrir?: (id: 'sofascore' | 'tabela' | 'odds' | 'analise') => void;
 }
 
 /** Helpers para adicionar/remover textos de prints de um grupo. */

@@ -2887,3 +2887,387 @@ main,
 #root {
   overflow-x: clip;
 }
+
+/* ---------- aba Jogo: nova análise ---------- */
+.aba-jogo {
+  display: grid;
+  gap: 16px;
+  padding-top: 12px;
+}
+.aba-jogo .painel {
+  margin: 0;
+}
+.nova-analise {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 2.2fr) 1fr;
+  align-items: center;
+  gap: 16px;
+  min-height: 230px;
+  padding: 24px;
+  border-radius: var(--raio);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background-size: cover;
+  background-position: center 50%;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.45),
+    0 0 40px rgba(34, 211, 238, 0.12);
+  overflow: hidden;
+  isolation: isolate;
+  animation: entrada 0.6s ease both;
+}
+/* escurece topo e bordas para o texto ler bem; varredura de luz no gramado */
+.nova-analise::before,
+.nova-analise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.nova-analise::before {
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 45%, rgba(5, 10, 23, 0.45), transparent 70%),
+    linear-gradient(180deg, rgba(5, 10, 23, 0.35), transparent 45%, rgba(5, 10, 23, 0.45));
+}
+.nova-analise::after {
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    rgba(34, 211, 238, 0.14) 50%,
+    transparent 60%
+  );
+  background-size: 250% 100%;
+  animation: varre-banner 7s ease-in-out infinite;
+}
+@keyframes varre-banner {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+.na-centro {
+  text-align: center;
+}
+.na-selo {
+  display: inline-block;
+  padding: 4px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--amarelo);
+  background: rgba(5, 10, 23, 0.75);
+  color: var(--amarelo);
+  font-family: var(--fonte-tecnica);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.na-centro h2 {
+  margin: 10px 0 2px;
+  font-family: var(--fonte-tecnica);
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8);
+}
+.na-centro h2 em {
+  font-style: normal;
+  color: var(--amarelo);
+  text-shadow: 0 0 28px rgba(255, 210, 63, 0.45);
+}
+.na-centro p {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #dce6fb;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+}
+.na-lado {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 14px;
+  list-style: none;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(5, 12, 28, 0.6);
+  backdrop-filter: blur(6px);
+  font-family: var(--fonte-tecnica);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(143, 220, 240, 0.85);
+}
+.na-esquerda {
+  justify-self: start;
+  opacity: 0.7;
+}
+.na-direita {
+  justify-self: end;
+  counter-reset: etapa;
+}
+.na-direita li {
+  counter-increment: etapa;
+}
+.na-direita li::before {
+  content: counter(etapa, decimal-leading-zero);
+  margin-right: 8px;
+  color: var(--amarelo);
+  opacity: 0.8;
+}
+@media (max-width: 860px) {
+  .nova-analise {
+    grid-template-columns: 1fr;
+    min-height: 190px;
+    background-position: center 30%;
+  }
+  .na-lado {
+    display: none;
+  }
+}
+
+.grade-jogo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 960px) {
+  .grade-jogo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.titulo-grande {
+  align-items: flex-start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--borda);
+  position: relative;
+}
+.titulo-grande::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 48px;
+  height: 2px;
+  background: var(--amarelo);
+  box-shadow: 0 0 8px rgba(255, 210, 63, 0.6);
+}
+.titulo-sub {
+  display: block;
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--suave);
+}
+.rotulo-campo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-family: var(--fonte-tecnica);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--texto);
+}
+.rotulo-campo .icone {
+  color: var(--amarelo);
+}
+.times-cadastro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  margin-bottom: 4px;
+}
+.times-cadastro label + label {
+  padding-left: 24px;
+  border-left: 1px solid var(--borda);
+}
+@media (max-width: 560px) {
+  .times-cadastro {
+    grid-template-columns: 1fr;
+  }
+  .times-cadastro label + label {
+    padding-left: 0;
+    border-left: none;
+  }
+}
+.campo-com-icone {
+  position: relative;
+  display: block;
+}
+.campo-com-icone > .icone {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--suave);
+}
+.campo-com-icone input {
+  padding-left: 42px;
+  min-height: 44px;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.checklist li + li {
+  border-top: 1px solid var(--borda);
+}
+.cl-linha {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  text-align: left;
+  color: inherit;
+  font-weight: 400;
+}
+button.cl-linha:hover {
+  background: rgba(34, 211, 238, 0.05);
+}
+.cl-icone {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: rgba(120, 170, 255, 0.06);
+  color: #c7d2ee;
+}
+.cl-texto {
+  display: grid;
+  min-width: 0;
+}
+.cl-texto strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cl-texto span {
+  font-size: 12px;
+  color: var(--suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--borda);
+  background: rgba(120, 170, 255, 0.08);
+  color: #a9b6d6;
+  white-space: nowrap;
+}
+.cl-ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+.cl-ok .icone {
+  animation: selo 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.cl-parcial {
+  color: var(--ciano);
+  border-color: rgba(34, 211, 238, 0.45);
+}
+.cl-erro {
+  color: var(--erro);
+  border-color: color-mix(in srgb, var(--erro) 50%, transparent);
+}
+
+.opcoes-contexto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 18px;
+}
+.opcoes-contexto label.check {
+  margin: 0;
+  padding: 10px 8px;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+.opcoes-contexto label.check:hover {
+  background: rgba(34, 211, 238, 0.05);
+}
+.opcoes-contexto .dica.bloco {
+  font-size: 12px;
+}
+.parametros {
+  margin: 12px 0 0;
+  padding: 0 14px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: rgba(5, 12, 28, 0.4);
+}
+.parametros summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+.parametros summary .icone {
+  color: var(--amarelo);
+}
+.parametros[open] summary {
+  border-bottom: 1px solid var(--borda);
+  margin-bottom: 12px;
+}
+.acoes-jogo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--borda);
+}
+.acoes-jogo .primario.grande {
+  min-width: min(100%, 320px);
+  min-height: 48px;
+  font-family: var(--fonte-tecnica);
+  font-size: 17px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.acoes-jogo .contorno {
+  min-height: 48px;
+  border-color: rgba(34, 211, 238, 0.55);
+  color: var(--texto);
+}
+.acoes-jogo .contorno:hover {
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.25);
+}
+.acoes-jogo .contorno .icone {
+  color: var(--ciano);
+}
+@media (max-width: 560px) {
+  .na-centro p {
+    font-size: 15px;
+  }
+  .parametros summary .dica {
+    display: none;
+  }
+}

@@ -80,6 +80,15 @@ const CAMINHOS = {
     <path d="M9 4a3 3 0 00-3 3 3 3 0 00-2 5 3 3 0 002 5 3 3 0 003 3h1V4z M15 4a3 3 0 013 3 3 3 0 012 5 3 3 0 01-2 5 3 3 0 01-3 3h-1V4z M10 9H8 M10 14H7 M14 9h2 M14 14h3" />
   ),
   mais: <path d="M12 5v14 M5 12h14" />,
+  casa: <path d="M3 11l9-7 9 7 M5 10v10h14V10 M10 20v-6h4v6" />,
+  aviao: <path d="M21 4L3 11l7 2 2 7 3-5 4 3z M10 13l11-9" />,
+  calendario: <path d="M4 6h16v14H4z M4 10h16 M8 3v5 M16 3v5" />,
+  pessoas: (
+    <path d="M9 11a3 3 0 100-6 3 3 0 000 6z M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6 M16 5.5a3 3 0 010 5.5 M18 14.5c1.8.8 3 2.8 3 5.5" />
+  ),
+  prancheta: <path d="M8 4h8v3H8z M6 5H5v16h14V5h-1 M8 11h8 M8 15h6" />,
+  seta: <path d="M5 12h14 M13 6l6 6-6 6" />,
+  livro: <path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1z M12 6v14" />,
 } satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof CAMINHOS;
