@@ -36,6 +36,7 @@ import {
   estatisticasParaModelo,
   juntarEscalacoes,
   juntarLeiturasStats,
+  juntarUltimas,
   lerEscalacao,
   mesmoJogador,
   lerOddsCasa,
@@ -43,6 +44,7 @@ import {
   lerDesfalques,
   lerEstatisticas,
   lerTextoFlashscore,
+  lerUltimas,
   type Desfalque,
   type EstatisticasModelo,
   type ImpactoSugerido,
@@ -50,6 +52,7 @@ import {
   type LeituraStats,
   type LinhaClassificacao,
   type ProblemaLinha,
+  type ResumoUltimas,
   type StatusEscalacao,
   type TabelaConsolidada,
 } from '@pe/parsers';
@@ -86,6 +89,8 @@ export interface Derivado {
   desfalques: Desfalque[];
   avisosDesfalques: string[];
   escalacao: EscalacaoDerivada;
+  /** últimas partidas de cada time: sequência, casa/fora e gols */
+  ultimas: Record<'casa' | 'fora', ResumoUltimas | null>;
   impacto: Record<'casa' | 'fora', ImpactoSugerido>;
   classificacao: LinhaClassificacao[];
   avisosClassificacao: string[];
@@ -325,6 +330,10 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     desfalques,
     avisosDesfalques: desf.flatMap((d) => d.avisos),
     escalacao,
+    ultimas: {
+      casa: juntarUltimas(textos(r, 'ultimas:casa').map((t) => lerUltimas(t, nomes, 'casa'))),
+      fora: juntarUltimas(textos(r, 'ultimas:fora').map((t) => lerUltimas(t, nomes, 'fora'))),
+    },
     impacto,
     classificacao: clas.flatMap((c) => c.linhas),
     avisosClassificacao: clas.flatMap((c) => c.avisos),

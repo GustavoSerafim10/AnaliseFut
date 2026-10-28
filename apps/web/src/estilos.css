@@ -3667,3 +3667,37 @@ button.cl-linha:hover {
 .escalacao .mini {
   align-self: flex-start;
 }
+
+/* ---------- últimas partidas ---------- */
+.ultimas .forma {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.forma-V,
+.forma-E,
+.forma-D {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 13px;
+}
+.forma-V {
+  color: var(--ok);
+  background: var(--ok-fundo);
+  border: 1px solid var(--ok);
+}
+.forma-E {
+  color: var(--alerta);
+  background: var(--alerta-fundo);
+  border: 1px solid var(--alerta);
+}
+.forma-D {
+  color: var(--erro);
+  background: var(--erro-fundo);
+  border: 1px solid var(--erro);
+}
