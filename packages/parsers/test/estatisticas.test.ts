@@ -280,3 +280,36 @@ describe('proteções contra valor impossível (Raio-X Remo × Botafogo)', () =>
     expect(m.declaracoes.join()).toContain('não bate');
   });
 });
+
+describe('SuperScore Remo × Botafogo (OCR real, Média)', () => {
+  const l = juntarLeiturasStats(
+    ['superscore-remo-1.txt', 'superscore-remo-2.txt', 'superscore-remo-3.txt'].map((f) =>
+      lerEstatisticas(fx(f), 'superscore', { casa: 'Remo', fora: 'Botafogo' }),
+    ),
+  )!;
+  const c = l.campos;
+  it('principais', () => {
+    expect(c.golsPorJogo).toMatchObject({ casa: 1.1, fora: 1.4 });
+    expect(c.xg).toMatchObject({ casa: 1.0, fora: 1.3 });
+    expect(c.xgot).toMatchObject({ casa: 1.0, fora: 1.4 });
+    expect(c.chutesNoAlvo).toMatchObject({ casa: 3.9, fora: 5.3 }); // "Chutes no go!"
+    expect(c.escanteios).toMatchObject({ casa: 5.2, fora: 4.6 });
+    expect(c.golsEvitados).toMatchObject({ casa: 0.1, fora: -0.1 }); // "01"
+  });
+  it('"1" sozinho (era 1.1) fica vazio em vez de 0,1; "ns" (era 11.5) também', () => {
+    expect(c.grandesChancesPerdidas?.casa).toBeUndefined();
+    expect(c.grandesChancesPerdidas?.fora).toBe(1.6);
+    expect(c.faltas?.casa).toBeUndefined();
+  });
+  it('"passes certos no campo de defesa" não some como repetido de "passes certos"', () => {
+    expect(c.passesCertos).toMatchObject({ casa: 298, fora: 320.9 });
+    const o = (r: string) => l.outros.find((x) => x.rotulo.includes(r));
+    expect(o('campo de defesa')).toMatchObject({ casa: 139.8, fora: 170.4 });
+  });
+  it('"outros" com a casa decimal do site ("55" = 5,5) e sem lixo', () => {
+    const o = (r: string) => l.outros.find((x) => x.rotulo.includes(r));
+    expect(o('Dribles')).toMatchObject({ casa: 5.5, fora: 8.3 });
+    expect(o('chão')).toMatchObject({ casa: 32.5, fora: 35.5 });
+    expect(l.outros.some((x) => /OITO/.test(x.rotulo))).toBe(false);
+  });
+});

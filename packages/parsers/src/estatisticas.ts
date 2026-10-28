@@ -309,7 +309,8 @@ export const CAMPOS_STATS: DefCampo[] = [
   {
     campo: 'passesCertos',
     rotulo: 'Passes certos por jogo',
-    re: /passes certos/,
+    // "passes certos no campo de defesa/ataque" (SuperScore) é outro dado
+    re: /passes certos(?! no campo)/,
     formato: 'decimal1',
     faixa: [80, 900],
   },
@@ -355,6 +356,40 @@ const FRASES: [CampoStat | null, string][] = [
   ['laterais', 'laterais por jogo'],
   ['cartoesAmarelos', 'cartoes amarelos por partida'],
   ['cartoesVermelhos', 'cartoes vermelhos'],
+];
+
+/** Rótulos do SuperScore (só para semelhança; a ordem acima é a das linhas do SofaScore). */
+const FRASES_SUPERSCORE: [CampoStat | null, string][] = [
+  ['golsPorJogo', 'gols'],
+  ['xg', 'gols esperados xg'],
+  ['finalizacoes', 'finalizacoes totais'],
+  ['chutesNoAlvo', 'chutes no gol'],
+  ['grandesChances', 'grandes chances criadas'],
+  ['escanteios', 'escanteios'],
+  ['faltas', 'faltas cometidas'],
+  ['faltasSofridas', 'faltas cobradas'],
+  ['cartoesAmarelos', 'cartoes amarelos'],
+  ['chutesFora', 'chutes fora do gol'],
+  ['chutesBloqueados', 'chutes bloqueados'],
+  ['finalizacoesDentroArea', 'finalizacoes dentro da area'],
+  ['finalizacoesForaArea', 'finalizacoes fora da area'],
+  ['ataquesPerigosos', 'ataques perigosos'],
+  ['grandesChancesMarcadas', 'grandes chances marcadas'],
+  ['toquesAreaAdversaria', 'toques na area adversaria'],
+  ['defesasGoleiro', 'defesas do goleiro'],
+  ['golsEvitados', 'gols evitados'],
+  [null, 'passes certos no campo de defesa'],
+  [null, 'passes certos no campo de ataque'],
+  [null, 'bola na trave'],
+  [null, 'dribles vencidos'],
+  [null, 'posses perdidas'],
+  [null, 'passes no terco final'],
+  [null, 'lancamentos'],
+  [null, 'erros que levaram a finalizacao'],
+  [null, 'bloqueios'],
+  [null, 'duelos vencidos'],
+  [null, 'duelos no chao vencidos'],
+  [null, 'bolas aereas vencidas'],
 ];
 
 /** 0–1: 1 − distância de edição ÷ tamanho do maior. */
@@ -406,6 +441,8 @@ function corrigirRotulo(t: string): string {
 interface TokenNum {
   valor: number;
   temPonto: boolean;
+  /** quantos dígitos estavam escritos ("01" = 2) */
+  digitos: number;
   pos: number;
 }
 
@@ -421,10 +458,15 @@ function tokenizar(linha: string): { nums: TokenNum[]; palavras: { txt: string; 
     .split(/\s+/)
     .filter(Boolean)
     .forEach((tok, pos) => {
-      const t = tok.replace(/^[[(|~«»“”"']+|[\])|.,;:'"»”]+$/g, '');
+      const t = tok.replace(/^[[(|~«»“”"']+|[\])|.,;:'"»”!?]+$/g, '');
       const m = /^[A-Za-z]?(-?\d{1,4}(?:[.,]\d{1,2})?)(%)?$/.exec(t);
       if (m && !/^\d{1,2}:\d{2}$/.test(tok)) {
-        nums.push({ valor: Number(m[1].replace(',', '.')), temPonto: /[.,]/.test(m[1]), pos });
+        nums.push({
+          valor: Number(m[1].replace(',', '.')),
+          temPonto: /[.,]/.test(m[1]),
+          digitos: m[1].replace(/\D/g, '').length,
+          pos,
+        });
       } else if (/[a-zà-ú]{2,}/i.test(t)) {
         palavras.push({ txt: t, pos });
       }
@@ -486,7 +528,7 @@ function acharCampo(rotulo: string): DefCampo | null | undefined {
   if (exato) return exato;
   // por semelhança: a frase inteira, ou o fim dela ("ry once perdidas" ~ "... perdidas por jogo")
   let melhor: { campo: CampoStat | null; s: number } = { campo: null, s: 0 };
-  for (const [campo, frase] of FRASES) {
+  for (const [campo, frase] of [...FRASES, ...FRASES_SUPERSCORE]) {
     const s = Math.max(
       semelhanca(rotulo, frase),
       rotulo.length >= 8 ? semelhanca(rotulo, frase.slice(-rotulo.length)) - 0.05 : 0,
@@ -615,11 +657,16 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
   for (const { bruto, rotulo, def, esq, dir, avisoPosicao } of filas) {
     if (!def) {
       // cabeçalho da página (competição, temporada, menu) não é dado
+      // cabeçalho da página (competição, temporada, menu) ou lixo ("OITO OUVTVOI") não é dado
       const cabecalho =
         !rotulo ||
         /campeonato|temporada|serie|mais|tenis|basquete|volei/i.test(semAcento(rotulo)) ||
+        /\b[A-Z]{4,}\b/.test(rotulo) ||
         [esq, dir].some((t) => t && t.valor >= 1900);
-      if (!cabecalho) outros.push({ rotulo, casa: esq?.valor, fora: dir?.valor, bruto });
+      // SuperScore mostra toda média com 1 casa decimal: "55" é 5,5; "325" é 32,5
+      const valor = (t?: TokenNum) =>
+        t && (fonte === 'superscore' && !t.temPonto ? t.valor / 10 : t.valor);
+      if (!cabecalho) outros.push({ rotulo, casa: valor(esq), fora: valor(dir), bruto });
       continue;
     }
     if (campos[def.campo]?.casa !== undefined && campos[def.campo]?.fora !== undefined) continue; // repetido entre prints
@@ -627,6 +674,12 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
     const v: ValorLido = { bruto, avisos: avisoPosicao ? [avisoPosicao] : [] };
     const aplicar = (tok: TokenNum | undefined): number | undefined => {
       if (!tok) return undefined;
+      // SuperScore sempre mostra "1.1": um dígito só, sem ponto, perdeu pedaço (pode ser 1.1,
+      // 0.1, 1.0...); fica vazio em vez de virar 0,1
+      if (fonte === 'superscore' && def.formato === 'decimal1' && tok.digitos === 1) {
+        v.avisos.push(`"${tok.valor}" ilegível (o site mostra uma casa decimal): conferir`);
+        return undefined;
+      }
       const { valor, corrigido } = interpretar(tok, def);
       if (corrigido) v.avisos.push(`ponto decimal perdido no OCR: ${tok.valor} lido como ${valor}`);
       if (valor < def.faixa[0] || valor > def.faixa[1]) {
