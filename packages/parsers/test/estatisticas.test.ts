@@ -347,3 +347,16 @@ describe('prints maiores (zoom), parte de baixo das duas páginas', () => {
     });
   });
 });
+
+describe('valor posto pela posição que confere com média × partidas', () => {
+  it('"Gols marcados 34 uy" com 1,1 por jogo em 32 jogos: 34 confirmado, sem aviso de dúvida', () => {
+    const l = lerEstatisticas(
+      'Remo Botafogo\nPartidas 32 32\nGols marcados 34 uy\nGols por partida 11 14',
+      'sofascore',
+      { casa: 'Remo', fora: 'Botafogo' },
+    );
+    expect(l.campos.golsMarcados?.casa).toBe(34);
+    expect(l.campos.golsMarcados!.avisos.join()).toContain('confirmado');
+    expect(l.campos.golsMarcados!.avisos.join()).not.toContain('pela posição');
+  });
+});

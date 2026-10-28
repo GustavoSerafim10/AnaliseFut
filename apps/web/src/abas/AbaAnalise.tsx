@@ -342,7 +342,19 @@ export function AbaAnalise({
                     !!v &&
                     v.fonte !== 'manual' &&
                     (v.divergente ||
-                      (!concordam && v.avisos.some((a) => !/ponto decimal perdido/.test(a))));
+                      (!concordam &&
+                        v.avisos.some((a) => !/ponto decimal perdido|confirmado/.test(a))));
+                  // total vazio: sugere média × partidas (só dica; o modelo já usa a média)
+                  const media = {
+                    golsMarcados: 'golsPorJogo',
+                    golsSofridos: 'golsSofridosPorJogo',
+                  }[c.campo as 'golsMarcados' | 'golsSofridos'] as CampoStat | undefined;
+                  const mediaLida = media && d.tabela[media]?.[t]?.valor;
+                  const jogos = d.tabela.partidas?.[t]?.valor;
+                  const dica =
+                    v?.valor === undefined && mediaLida !== undefined && jogos
+                      ? `≈ ${Math.round(mediaLida * jogos)} (${String(mediaLida).replace('.', ',')} × ${jogos})`
+                      : undefined;
                   return (
                     <td
                       key={t}
@@ -355,6 +367,7 @@ export function AbaAnalise({
                         key={`${c.campo}-${t}-${v?.valor}`}
                         inputMode="decimal"
                         defaultValue={v?.valor !== undefined ? Number(v.valor.toFixed(2)) : ''}
+                        placeholder={dica}
                         onBlur={(e) => corrigir(c.campo, t, e.target.value)}
                       />
                       <div className="miudo">

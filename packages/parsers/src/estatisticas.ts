@@ -768,7 +768,19 @@ function coerencia(l: LeituraStats): LeituraStats {
       if (vt === undefined || vm === undefined || !jogos) continue;
       const esperado = vm * jogos;
       // a média tem 1 casa decimal: arredondamento dá até ±0,05 × jogos de folga
-      if (Math.abs(vt - esperado) <= Math.max(3, 0.05 * jogos + 0.1 * esperado)) continue;
+      if (Math.abs(vt - esperado) <= Math.max(3, 0.05 * jogos + 0.1 * esperado)) {
+        // valor posto pela posição (o vizinho ficou ilegível) que bate com a conta: confirmado
+        const v = l.campos[total]!;
+        if (v.avisos.some((a) => a.includes('pela posição')))
+          l.campos[total] = {
+            ...v,
+            avisos: [
+              ...v.avisos.filter((a) => !a.includes('pela posição')),
+              `${vt} confirmado (o outro valor da linha ficou ilegível): bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)})`,
+            ],
+          };
+        continue;
+      }
       l.campos[total] = {
         ...l.campos[total]!,
         [t]: undefined,
