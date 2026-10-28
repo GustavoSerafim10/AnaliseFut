@@ -139,6 +139,19 @@ describe('classificação (SofaScore, print recortado)', () => {
     expect(linhas.find((l) => l.doJogo === 'fora')?.posicao).toBe(6);
     expect(linhas.find((l) => l.time === 'Palmeiras')?.pontos).toBe(69);
   });
+  it('Flashscore: 20 de 20, pontos conferidos por 3V + E (a coluna Forma vem depois)', () => {
+    const { linhas, avisos } = lerClassificacao(fx('flashscore-classificacao.txt'), {
+      casa: 'Remo',
+      fora: 'Botafogo',
+    });
+    expect(linhas.map((l) => l.pontos)).toEqual([
+      70, 69, 54, 54, 51, 50, 50, 46, 43, 41, 39, 39, 38, 38, 37, 35, 34, 33, 26, 21,
+    ]);
+    expect(linhas.map((l) => l.posicao)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    expect(linhas.find((l) => l.doJogo === 'casa')?.posicao).toBe(19);
+    expect(linhas.find((l) => l.doJogo === 'fora')?.posicao).toBe(11);
+    expect(avisos.some((a) => a.includes('fora de ordem'))).toBe(false);
+  });
 });
 
 describe('impacto automático dos desfalques', () => {

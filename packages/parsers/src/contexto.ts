@@ -100,19 +100,52 @@ export function lerClassificacao(
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)) {
-    const m = /^(\d{1,2})\b\s*(.*)$/.exec(bruto);
-    if (!m) continue;
-    const posicao = Number(m[1]);
-    const resto = m[2].split(/\s+/);
+    const m = /^(\d{1,3})\b\.?\s*(.*)$/.exec(bruto);
+    const lida = m ? Number(m[1]) : undefined;
+    const tokens = (m ? m[2] : bruto).split(/\s+/);
+    // nome: da primeira palavra de 3+ letras até o primeiro número (escudo lido como "7" ou "£3"
+    // antes do nome não corta a linha)
     const nome: string[] = [];
-    for (const tok of resto) {
-      if (/^\d/.test(tok) || /^[+-]\d/.test(tok)) break;
+    let fimNome = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if (/^[+-]?\d/.test(tok)) {
+        if (nome.length) break;
+        continue;
+      }
       const limpo = tok.replace(/[^A-Za-zÀ-ú-]/g, '');
-      if (limpo.length >= 3 && !/^[A-Z]{2,3}$/.test(limpo)) nome.push(limpo);
+      if (limpo.length >= 3 && !/^[A-Z]{2,3}$/.test(limpo)) {
+        nome.push(limpo);
+        fimNome = i + 1;
+      }
     }
-    if (!nome.length || posicao < 1 || posicao > 30) continue;
-    const nums = bruto.match(/\b\d{1,3}\b/g)?.map(Number) ?? [];
-    const pontos = nums.length > 2 ? nums[nums.length - 1] : undefined;
+    if (!nome.length) continue;
+    const nums = tokens
+      .slice(fimNome)
+      .filter((t) => /^[+-]?\d{1,3}$/.test(t))
+      .map(Number);
+    // J = V + E + D marca as colunas; Pts = 3V + E confere (ou repõe) os pontos
+    const iJ = nums.findIndex(
+      (n, i) => i + 3 < nums.length && n > 0 && n === nums[i + 1] + nums[i + 2] + nums[i + 3],
+    );
+    let pontos: number | undefined;
+    if (iJ >= 0) {
+      const calculado = 3 * nums[iJ + 1] + nums[iJ + 2];
+      pontos = calculado;
+      if (!nums.slice(iJ + 4).includes(calculado))
+        avisos.push(
+          `${nome.join(' ')}: pontos ilegíveis no print, calculados por 3V + E = ${calculado}`,
+        );
+    } else {
+      if (nums.length < 3) continue; // não é linha da tabela
+      pontos = nums[nums.length - 1];
+    }
+    // posição: a lida, se seguir a sequência (pode pular linhas perdidas no OCR); senão a
+    // seguinte à anterior (OCR "171" no 11, "4" no 14, linha sem número)
+    const anterior = linhas[linhas.length - 1]?.posicao ?? 0;
+    const posicao =
+      lida !== undefined && lida > anterior && lida <= anterior + 3 ? lida : anterior + 1;
+    if (posicao < 1 || posicao > 30) continue;
     const time = nome.join(' ');
     linhas.push({ posicao, time, pontos, doJogo: reconhecerTime(time, jogo) ?? undefined, bruto });
   }
