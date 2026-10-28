@@ -1,4 +1,5 @@
 import { CAMPOS_STATS, type FonteStats } from '@pe/parsers';
+import { RaioX } from '../componentes/RaioX';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { acoesPrints, type PropsAba } from './tipos';
 
@@ -34,6 +35,8 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         desabilitado={semTimes}
         {...acoesPrints(setR, fonte)}
       />
+
+      <RaioX d={d} nomes={{ casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' }} />
 
       {leitura && (
         <>

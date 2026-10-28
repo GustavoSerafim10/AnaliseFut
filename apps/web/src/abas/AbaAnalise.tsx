@@ -6,6 +6,7 @@ import { Auditoria } from '../componentes/Auditoria';
 import { CentroDecisao } from '../componentes/CentroDecisao';
 import { ComparativoOdds } from '../componentes/ComparativoOdds';
 import { Distribuicao } from '../componentes/Distribuicao';
+import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
@@ -124,6 +125,7 @@ export function AbaAnalise({
           <Auditoria r={r} d={d} />
         </div>
       </div>
+      <GrafoDecisao d={d} />
 
       <h3>Situação dos dados</h3>
       <p className="dica">

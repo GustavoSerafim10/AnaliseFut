@@ -3271,3 +3271,403 @@ button.cl-linha:hover {
     display: none;
   }
 }
+
+/* ---------- Raio-X dos times (abas de estatísticas) ---------- */
+.raio-x {
+  margin: 18px 0;
+  animation: entrada 0.5s ease both;
+}
+.legenda-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-weight: 600;
+  color: var(--texto);
+}
+.legenda-time::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--cor-time);
+  box-shadow: 0 0 8px var(--cor-time);
+}
+.legenda-time.casa,
+.rx-duelo .casa,
+.rx-par .casa {
+  --cor-time: var(--amarelo);
+}
+.legenda-time.fora,
+.rx-duelo .fora,
+.rx-par .fora {
+  --cor-time: var(--ciano);
+}
+.raio-x-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 960px) {
+  .raio-x-grade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.raio-x .painel {
+  margin: 0;
+  position: relative;
+  overflow: hidden;
+}
+/* brilho de monitor no topo de cada gráfico */
+.raio-x .painel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.6), transparent);
+}
+.raio-x h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-family: var(--fonte-tecnica);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c7d2ee;
+}
+.raio-x h4 .miudo {
+  margin-left: auto;
+  letter-spacing: 0;
+  text-transform: none;
+  font-family: 'Inter', sans-serif;
+}
+.raio-x .miudo {
+  margin: 10px 0 0;
+}
+
+/* duelo: barras espelhadas a partir do rótulo central */
+.rx-duelo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.rx-duelo li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(96px, 150px) minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  animation: entrada 0.4s ease both;
+}
+.rx-valor {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--suave);
+}
+.rx-valor:first-child {
+  text-align: right;
+}
+.rx-valor.melhor {
+  color: var(--texto);
+}
+.rx-rotulo {
+  text-align: center;
+  font-size: 12px;
+  color: #b9c7e6;
+  line-height: 1.2;
+}
+.rx-barra {
+  position: relative;
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(120, 170, 255, 0.08);
+  overflow: hidden;
+}
+.rx-esq {
+  justify-content: flex-end;
+}
+.rx-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--cor-time) 55%, transparent),
+    var(--cor-time)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--cor-time) 45%, transparent);
+  transform-origin: left;
+  animation: cresce 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.rx-esq > span {
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--cor-time) 55%, transparent),
+    var(--cor-time)
+  );
+  transform-origin: right;
+}
+@media (max-width: 560px) {
+  .rx-duelo li {
+    grid-template-columns: 36px minmax(0, 1fr) 84px minmax(0, 1fr) 36px;
+    gap: 6px;
+  }
+  .rx-rotulo {
+    font-size: 11px;
+  }
+}
+
+/* radar */
+.radar {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
+  overflow: visible;
+}
+.radar-grade {
+  fill: none;
+  stroke: rgba(120, 170, 255, 0.16);
+}
+.radar-eixo {
+  stroke: rgba(120, 170, 255, 0.14);
+}
+.radar-rotulo {
+  fill: #b9c7e6;
+  font-size: 10.5px;
+  font-family: 'Inter', sans-serif;
+}
+.radar-forma {
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transform-origin: 130px 130px;
+  animation: radar-abre 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.radar-casa {
+  fill: rgba(255, 210, 63, 0.18);
+  stroke: var(--amarelo);
+  filter: drop-shadow(0 0 6px rgba(255, 210, 63, 0.5));
+}
+.radar-fora {
+  fill: rgba(34, 211, 238, 0.16);
+  stroke: var(--ciano);
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.5));
+  animation-delay: 0.12s;
+}
+@keyframes radar-abre {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* colunas de gols: par mandante/visitante por número de gols */
+.rx-colunas {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  height: 150px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--borda);
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(120, 170, 255, 0.06) 0 1px,
+    transparent 1px 37px
+  );
+}
+.rx-coluna {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 4px;
+  min-height: 0;
+}
+.rx-par {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0;
+}
+.rx-par span {
+  width: 42%;
+  max-width: 18px;
+  border-radius: 4px 4px 1px 1px;
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--cor-time) 35%, transparent),
+    var(--cor-time)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--cor-time) 40%, transparent);
+  transform-origin: bottom;
+  animation: sobe 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes sobe {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.rx-k {
+  text-align: center;
+  font-size: 12px;
+  color: var(--suave);
+  font-variant-numeric: tabular-nums;
+}
+
+/* placares */
+.rx-placares ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.rx-placares li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 10px;
+}
+.rx-placar {
+  font-family: var(--fonte-tecnica);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rx-placar small {
+  color: var(--suave);
+  font-size: 13px;
+}
+.rx-placares .prob-trilho {
+  height: 8px;
+  border-radius: 4px;
+}
+.rx-p {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #b9c7e6;
+}
+
+/* ---------- grafo da decisão (aba Análise) ---------- */
+.grafo-decisao {
+  margin-top: 16px;
+  background:
+    radial-gradient(ellipse 50% 80% at 85% 50%, rgba(34, 211, 238, 0.06), transparent 70%),
+    var(--cartao);
+}
+.gd-svg {
+  display: block;
+  width: 100%;
+  max-width: 1120px;
+  min-width: 720px;
+  height: auto;
+  margin: 0 auto;
+  font-family: 'Inter', sans-serif;
+}
+.gd-no {
+  --cor: rgba(120, 170, 255, 0.35);
+  animation: entrada 0.45s ease both;
+}
+.gd-no rect {
+  fill: rgba(9, 18, 38, 0.92);
+  stroke: var(--cor);
+  stroke-width: 1.5;
+  transition: filter 0.2s ease;
+}
+.gd-no:hover rect {
+  filter: drop-shadow(0 0 8px var(--cor));
+}
+.gd-titulo {
+  fill: var(--texto);
+  font-size: 13px;
+  font-weight: 600;
+}
+.gd-sub {
+  fill: #9fb0d3;
+  font-size: 11px;
+}
+.gd-no.ok {
+  --cor: var(--ciano);
+}
+.gd-no.alerta {
+  --cor: var(--alerta);
+}
+.gd-no.hub {
+  --cor: var(--ciano);
+}
+.gd-no.hub rect {
+  fill: rgba(34, 211, 238, 0.1);
+  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.35));
+}
+.gd-no.escolhida {
+  --cor: var(--amarelo);
+}
+.gd-no.escolhida rect {
+  fill: rgba(255, 210, 63, 0.1);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 10px rgba(255, 210, 63, 0.45));
+}
+.gd-no.fantasma rect {
+  stroke-dasharray: 4 4;
+}
+.gd-no.fantasma .gd-titulo {
+  fill: #b9c7e6;
+}
+.gd-no.decisao .gd-titulo {
+  font-family: var(--fonte-tecnica);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  fill: var(--cor);
+}
+.gd-no.decisao rect {
+  stroke-width: 2;
+  filter: drop-shadow(0 0 12px var(--cor));
+}
+.gd-no.bet {
+  --cor: var(--ok);
+}
+.gd-no.watchlist,
+.gd-no.no-bet {
+  --cor: var(--amarelo);
+}
+.gd-no.investigar,
+.gd-no.excluido {
+  --cor: var(--erro);
+}
+.gd-aresta {
+  fill: none;
+  stroke: rgba(120, 170, 255, 0.18);
+  stroke-width: 1.5;
+}
+.gd-aresta.ativa {
+  stroke: rgba(34, 211, 238, 0.55);
+}
+/* caminho do mercado escolhido: fluxo correndo até a decisão */
+.gd-aresta.escolhida {
+  stroke: var(--amarelo);
+  stroke-width: 2.5;
+  stroke-dasharray: 8 6;
+  filter: drop-shadow(0 0 4px rgba(255, 210, 63, 0.7));
+  animation: fluxo 1.2s linear infinite;
+}
+.gd-aresta.escolhida.bet {
+  stroke: var(--ok);
+  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.7));
+}
+@keyframes fluxo {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
