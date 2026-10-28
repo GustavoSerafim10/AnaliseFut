@@ -1,0 +1,45 @@
+### POSICOES
+### MEIO y 591
+@920,29 "
+@487,32 Ezcalaçõe:
+@926,38 Lá
+@468,75 21
+@531,75 30
+@256,83 Remo
+@395,88 vd
+@610,88 vd
+@768,85 Botafogo
+@502,98 Hoje
+@234,138 Escalações
+@515,274 4. Rangel
+@148,326 *
+@170,347 Marcelinho
+@408,347 Marllon
+@628,347 D. Tchamba
+@854,347 Marton
+@282,398 +
+@286,422 Z.Welison
+@744,422 Z. Ricardo
+@504,466 =
+@207,495 A. Galeano
+@513,496 V. Bueno
+@814,497 Jaja
+@504,547 wis
+@513,570 G. 1ahan
+@510,643 1. Soares
+@198,699 -
+@503,696 sa.
+@206,717 Ms. Martins
+@515,718 H. Ziyech
+@815,717 C. Medina
+@276,762 -
+@281,770 .
+@285,793 Huguinho
+@744,791 Allan
+@621,835 -
+@616,844 wo
+@178,865 A Telles
+@398,866 Marçal
+@624,865 N.Ferrares:
+@853,865 Vitinho
+@513,939 G. Batista

@@ -1,7 +1,8 @@
 /**
- * Leitor de escalações (SofaScore → aba Escalações). O OCR lê o print em duas metades
- * (marcadores "### ESQUERDA" / "### DIREITA"): esquerda = mandante, direita = visitante,
- * salvo quando o nome do time aparece trocado. Só nomes de jogadores; nada vira número.
+ * Leitor de escalações (Flashscore, SuperScore, SofaScore → aba Escalações). O OCR guarda a
+ * posição de cada nome e a linha do meio de campo: campo deitado → esquerda = mandante;
+ * campo em pé → em cima = mandante. Prints antigos (duas metades, "### ESQUERDA" /
+ * "### DIREITA") continuam lidos. Só nomes de jogadores; nada vira número.
  */
 import type { NomesTimes, Time } from '@pe/engine';
 import { semAcento } from './texto';
@@ -9,6 +10,9 @@ import { similaridadeTime, tokensDoNome } from './times';
 
 export const MARCA_ESQUERDA = '### ESQUERDA';
 export const MARCA_DIREITA = '### DIREITA';
+/** formato atual do OCR: linhas "@x,y texto" + "### MEIO <x|y> <milésimos>" */
+export const MARCA_POSICOES = '### POSICOES';
+export const MARCA_MEIO = '### MEIO';
 
 export type StatusEscalacao = 'provavel' | 'confirmada';
 
@@ -141,6 +145,7 @@ export function lerEscalacao(texto: string, jogo: NomesTimes): LeituraEscalacao 
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
+  if (linhas[0] === MARCA_POSICOES) return lerPorPosicao(linhas, jogo);
   const iE = linhas.indexOf(MARCA_ESQUERDA);
   const iD = linhas.indexOf(MARCA_DIREITA);
   if (iE < 0 || iD < 0) {
@@ -172,6 +177,76 @@ export function lerEscalacao(texto: string, jogo: NomesTimes): LeituraEscalacao 
     fora: ladosInvertidos ? ladoE : ladoD,
     status,
     ladosInvertidos,
+    avisos,
+  };
+}
+
+function statusDoTexto(texto: string): StatusEscalacao | undefined {
+  const t = semAcento(texto);
+  return /provav|possive/.test(t) ? 'provavel' : /confirmad/.test(t) ? 'confirmada' : undefined;
+}
+
+/** Mais de 11: o que sobra costuma ser lixo de selo/nota ("Lio 6.9"), palavra solta curta. */
+function cortarExcesso(nomes: string[]): string[] {
+  const curto = (n: string) => !n.includes(' ') && n.replace(/[^A-Za-zÀ-ú]/g, '').length <= 3;
+  const r = [...nomes];
+  while (r.length > 11 && r.some(curto)) r.splice(r.findIndex(curto), 1);
+  return r;
+}
+
+/**
+ * Formato com posição ("@x,y texto", milésimos da imagem) e a linha do meio de campo achada
+ * na imagem. Campo em pé (meio em y): mandante em cima. Deitado (meio em x): à esquerda.
+ * O campo é simétrico: vai do meio até o goleiro de cada lado; o que passar disso (placar,
+ * abas, "Técnicos") fica de fora.
+ */
+function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
+  const avisos: string[] = [];
+  const m = linhas.find((l) => l.startsWith(MARCA_MEIO))?.split(' ');
+  const eixo = m?.[2] === 'y' ? 'y' : 'x';
+  const meio = m ? Number(m[3]) : 500;
+  if (!m) avisos.push('linha do meio de campo não achada na imagem: times separados pelo centro');
+  const itens: { nome: string; a: number; b: number }[] = [];
+  const formacoes: { f: string; a: number }[] = [];
+  for (const l of linhas) {
+    const p = /^@(\d+),(\d+) (.*)$/.exec(l);
+    if (!p) continue;
+    const [x, y, texto] = [Number(p[1]), Number(p[2]), p[3]];
+    const a = eixo === 'y' ? y : x;
+    const b = eixo === 'y' ? x : y;
+    const f = RE_FORMACAO.exec(texto);
+    if (f) formacoes.push({ f: f.slice(1).filter(Boolean).join('-'), a });
+    if (citaTime(texto, jogo.casa) || citaTime(texto, jogo.fora)) continue;
+    // "N.Ferrares" → "N. Ferrares"
+    const nome = nomeDeJogador(texto.replace(/\b([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 '));
+    if (nome) itens.push({ nome, a, b });
+  }
+  const antes = itens.filter((i) => i.a < meio);
+  const depois = itens.filter((i) => i.a >= meio);
+  const alcance =
+    antes.length && depois.length
+      ? Math.min(
+          meio - Math.min(...antes.map((i) => i.a)),
+          Math.max(...depois.map((i) => i.a)) - meio,
+        ) + 50
+      : 1000;
+  const noCampo = (i: { a: number }) => Math.abs(i.a - meio) <= alcance;
+  // ordem: do goleiro para frente, fileira por fileira
+  const ordenar = (xs: typeof itens, doGol: 1 | -1) =>
+    xs
+      .filter(noCampo)
+      .sort((p, q) => (Math.abs(p.a - q.a) > 15 ? doGol * (p.a - q.a) : p.b - q.b))
+      .map((i) => i.nome);
+  const lado = (xs: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => ({
+    titulares: cortarExcesso([...new Set(ordenar(xs, doGol))]),
+    reservas: [],
+    formacao: formacoes.find((f) => f.a < meio === ehAntes)?.f,
+  });
+  return {
+    casa: lado(antes, 1, true),
+    fora: lado(depois, -1, false),
+    status: statusDoTexto(linhas.join(' ')),
+    ladosInvertidos: false,
     avisos,
   };
 }

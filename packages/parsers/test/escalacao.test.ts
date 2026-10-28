@@ -138,3 +138,30 @@ describe('escalação do Flashscore (OCR real do campo)', () => {
     expect(l.fora.titulares).toContain('Alex Tell');
   });
 });
+
+describe('escalação com posição e linha do meio (OCR atual)', () => {
+  const ler = (f: string) =>
+    lerEscalacao(readFileSync(new URL(`./fixtures-reais/${f}`, import.meta.url), 'utf8'), {
+      casa: 'Remo',
+      fora: 'Botafogo',
+    });
+  it('SuperScore, campo em pé: mandante em cima, cabeçalho da página fora', () => {
+    const l = ler('superscore-escalacao.txt');
+    expect(l.fora.titulares).toHaveLength(11);
+    expect(l.fora.titulares[0]).toBe('G. Batista'); // goleiro primeiro
+    expect(l.fora.titulares).toContain('H. Ziyech');
+    expect(l.fora.titulares).toContain('N. Ferrares'); // "N.Ferrares" separado
+    // "G. Taliari" o OCR leu "G. 1ahan": fica de fora (nunca inventado), sobram 10
+    expect(l.casa.titulares).toHaveLength(10);
+    expect(l.casa.titulares[0]).toBe('Rangel');
+    expect(l.casa.titulares).not.toContain('Hoje');
+    expect(l.casa.titulares.some((n) => /escala/i.test(n))).toBe(false);
+  });
+  it('Flashscore, campo deitado: mandante à esquerda, 11 de cada lado', () => {
+    const l = ler('flashscore-escalacao-pos.txt');
+    expect(l.casa.titulares).toHaveLength(11);
+    expect(l.fora.titulares).toHaveLength(11);
+    expect(l.casa.titulares).toContain('Tchamba');
+    expect(l.fora.titulares).toContain('Tiquinho');
+  });
+});

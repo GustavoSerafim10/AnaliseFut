@@ -79,7 +79,7 @@ export function AbaTabela({ r, setR, d }: PropsAba) {
       <h3>Escalações</h3>
       <UploadPrints
         rotulo="Enviar prints da escalação"
-        dica='Flashscore ou SofaScore → página do jogo → "Escalações": print do campo com os dois times (e, se quiser, dos reservas). Esquerda = mandante, direita = visitante.'
+        dica='Flashscore, SuperScore ou SofaScore → "Escalações": print do campo com os dois times (pode ser a tela inteira). Campo deitado: esquerda = mandante; em pé: em cima = mandante.'
         leituras={r.prints.escalacao ?? []}
         desabilitado={semTimes}
         modo="lados"
