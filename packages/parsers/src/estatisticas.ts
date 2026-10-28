@@ -93,13 +93,14 @@ export const CAMPOS_STATS: DefCampo[] = [
     formato: 'decimal1',
     faixa: [0, 5],
   },
-  { campo: 'xgot', rotulo: 'xGOT', re: /xgot|xcot/, formato: 'decimal1', faixa: [0, 5] },
+  // média de xG na temporada abaixo de 0,2 não existe: é OCR ("0", "1" sem ponto)
+  { campo: 'xgot', rotulo: 'xGOT', re: /xgot|xcot/, formato: 'decimal1', faixa: [0.2, 4] },
   {
     campo: 'xg',
     rotulo: 'xG (gols esperados)',
     re: /gols esperados|\bxg\b/,
     formato: 'decimal1',
-    faixa: [0, 5],
+    faixa: [0.2, 4],
   },
   {
     campo: 'golsEvitados',

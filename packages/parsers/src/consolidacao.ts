@@ -123,16 +123,23 @@ export function estatisticasParaModelo(t: TabelaConsolidada, time: Time): Estati
   const jogos = val(t, 'partidas', time);
   const gm = val(t, 'golsMarcados', time);
   const gs = val(t, 'golsSofridos', time);
-  let golsPro: number | undefined;
-  let golsContra: number | undefined;
-  if (jogos && gm !== undefined) {
-    golsPro = gm / jogos;
-    declaracoes.push(`gols pró/jogo = ${gm} ÷ ${jogos} = ${golsPro.toFixed(2)}`);
-  } else golsPro = val(t, 'golsPorJogo', time);
-  if (jogos && gs !== undefined) {
-    golsContra = gs / jogos;
-    declaracoes.push(`gols contra/jogo = ${gs} ÷ ${jogos} = ${golsContra.toFixed(2)}`);
-  } else golsContra = val(t, 'golsSofridosPorJogo', time);
+  // total ÷ partidas é mais preciso que a média (1 casa decimal), salvo quando não bate com
+  // ela: aí o total é que veio errado ("gols marcados 4" em 32 jogos com 1,1 por jogo)
+  const porJogo = (total: number | undefined, campoMedia: CampoStat, nome: string) => {
+    const media = val(t, campoMedia, time);
+    if (!jogos || total === undefined) return media;
+    const conta = total / jogos;
+    if (media !== undefined && Math.abs(conta - media) > 0.15) {
+      declaracoes.push(
+        `${nome}/jogo = ${media} (média lida): ${total} ÷ ${jogos} = ${conta.toFixed(2)} não bate, total ignorado`,
+      );
+      return media;
+    }
+    declaracoes.push(`${nome}/jogo = ${total} ÷ ${jogos} = ${conta.toFixed(2)}`);
+    return conta;
+  };
+  const golsPro = porJogo(gm, 'golsPorJogo', 'gols pró');
+  const golsContra = porJogo(gs, 'golsSofridosPorJogo', 'gols contra');
 
   if (!jogos) faltando.push('partidas');
   if (golsPro === undefined) faltando.push('gols marcados');

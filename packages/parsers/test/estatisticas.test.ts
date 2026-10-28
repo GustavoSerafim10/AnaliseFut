@@ -255,3 +255,28 @@ describe('SofaScore Remo × Botafogo (OCR real, ampliação Lanczos em cinza)', 
     expect(c.jogosSemSofrer).toMatchObject({ casa: 4, fora: 5 });
   });
 });
+
+describe('proteções contra valor impossível (Raio-X Remo × Botafogo)', () => {
+  const j = { casa: 'Remo', fora: 'Botafogo' };
+  it('xG 0 na média da temporada é descartado', () => {
+    const l = lerEstatisticas('Remo Botafogo\n1.2 Gols esperados (xG) 0', 'superscore', j);
+    expect(l.campos.xg?.casa).toBe(1.2);
+    expect(l.campos.xg?.fora).toBeUndefined();
+  });
+  it('gols marcados 4 em 32 jogos com 1,1 por jogo: o modelo usa a média, não 0,1', () => {
+    const t = consolidar(
+      {
+        sofascore: lerEstatisticas(
+          'Remo Botafogo\nPartidas 32 32\nGols por partida 1.1 1.4\nGols sofridos por jogo 1.6 1.6',
+          'sofascore',
+          j,
+        ),
+        superscore: null,
+      },
+      { 'golsMarcados.casa': 4 },
+    );
+    const m = estatisticasParaModelo(t, 'casa');
+    expect(m.stats!.golsPro).toBe(1.1);
+    expect(m.declaracoes.join()).toContain('não bate');
+  });
+});
