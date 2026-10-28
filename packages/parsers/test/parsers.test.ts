@@ -156,3 +156,35 @@ describe('sanidade', () => {
     );
   });
 });
+
+describe('sanidade: primeiro gol contra o favorito do 1X2', () => {
+  const l = (mercado: string, lado: string, odd: number): LinhaOdd =>
+    ({
+      casa: '1win',
+      mercado,
+      periodo: 'FT',
+      lado,
+      odd,
+      horarioColeta: '2026-10-28T15:52:00-03:00',
+    }) as LinhaOdd;
+  const x12 = [l('1X2', '1', 1.4), l('1X2', 'X', 4.6), l('1X2', '2', 7.5)];
+  it('Bragantino favorito "@ 2.88" para marcar primeiro: lados trocados → erro nas duas', () => {
+    const p = checarSanidade([
+      ...x12,
+      l('primeiro_gol', 'casa', 2.88),
+      l('primeiro_gol', 'fora', 1.36),
+      l('primeiro_gol', 'nenhum', 13),
+    ]);
+    const erros = p.filter((x) => x.nivel === 'erro' && x.mensagem.includes('primeiro gol'));
+    expect(erros.map((e) => e.indice).sort()).toEqual([3, 4]);
+  });
+  it('na ordem certa não acusa', () => {
+    const p = checarSanidade([
+      ...x12,
+      l('primeiro_gol', 'casa', 1.36),
+      l('primeiro_gol', 'fora', 2.88),
+      l('primeiro_gol', 'nenhum', 13),
+    ]);
+    expect(p.some((x) => x.mensagem.includes('primeiro gol'))).toBe(false);
+  });
+});

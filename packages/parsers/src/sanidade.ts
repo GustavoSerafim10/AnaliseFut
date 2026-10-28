@@ -99,6 +99,35 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
       );
   }
 
+  // primeiro gol tem de seguir o favorito do 1X2: favorito claro (odd 1X2 bem menor) com odd
+  // maior para marcar primeiro é lado trocado na leitura (Bragantino 70% "@ 2.88" para marcar
+  // primeiro era a odd da Chapecoense) → erro, sai da análise
+  const odd = (casa: string, mercado: string, lado: string) =>
+    linhas.findIndex(
+      (l) =>
+        l.casa.toLowerCase() === casa &&
+        l.mercado === mercado &&
+        l.periodo === 'FT' &&
+        normalizarLado(l.lado) === lado,
+    );
+  for (const casa of new Set(linhas.map((l) => l.casa.toLowerCase()))) {
+    const [c1, c2] = [odd(casa, '1X2', '1'), odd(casa, '1X2', '2')];
+    const [p1, p2] = [odd(casa, 'primeiro_gol', 'casa'), odd(casa, 'primeiro_gol', 'fora')];
+    if ([c1, c2, p1, p2].some((i) => i < 0)) continue;
+    const favCasa = linhas[c1].odd * 1.25 < linhas[c2].odd;
+    const favFora = linhas[c2].odd * 1.25 < linhas[c1].odd;
+    const invertido =
+      (favCasa && linhas[p1].odd > linhas[p2].odd) || (favFora && linhas[p2].odd > linhas[p1].odd);
+    if (invertido)
+      [p1, p2].forEach((i) =>
+        add(
+          i,
+          'erro',
+          `primeiro gol contra o favorito do 1X2 (1X2 ${linhas[c1].odd} × ${linhas[c2].odd}, primeiro gol ${linhas[p1].odd} × ${linhas[p2].odd}): lados trocados na leitura?`,
+        ),
+      );
+  }
+
   // ordem das linhas: over sobe com a linha, under desce
   const series = new Map<string, number[]>();
   linhas.forEach((l, i) => {
