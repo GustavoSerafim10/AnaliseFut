@@ -34,7 +34,10 @@ import {
   destaquesComparativos,
   estatisticasContagem,
   estatisticasParaModelo,
+  juntarEscalacoes,
   juntarLeiturasStats,
+  lerEscalacao,
+  mesmoJogador,
   lerOddsCasa,
   lerClassificacao,
   lerDesfalques,
@@ -47,9 +50,29 @@ import {
   type LeituraStats,
   type LinhaClassificacao,
   type ProblemaLinha,
+  type StatusEscalacao,
   type TabelaConsolidada,
 } from '@pe/parsers';
 import { FATOR_DESFALQUE, inicioIso, num, ROTULO_DESFALQUE, type Rascunho } from './estado';
+
+export interface EscalacaoTime {
+  titulares: string[];
+  reservas: string[];
+  formacao?: string;
+  tecnico?: string;
+  origem: 'print' | 'manual' | 'vazio';
+}
+
+export interface EscalacaoDerivada {
+  casa: EscalacaoTime;
+  fora: EscalacaoTime;
+  status?: StatusEscalacao;
+  avisos: string[];
+  /** os dois times com 9+ titulares: conta como "escalação conferida" (DQ A) */
+  conferida: boolean;
+  /** só provável: o gate sobe (+1 pp) e o modelo pesa menos */
+  incerta: boolean;
+}
 
 export interface Derivado {
   sofa: LeituraStats | null;
@@ -62,6 +85,7 @@ export interface Derivado {
   contagens: Partial<Record<Estatistica, ResultadoLambdaContagem>>;
   desfalques: Desfalque[];
   avisosDesfalques: string[];
+  escalacao: EscalacaoDerivada;
   impacto: Record<'casa' | 'fora', ImpactoSugerido>;
   classificacao: LinhaClassificacao[];
   avisosClassificacao: string[];
@@ -101,6 +125,8 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
 
   const desf = textos(r, 'desfalques').map((t) => lerDesfalques(t, nomes));
   const desfalques = desf.flatMap((d) => d.desfalques);
+  const escalacao = derivarEscalacao(r, nomes, desfalques);
+  const escalacaoIncerta = r.config.escalacaoIncerta || escalacao.incerta;
   const clas = textos(r, 'classificacao').map((t) => lerClassificacao(t, nomes));
   const flash = r.flashscore.trim() ? lerTextoFlashscore(r.flashscore, nomes) : null;
 
@@ -174,7 +200,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     fontesStats,
     desfalquesConhecidos,
     ligaTop: r.config.ligaTop,
-    escalacaoProvavel: r.config.escalacaoProvavel,
+    escalacaoProvavel: r.config.escalacaoProvavel || escalacao.conferida,
   });
 
   const problemasOdds = checarSanidade(r.odds as LinhaOdd[]);
@@ -204,7 +230,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       linhas: r.odds as LinhaOdd[],
       contexto: {
         favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
-        escalacaoIncerta: r.config.escalacaoIncerta,
+        escalacaoIncerta,
         mercadoMuitoLiquido: r.config.mercadoMuitoLiquido,
         priorNeutro: lambda.priorNeutro,
         explicacaoDivergencia: r.explicacaoDivergencia.trim() || undefined,
@@ -230,7 +256,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
       linhas: r.odds as LinhaOdd[],
       ligaPrincipal: r.config.ligaTop,
-      escalacaoIncerta: r.config.escalacaoIncerta,
+      escalacaoIncerta,
       noticia: r.noticia,
       fatoNovo: r.explicacaoDivergencia.trim() || undefined,
       apoio: lambda
@@ -240,7 +266,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
             dq: dq.dq,
             w: pesoModelo(dq.dq, {
               mercadoMuitoLiquido: r.config.mercadoMuitoLiquido,
-              escalacaoIncerta: r.config.escalacaoIncerta,
+              escalacaoIncerta,
             }),
             jogosMin:
               modeloCasa.stats && modeloFora.stats
@@ -281,6 +307,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     contagens,
     desfalques,
     avisosDesfalques: desf.flatMap((d) => d.avisos),
+    escalacao,
     impacto,
     classificacao: clas.flatMap((c) => c.linhas),
     avisosClassificacao: clas.flatMap((c) => c.avisos),
@@ -298,4 +325,46 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     resultado,
     relatorio,
   };
+}
+
+/** Escalação: a lida dos prints, salvo o que você digitou à mão; cruza com os desfalques. */
+function derivarEscalacao(
+  r: Rascunho,
+  nomes: { casa: string; fora: string },
+  desfalques: Desfalque[],
+): EscalacaoDerivada {
+  const lida = juntarEscalacoes(textos(r, 'escalacao').map((t) => lerEscalacao(t, nomes)));
+  const avisos = [...(lida?.avisos ?? [])];
+  const time = (t: 'casa' | 'fora'): EscalacaoTime => {
+    const manual = (r.escalacaoManual?.[t] ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const doPrint = lida?.[t];
+    if (manual.length)
+      return { ...doPrint, titulares: manual, reservas: doPrint?.reservas ?? [], origem: 'manual' };
+    if (doPrint?.titulares.length) return { ...doPrint, origem: 'print' };
+    return { titulares: [], reservas: [], origem: 'vazio' };
+  };
+  const casa = time('casa');
+  const fora = time('fora');
+  for (const [t, e] of [
+    ['casa', casa],
+    ['fora', fora],
+  ] as const) {
+    if (e.origem === 'print' && e.titulares.length > 11)
+      avisos.push(
+        `${nomes[t]}: ${e.titulares.length} titulares lidos (máx. 11) — confira e apague os que sobram`,
+      );
+    if (e.origem !== 'vazio' && e.titulares.length < 11)
+      avisos.push(`${nomes[t]}: só ${e.titulares.length} titular(es) — falta nome na leitura`);
+    for (const d of desfalques.filter((x) => x.time === t))
+      if (e.titulares.some((n) => mesmoJogador(n, d.jogador)))
+        avisos.push(
+          `${d.jogador} (${nomes[t]}) está nos desfalques mas aparece como titular — conferir`,
+        );
+  }
+  const status = r.statusEscalacao === 'auto' ? lida?.status : r.statusEscalacao;
+  const conferida = casa.titulares.length >= 9 && fora.titulares.length >= 9;
+  return { casa, fora, status, avisos, conferida, incerta: conferida && status === 'provavel' };
 }

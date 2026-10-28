@@ -17,6 +17,7 @@ export * from './sanidade';
 export * from './estatisticas';
 export * from './contexto';
 export * from './consolidacao';
+export * from './escalacao';
 
 export interface LeituraPrint extends ResultadoParser {
   fonte: FonteDetectada;

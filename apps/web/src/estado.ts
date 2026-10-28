@@ -55,7 +55,7 @@ export interface Rascunho {
     mediaEscanteios: string;
     mediaCartoes: string;
   };
-  /** textos de OCR por grupo: sofascore, superscore, classificacao, desfalques, ultimas, odds:<casa> */
+  /** textos de OCR por grupo: sofascore, superscore, classificacao, desfalques, escalacao, ultimas, odds:<casa> */
   prints: Record<string, Leitura[]>;
   flashscore: string;
   /** correções manuais das estatísticas: `${campo}.${time}` → valor */
@@ -67,6 +67,10 @@ export interface Rascunho {
   explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
   banca: string;
+  /** escalação digitada/corrigida à mão (um jogador por linha); vazio = a lida dos prints */
+  escalacaoManual: { casa: string; fora: string };
+  /** auto = o que o print diz ("prováveis"/"confirmadas") */
+  statusEscalacao: 'auto' | 'provavel' | 'confirmada';
   /** V4.0: entrada motivada por notícia (escalação, lesão) → estratégia S2 */
   noticia: boolean;
   /** id da entrada do histórico de onde veio (salvar de novo atualiza a mesma entrada) */
@@ -104,6 +108,8 @@ export function rascunhoNovo(): Rascunho {
     redTeam: { argumentos: ['', '', ''], atacaPremissa: false, sobreviveu: false },
     banca: '',
     noticia: false,
+    escalacaoManual: { casa: '', fora: '' },
+    statusEscalacao: 'auto',
   };
 }
 

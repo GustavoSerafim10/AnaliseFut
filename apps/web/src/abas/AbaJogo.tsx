@@ -13,7 +13,7 @@ const OPCOES: [keyof Rascunho['config'], string, string][] = [
   [
     'escalacaoProvavel',
     'Escalação provável conferida',
-    'Você viu as prováveis escalações (ex.: aba Formações do SofaScore). Necessário para DQ A.',
+    'Marca sozinho quando a escalação dos dois times é lida em Tabela e escalações. Necessário para DQ A.',
   ],
   [
     'escalacaoIncerta',
@@ -98,11 +98,21 @@ export function AbaJogo({
     },
     {
       nome: 'Desfalques e escalações',
-      detalhe: d.desfalques.length
-        ? `${d.desfalques.length} desfalque(s) lido(s)`
-        : 'Confirmar quem joga',
+      detalhe:
+        [
+          d.escalacao.conferida &&
+            `escalação ${d.escalacao.status === 'confirmada' ? 'confirmada' : 'lida'}`,
+          d.desfalques.length > 0 && `${d.desfalques.length} desfalque(s)`,
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'Confirmar quem joga',
       icone: 'pessoas',
-      estado: d.desfalques.length || r.config.escalacaoProvavel ? 'ok' : 'pendente',
+      estado:
+        d.escalacao.conferida || r.config.escalacaoProvavel
+          ? 'ok'
+          : d.desfalques.length
+            ? 'parcial'
+            : 'pendente',
       ir: abrir && (() => abrir('tabela')),
     },
   ];

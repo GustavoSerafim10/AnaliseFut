@@ -129,7 +129,7 @@ export function App() {
           rotulo: 'Flashscore',
           marca: r.flashscore.trim() ? '✓' : undefined,
         },
-        { aba: { id: 'tabela' }, rotulo: 'Tabela e desfalques' },
+        { aba: { id: 'tabela' }, rotulo: 'Tabela e escalações' },
         { aba: { id: 'ultimas' }, rotulo: 'Últimas partidas' },
       ],
     },

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { isoLocal, pct, type Leitura } from '../estado';
-import { lerImagem } from '../ocr';
+import { lerImagem, type ModoOcr } from '../ocr';
 
 interface Props {
   rotulo: string;
   dica?: string;
   leituras: Leitura[];
   desabilitado?: boolean;
+  /** 'lados': lê metade esquerda e direita em separado (escalação) */
+  modo?: ModoOcr;
   onLido: (l: Leitura) => void;
   onRemover: (indice: number) => void;
 }
@@ -31,7 +33,15 @@ function soImagens(arquivos: Iterable<File>): File[] {
  * Envia vários prints de uma vez; lê um por um e mostra o texto lido de cada.
  * Aceita escolher arquivos, colar (clique na área ou Ctrl+V com ela em foco) e arrastar.
  */
-export function UploadPrints({ rotulo, dica, leituras, desabilitado, onLido, onRemover }: Props) {
+export function UploadPrints({
+  rotulo,
+  dica,
+  leituras,
+  desabilitado,
+  modo,
+  onLido,
+  onRemover,
+}: Props) {
   const [fila, setFila] = useState<{
     atual: string;
     feitos: number;
@@ -51,8 +61,10 @@ export function UploadPrints({ rotulo, dica, leituras, desabilitado, onLido, onR
       const arq = lista[i];
       setFila({ atual: arq.name, feitos: i, total: lista.length, p: 0 });
       try {
-        const texto = await lerImagem(arq, (p) =>
-          setFila({ atual: arq.name, feitos: i, total: lista.length, p }),
+        const texto = await lerImagem(
+          arq,
+          (p) => setFila({ atual: arq.name, feitos: i, total: lista.length, p }),
+          modo,
         );
         onLido({ arquivo: arq.name, texto, capturadoEm: isoLocal(new Date(arq.lastModified)) });
       } catch (e) {

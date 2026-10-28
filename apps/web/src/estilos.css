@@ -3732,3 +3732,26 @@ button.cl-linha:hover {
     stroke-dashoffset: -28;
   }
 }
+
+/* ---------- escalações ---------- */
+.escalacao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.escalacao-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.escalacao textarea {
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.escalacao .mini {
+  align-self: flex-start;
+}

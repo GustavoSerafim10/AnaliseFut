@@ -483,7 +483,37 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       fora: v.fora ?? anterior?.fora,
     };
   }
-  return { fonte, campos, outros, colunasInvertidas, avisos };
+  return coerencia({ fonte, campos, outros, colunasInvertidas, avisos });
+}
+
+/**
+ * Total tem de bater com média × partidas ("Gols marcados 4" com 1,4 por jogo em 32 jogos é
+ * o 44 com um dígito perdido). Sem bater, o total é descartado: a média serve de reserva.
+ */
+function coerencia(l: LeituraStats): LeituraStats {
+  const pares: [CampoStat, CampoStat][] = [
+    ['golsMarcados', 'golsPorJogo'],
+    ['golsSofridos', 'golsSofridosPorJogo'],
+  ];
+  for (const [total, media] of pares)
+    for (const t of ['casa', 'fora'] as const) {
+      const vt = l.campos[total]?.[t];
+      const vm = l.campos[media]?.[t];
+      const jogos = l.campos.partidas?.[t];
+      if (vt === undefined || vm === undefined || !jogos) continue;
+      const esperado = vm * jogos;
+      // a média tem 1 casa decimal: arredondamento dá até ±0,05 × jogos de folga
+      if (Math.abs(vt - esperado) <= Math.max(3, 0.05 * jogos + 0.1 * esperado)) continue;
+      l.campos[total] = {
+        ...l.campos[total]!,
+        [t]: undefined,
+        avisos: [
+          ...l.campos[total]!.avisos,
+          `${vt} não bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)}): descartado, conferir`,
+        ],
+      };
+    }
+  return l;
 }
 
 /** Junta a leitura de vários prints do mesmo site (rolagem com sobreposição). */
@@ -512,5 +542,5 @@ export function juntarLeiturasStats(leituras: LeituraStats[]): LeituraStats | nu
       if (!base.outros.some((x) => x.rotulo === o.rotulo)) base.outros.push(o);
     base.avisos.push(...l.avisos);
   }
-  return base;
+  return coerencia(base);
 }
