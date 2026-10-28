@@ -1436,6 +1436,67 @@ pre {
   background: rgba(34, 211, 238, 0.12);
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
 }
+.upload-linha {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0;
+  border-radius: var(--raio);
+}
+.upload-linha .upload {
+  margin: 0;
+  flex: 0 0 auto;
+}
+.upload-linha .upload span {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  font-size: 14px;
+}
+.upload-colar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 20px;
+  border: 1.5px dashed var(--ciano);
+  border-radius: var(--raio);
+  color: var(--ciano);
+  background: rgba(34, 211, 238, 0.06);
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.upload-colar small {
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.upload-colar:hover,
+.upload-colar:focus-visible,
+.upload-linha.arrastando .upload-colar {
+  background: rgba(34, 211, 238, 0.14);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+  outline: none;
+}
+.upload-colar:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+@media (max-width: 560px) {
+  .upload-linha {
+    flex-direction: column;
+  }
+  .upload-linha .upload span {
+    padding: 12px;
+    justify-content: center;
+  }
+}
 
 .abas-mini {
   display: flex;
