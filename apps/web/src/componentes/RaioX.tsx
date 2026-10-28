@@ -1,11 +1,11 @@
 /**
- * Raio-X dos times (abas de estatísticas): os números consolidados das fontes lidas,
- * desenhados lado a lado. Duelo de atributos, radar ofensivo, distribuição de gols e
+ * Raio-X dos times (abas de estatísticas): com `fonte`, só o que aquele site leu; sem, os
+ * números consolidados de todas as fontes. Desenhados lado a lado. Duelo de atributos, radar ofensivo, distribuição de gols e
  * placares mais prováveis. Os dois últimos vêm da matriz Dixon-Coles do próprio motor
  * (matrizPlacares) com o λ do modelo; nada é estimado na tela.
  */
 import { matrizPlacares, placaresMaisProvaveis } from '@pe/engine';
-import type { CampoStat } from '@pe/parsers';
+import type { CampoStat, FonteStats } from '@pe/parsers';
 import type { Derivado } from '../dados';
 import { Icone } from './ui';
 
@@ -101,13 +101,19 @@ export function RaioX({
   d,
   nomes,
   correcoes = 0,
+  fonte,
 }: {
   d: Derivado;
   nomes: Record<Time, string>;
   /** quantos valores você corrigiu à mão (entram por cima das fontes) */
   correcoes?: number;
+  /** só os dados deste site (a aba dele); sem isto, o consolidado */
+  fonte?: FonteStats;
 }) {
-  // de onde vieram os números: o Raio-X é o mesmo em todas as abas (é o que entra no modelo)
+  const doSite = fonte ? (fonte === 'sofascore' ? d.sofa : d.sup) : undefined;
+  const nomeSite = fonte === 'sofascore' ? 'SofaScore' : 'SuperScore';
+  if (fonte && !(doSite && Object.keys(doSite.campos).length)) return null;
+  // de onde vieram os números que entram no modelo
   const origem = [
     d.sofa &&
       Object.keys(d.sofa.campos).length &&
@@ -123,7 +129,18 @@ export function RaioX({
       fora: d.modeloFora.stats?.golsContra,
     },
   };
-  const val = (c: CampoStat, t: Time) => doModelo[c]?.[t] ?? d.tabela[c]?.[t]?.valor;
+  // num site só: a média lida, ou o total ÷ partidas do próprio site
+  const doSiteVal = (c: CampoStat, t: Time): number | undefined => {
+    const lido = doSite?.campos[c]?.[t];
+    if (lido !== undefined) return lido;
+    const total =
+      c === 'golsPorJogo' ? 'golsMarcados' : c === 'golsSofridosPorJogo' ? 'golsSofridos' : null;
+    const tot = total ? doSite?.campos[total]?.[t] : undefined;
+    const jogos = doSite?.campos.partidas?.[t];
+    return tot !== undefined && jogos ? tot / jogos : undefined;
+  };
+  const val = (c: CampoStat, t: Time) =>
+    doSite ? doSiteVal(c, t) : (doModelo[c]?.[t] ?? d.tabela[c]?.[t]?.valor);
   const par = (c: CampoStat) => {
     const casa = val(c, 'casa');
     const fora = val(c, 'fora');
@@ -193,9 +210,9 @@ export function RaioX({
               })}
             </ul>
             <p className="miudo">
-              Consolidado de todas as fontes: {origem.join(' + ') || 'nenhuma'}. É o mesmo em todas
-              as abas e é o que entra no modelo; o que cada site leu sozinho fica na tabela da aba
-              dele.
+              {doSite
+                ? `Só o que o ${nomeSite} leu (${Object.keys(doSite.campos).length} dados). O modelo junta todas as fontes: ${origem.join(' + ')}.`
+                : `Consolidado de todas as fontes: ${origem.join(' + ') || 'nenhuma'}.`}
             </p>
           </div>
         )}
@@ -242,7 +259,9 @@ export function RaioX({
                 </div>
               ))}
             </div>
-            <p className="miudo">Matriz Dixon-Coles do motor com o λ do modelo.</p>
+            <p className="miudo">
+              Matriz Dixon-Coles do motor com o λ do modelo (todas as fontes juntas).
+            </p>
           </div>
         )}
 

@@ -40,6 +40,7 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         d={d}
         nomes={{ casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' }}
         correcoes={Object.keys(r.correcoes).length}
+        fonte={fonte}
       />
 
       {leitura && (
