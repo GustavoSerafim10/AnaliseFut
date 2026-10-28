@@ -325,3 +325,25 @@ describe('SofaScore com print maior (zoom): print que termina no meio da tabela'
     expect(c.grandesChances).toMatchObject({ casa: 1.6, fora: 2.1 });
   });
 });
+
+describe('prints maiores (zoom), parte de baixo das duas páginas', () => {
+  const j = { casa: 'Remo', fora: 'Botafogo' };
+  it('SofaScore: 14 de 14 linhas certas', () => {
+    const c = lerEstatisticas(fx('sofascore-remo-zoom-2.txt'), 'sofascore', j).campos;
+    expect(c.faltas).toMatchObject({ casa: 11.5, fora: 13.4 });
+    expect(c.interceptacoes).toMatchObject({ casa: 9.7, fora: 7.9 });
+    expect(c.laterais).toMatchObject({ casa: 19.4, fora: 19.3 });
+    expect(c.desarmes).toMatchObject({ casa: 15.1, fora: 15.3 });
+    expect(c.cartoesAmarelos).toMatchObject({ casa: 2.1, fora: 2.6 });
+    expect(c.impedimentos).toMatchObject({ casa: 1.7, fora: 0.8 });
+  });
+  it('SuperScore: defesa e passes; "à" não corta o rótulo', () => {
+    const l = lerEstatisticas(fx('superscore-remo-zoom.txt'), 'superscore', j);
+    expect(l.campos.interceptacoes).toMatchObject({ casa: 9.7, fora: 7.9 });
+    expect(l.campos.golsEvitados).toMatchObject({ casa: 0.1, fora: -0.1 });
+    expect(l.outros.find((o) => o.rotulo.includes('finalização'))).toMatchObject({
+      casa: 0.6,
+      fora: 1.0,
+    });
+  });
+});

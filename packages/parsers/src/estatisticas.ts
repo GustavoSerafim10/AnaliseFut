@@ -467,7 +467,8 @@ function tokenizar(linha: string): { nums: TokenNum[]; palavras: { txt: string; 
           digitos: m[1].replace(/\D/g, '').length,
           pos,
         });
-      } else if (/[a-zà-ú]{2,}/i.test(t)) {
+      } else if (/[a-zà-ú]{2,}/i.test(t) || /^[àaeé]$/.test(t)) {
+        // "à", "e": ligam o rótulo ("Erros que levaram à finalização") em vez de cortá-lo
         palavras.push({ txt: t, pos });
       }
     });
