@@ -69,7 +69,7 @@ export const CAMPOS_STATS: DefCampo[] = [
   {
     campo: 'golsMarcados',
     rotulo: 'Gols marcados (total)',
-    re: /gols marcados/,
+    re: /gols m[ae]rcados/,
     formato: 'inteiro',
     faixa: [0, 200],
   },
@@ -83,7 +83,8 @@ export const CAMPOS_STATS: DefCampo[] = [
   {
     campo: 'golsPorJogo',
     rotulo: 'Gols por jogo',
-    re: /gols por partida|^gols$|^gols\b(?! (esperados|evitados|de))/,
+    // só o rótulo exato: "Gols <lixo do OCR>" não pode virar média de gols
+    re: /gols por (partida|jogo)|^gols$/,
     formato: 'decimal1',
     faixa: [0, 5],
   },
@@ -224,7 +225,7 @@ export const CAMPOS_STATS: DefCampo[] = [
   {
     campo: 'cartoesAmarelos',
     rotulo: 'Cartões amarelos por jogo',
-    re: /cartoes amarelos/,
+    re: /cartoes amare/,
     formato: 'decimal1',
     faixa: [0, 6],
   },
@@ -304,7 +305,7 @@ export interface LeituraStats {
 /** Erros típicos do OCR nesses sites. */
 function corrigirRotulo(t: string): string {
   return t
-    .replace(/\bgo[il1]s\b|\bgots\b/g, 'gols')
+    .replace(/\bgo[il1]s\b|\bgots\b|\bgos\b/g, 'gols')
     .replace(/assisten/g, 'assisten')
     .replace(/interceptac\w*/g, 'interceptacoes')
     .replace(/\bduetos\b/g, 'duelos')
@@ -319,7 +320,10 @@ interface TokenNum {
 
 /** Separa números e palavras. "17.3(59.9%)" → 17.3; "[158" → 158; "W6.97" → 6.97. */
 function tokenizar(linha: string): { nums: TokenNum[]; palavras: { txt: string; pos: number }[] } {
-  const limpa = linha.replace(/\(\s*[\d.,]+\s*%\s*\)/g, ' ');
+  const limpa = linha
+    .replace(/\(\s*[\d., ]+%\s*\)/g, ' ')
+    // "44 0%": o ponto do percentual virou espaço
+    .replace(/\b(\d{1,2}) (\d)%/g, '$1.$2%');
   const nums: TokenNum[] = [];
   const palavras: { txt: string; pos: number }[] = [];
   limpa
@@ -362,10 +366,17 @@ function rotuloPrincipal(palavras: { txt: string; pos: number }[]): {
 function interpretar(tok: TokenNum, def: DefCampo): { valor: number; corrigido: boolean } {
   if (def.formato === 'decimal1' && !tok.temPonto)
     return { valor: tok.valor / 10, corrigido: true };
+  // "44.0%" lido como "440%": percentual acima de 100 perdeu o ponto
+  if (def.formato === 'percentual' && !tok.temPonto && tok.valor > 100)
+    return { valor: tok.valor / 10, corrigido: true };
   if (def.formato === 'decimal2' && !tok.temPonto)
     return { valor: tok.valor / 100, corrigido: true };
   return { valor: tok.valor, corrigido: false };
 }
+
+/** Palavra de até 3 letras que não faz parte de rótulo nenhum: é número que o OCR estragou. */
+const LIXO_CURTO = (p: string) =>
+  p.length <= 3 && !/^(por|de|da|do|no|na|em|gol|xg|e)$/i.test(semAcento(p));
 
 function acharCampo(rotulo: string): DefCampo | undefined {
   return CAMPOS_STATS.find((d) => d.re.test(rotulo));
@@ -405,8 +416,20 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
     const { nums, palavras } = tokenizar(bruto);
     if (!palavras.length || !nums.length) continue;
     const rot = rotuloPrincipal(palavras);
-    const rotulo = corrigirRotulo(semAcento(rot.txt));
-    const def = acharCampo(rotulo);
+    let rotulo = corrigirRotulo(semAcento(rot.txt));
+    let def = acharCampo(rotulo);
+    // "Gols marcados MH 44": o valor ilegível colou no rótulo como palavra curta
+    let partes = rot.txt.split(' ');
+    while (partes.length > 1 && LIXO_CURTO(partes[partes.length - 1])) {
+      const semUltima = corrigirRotulo(semAcento(partes.slice(0, -1).join(' ')));
+      const d = acharCampo(semUltima);
+      if (!d || (def && d !== def)) break;
+      partes = partes.slice(0, -1);
+      rot.fim--;
+      rot.txt = partes.join(' ');
+      rotulo = semUltima;
+      def = d;
+    }
     // posição dos números em relação ao rótulo define a coluna
     const antes = nums.filter((n) => n.pos < rot.ini);
     const depois = nums.filter((n) => n.pos > rot.fim);
@@ -441,9 +464,11 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       const { valor, corrigido } = interpretar(tok, def);
       if (corrigido) v.avisos.push(`ponto decimal perdido no OCR: ${tok.valor} lido como ${valor}`);
       if (valor < def.faixa[0] || valor > def.faixa[1]) {
+        // descartado: outro print (ou a correção à mão) completa o valor
         v.avisos.push(
-          `${valor} fora da faixa plausível (${def.faixa[0]}–${def.faixa[1]}): conferir`,
+          `${valor} fora da faixa plausível (${def.faixa[0]}–${def.faixa[1]}): descartado, conferir`,
         );
+        return undefined;
       }
       return valor;
     };

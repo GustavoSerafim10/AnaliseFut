@@ -91,8 +91,9 @@ describe('cruzamento SofaScore × SuperScore', () => {
     expect(t.chutesNoAlvo!.casa.valor).toBeCloseTo((5.6 + 5.7) / 2, 6);
     expect(t.chutesNoAlvo!.casa.divergente).toBe(false);
   });
-  it('faltas: OCR do SuperScore leu 1.7 (era 11.7) → divergência > 15% destacada', () => {
-    expect(t.faltas!.fora.divergente).toBe(true);
+  it('faltas: OCR do SuperScore leu 1.7 (era 11.7) → fora da faixa, descartado; vale o SofaScore', () => {
+    expect(sup.campos.faltas!.fora).toBeUndefined();
+    expect(sup.campos.faltas!.avisos.join()).toContain('descartado');
     expect(t.faltas!.fora.valor).toBe(11.8);
   });
   it('correção manual prevalece', () => {
