@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   juntarEscalacoes,
@@ -109,5 +110,31 @@ describe('coerência total × média × partidas', () => {
       jogo,
     );
     expect(l.campos.golsMarcados).toMatchObject({ casa: 34, fora: 44 });
+  });
+});
+
+describe('escalação do Flashscore (OCR real do campo)', () => {
+  const texto = readFileSync(
+    new URL('./fixtures-reais/flashscore-escalacao.txt', import.meta.url),
+    'utf8',
+  );
+  const l = lerEscalacao(texto, { casa: 'Ceará', fora: 'Botafogo' });
+  it('11 de cada lado, nomes cortados pelo site aceitos, lixo de selo descartado', () => {
+    expect(l.casa.titulares).toEqual([
+      'Marlon',
+      'Jaja',
+      'Ze Ricar',
+      'Tchamba',
+      'Marcelo',
+      'Vitor Bu.',
+      'Gabriel',
+      'Marllon',
+      'Ze Well',
+      'Galeano',
+      'Marceli',
+    ]);
+    expect(l.fora.titulares).toHaveLength(11);
+    expect(l.fora.titulares).toContain('Tiquinho');
+    expect(l.fora.titulares).toContain('Alex Tell');
   });
 });

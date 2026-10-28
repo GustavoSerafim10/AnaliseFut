@@ -26,9 +26,12 @@ function obterWorker(): Promise<Worker> {
 
 /**
  * Cinza → inverte tema escuro → amplia (até 3x, ~3000 px) → preto-e-branco por limiar.
- * Sem limiar (escalação): o gramado verde viraria preto junto com os nomes; o Tesseract binariza.
+ * Escalação (nomes brancos sobre o campo), pelo fundo mediano:
+ * - escuro (Flashscore): inverte e corta em 200 (calibrado com print real: 22 de 22 nomes);
+ * - médio (gramado verde do SofaScore): só pixel branco (menor canal RGB > 150) vira tinta;
+ * - claro: limiar normal.
  */
-async function preprocessar(arquivo: File, limiar = true): Promise<HTMLCanvasElement> {
+async function preprocessar(arquivo: File, modo: ModoOcr = 'bloco'): Promise<HTMLCanvasElement> {
   const img = await createImageBitmap(arquivo);
   const escala = Math.max(1, Math.min(3, Math.round(3000 / img.width)));
   const canvas = document.createElement('canvas');
@@ -39,6 +42,25 @@ async function preprocessar(arquivo: File, limiar = true): Promise<HTMLCanvasEle
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const dados = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const px = dados.data;
+  if (modo === 'lados') {
+    const hist = new Array<number>(256).fill(0);
+    for (let i = 0; i < px.length; i += 4)
+      hist[Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2])]++;
+    let mediana = 0;
+    for (let acc = 0; mediana < 255 && (acc += hist[mediana]) < px.length / 8;) mediana++;
+    for (let i = 0; i < px.length; i += 4) {
+      const cinza = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      const tinta =
+        mediana < 70
+          ? 255 - cinza <= 200
+          : mediana <= 170
+            ? Math.min(px[i], px[i + 1], px[i + 2]) > 150
+            : cinza <= 160;
+      px[i] = px[i + 1] = px[i + 2] = tinta ? 0 : 255;
+    }
+    ctx.putImageData(dados, 0, 0);
+    return canvas;
+  }
   let soma = 0;
   for (let i = 0; i < px.length; i += 4) {
     const cinza = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
@@ -48,7 +70,7 @@ async function preprocessar(arquivo: File, limiar = true): Promise<HTMLCanvasEle
   const inverter = soma / (px.length / 4) < 128;
   for (let i = 0; i < px.length; i += 4) {
     const v = inverter ? 255 - px[i] : px[i];
-    px[i] = px[i + 1] = px[i + 2] = limiar ? (v > 160 ? 255 : 0) : v;
+    px[i] = px[i + 1] = px[i + 2] = v > 160 ? 255 : 0;
   }
   ctx.putImageData(dados, 0, 0);
   return canvas;
@@ -77,7 +99,7 @@ export async function lerImagem(
       return data.text;
     }
     // escalação: cada metade sozinha, texto esparso (nomes espalhados pelo campo)
-    const canvas = await preprocessar(arquivo, false);
+    const canvas = await preprocessar(arquivo, 'lados');
     await w.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
     const partes: string[] = [];
     for (const [i, [marca, de, ate]] of (

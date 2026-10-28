@@ -47,10 +47,11 @@ export function nomeDeJogador(linha: string): string | null {
     .filter(Boolean);
   const partes: string[] = [];
   for (const t of tokens) {
-    const limpo = t.replace(/^[.,;:'-]+|[,;:'-]+$/g, '');
+    // "Ricar..." / "Ricar…": nome cortado pelo site; o ponto único fica (inicial "G.")
+    const limpo = t.replace(/^[.,;:'-]+|[,;:'-]+$/g, '').replace(/(\.{2,}|…)$/, '');
     if (!limpo) continue;
-    // inicial abreviada ("G.") ou palavra com letra maiúscula + 2 letras ou mais
-    const inicial = /^[A-ZÀ-Ú]\.$/.test(limpo);
+    // abreviação ("G.", "Bu.") ou palavra com letra maiúscula + 2 letras ou mais
+    const inicial = /^[A-ZÀ-Ú][a-zà-ú]{0,2}\.$/.test(limpo);
     const palavra = /^[A-ZÀ-Ú][a-zà-úA-ZÀ-Ú'’-]{1,}$/.test(limpo) && !/\d/.test(limpo);
     const particula = partes.length > 0 && /^(de|da|do|dos|das|di|van|von|el|al)$/i.test(limpo);
     if (inicial || palavra || particula) {
@@ -115,6 +116,10 @@ function lerLado(linhas: string[], jogo: NomesTimes): LadoEscalacao {
     const lista = modo === 'reservas' ? lado.reservas : lado.titulares;
     if (!lado.titulares.includes(nome) && !lado.reservas.includes(nome)) lista.push(nome);
   }
+  // mais de 11: o que sobra costuma ser lixo de selo/nota ("Lio 6.9"), palavra solta curta
+  const curto = (n: string) => !n.includes(' ') && n.replace(/[^A-Za-zÀ-ú]/g, '').length <= 3;
+  while (lado.titulares.length > 11 && lado.titulares.some(curto))
+    lado.titulares.splice(lado.titulares.findIndex(curto), 1);
   return lado;
 }
 
