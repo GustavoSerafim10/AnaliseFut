@@ -27,7 +27,8 @@ export interface Desfalque {
   situacao?: string;
 }
 
-const SITUACOES = /lesionad|suspens|duvida|machucad|contundid|afastad/;
+const SITUACOES = /lesionad|suspens|duvid|machucad|contundid|afastad|incert|convocad/;
+const TITULO_DESFALQUES = /ausentes|desfalques/;
 
 export function lerDesfalques(
   texto: string,
@@ -36,12 +37,15 @@ export function lerDesfalques(
   const desfalques: Desfalque[] = [];
   const avisos: string[] = [];
   let atual: Time | null = null;
-  for (const bruta of texto
+  const todas = texto
     .split('\n')
     .map((l) => l.trim())
-    .filter(Boolean)) {
+    .filter(Boolean);
+  // print da página inteira: o que vem antes de "Jogadores ausentes" é cabeçalho (placar, abas)
+  const iTitulo = todas.findIndex((l) => TITULO_DESFALQUES.test(semAcento(l)));
+  for (const bruta of iTitulo >= 0 ? todas.slice(iTitulo) : todas) {
     const t = semAcento(bruta);
-    if (/ausentes|possivel 11|desfalques/.test(t)) continue;
+    if (/ausentes|possivel 1|desfalques/.test(t)) continue;
     // cabeçalho de time: "Flamengo >" (linha curta com o nome do time)
     const timeLinha = reconhecerTime(bruta.replace(/[>›»]/g, ''), jogo);
     if (
@@ -55,13 +59,19 @@ export function lerDesfalques(
       atual = timeLinha;
       continue;
     }
-    if (SITUACOES.test(t) && desfalques.length) {
-      desfalques[desfalques.length - 1].situacao = bruta;
+    // "Lesionado" / "Duvidoso": situação do jogador de cima, nunca um jogador
+    if (SITUACOES.test(t) && bruta.split(/\s+/).length <= 3) {
+      if (desfalques.length) desfalques[desfalques.length - 1].situacao = bruta;
       continue;
     }
     // nome: começa na primeira palavra "Maiúscula + 2 letras"; antes disso é lixo (ícones, camisa)
     const partes = bruta.split(/\s+/).map((p) => p.replace(/[^A-Za-zÀ-ú.'-]/g, ''));
-    const ini = partes.findIndex((p) => /^[A-ZÀ-Ú][a-zà-ú]{2,}/.test(p));
+    // "Ze Ivaldo": palavra de 2 letras só conta seguida de outro nome
+    const ini = partes.findIndex(
+      (p, i) =>
+        /^[A-ZÀ-Ú][a-zà-ú]{2,}/.test(p) ||
+        (/^[A-ZÀ-Ú][a-zà-ú]$/.test(p) && /^[A-ZÀ-Ú][a-zà-ú]{2,}/.test(partes[i + 1] ?? '')),
+    );
     const nome =
       ini < 0
         ? ''
@@ -69,6 +79,8 @@ export function lerDesfalques(
             .slice(ini)
             .filter((p) => /[A-Za-zÀ-ú]/.test(p))
             .join(' ')
+            // letra solta no fim é ícone lido como texto ("Neido O")
+            .replace(/(\s+[A-Za-zÀ-ú])+$/, '')
             .trim();
     if (!nome || !/^[A-ZÀ-Ú]/.test(nome)) continue;
     if (!atual) {

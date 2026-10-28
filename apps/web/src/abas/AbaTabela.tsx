@@ -53,7 +53,7 @@ export function AbaTabela({ r, setR, d }: PropsAba) {
       <h3>Desfalques</h3>
       <UploadPrints
         rotulo="Enviar print dos desfalques"
-        dica='SuperScore → "Jogadores ausentes". Recorte só o bloco da lista.'
+        dica='SuperScore → "Jogadores ausentes". Pode ser a tela inteira: o que vem antes do título é ignorado.'
         leituras={r.prints.desfalques ?? []}
         desabilitado={semTimes}
         {...acoesPrints(setR, 'desfalques')}
