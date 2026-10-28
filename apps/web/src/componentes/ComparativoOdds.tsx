@@ -1,6 +1,6 @@
 /**
- * Comparativo de odds (V4.0): odd paga × odd justa, EV e status de cada mercado avaliado,
- * com uma barra fina P mercado (sem margem) × P_true. "Acima do gate" só quando o critério
+ * Comparativo de odds (V4.0): odd paga × odd justa, P mercado (sem margem) × P_true, EV
+ * contra o gate e status de cada mercado avaliado. "Acima do gate" só quando o critério
  * real do motor (EV ≥ gate) é satisfeito.
  */
 import type { AvaliacaoV4, LinhaOdd } from '@pe/engine';
@@ -11,6 +11,8 @@ import { Dica, Icone } from './ui';
 const p1 = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
 const n2 = (x: number) => x.toFixed(2);
 const LIMITE = 8;
+/** escala do medidor de EV: ±10% ocupa meia barra */
+const ESCALA_EV = 0.1;
 
 const LADO_1X2: Record<string, string> = { '1': 'Mandante', X: 'Empate', '2': 'Visitante' };
 const OU: Record<string, string> = { over: 'Over', under: 'Under' };
@@ -87,6 +89,33 @@ function IconeMercado({ a }: { a: AvaliacaoV4 }) {
   );
 }
 
+/** Probabilidade com barra proporcional (0–100%). */
+function Prob({ p, cor }: { p: number; cor: 'mercado' | 'true' }) {
+  return (
+    <div className="prob-cel">
+      <span>{p1(p)}</span>
+      <span className="prob-trilho" aria-hidden>
+        <span className={`prob-barra prob-${cor}`} style={{ width: `${p * 100}%` }} />
+      </span>
+    </div>
+  );
+}
+
+/** EV numa barra centrada no zero, com a marca do gate do próprio mercado. */
+function MedidorEv({ ev, gate }: { ev: number; gate: number | null }) {
+  const pos = (x: number) => 50 + (Math.max(-ESCALA_EV, Math.min(ESCALA_EV, x)) / ESCALA_EV) * 50;
+  const fim = pos(ev);
+  return (
+    <span className="medidor-ev" aria-hidden>
+      <span
+        className={`medidor-barra ${ev > 0 ? 'positivo' : 'negativo'}`}
+        style={{ left: `${Math.min(50, fim)}%`, width: `${Math.abs(fim - 50)}%` }}
+      />
+      {gate !== null && <span className="medidor-gate" style={{ left: `${pos(gate)}%` }} />}
+    </span>
+  );
+}
+
 export function ComparativoOdds({ d }: { d: Derivado }) {
   const [todos, setTodos] = useState(false);
   const v = d.v4;
@@ -116,7 +145,13 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                   Odd justa <Dica termo="justa" />
                 </th>
                 <th>
-                  EV <Dica termo="ev" />
+                  P mercado <Dica termo="devig" />
+                </th>
+                <th>
+                  P motor <Dica termo="ptrue" />
+                </th>
+                <th>
+                  EV × gate <Dica termo="gate" />
                 </th>
                 <th>Status</th>
               </tr>
@@ -138,19 +173,7 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                     <td title={a.descricao}>
                       <div className="mercado-linha">
                         <IconeMercado a={a} />
-                        <div>
-                          <div className="mercado-nome">{rotuloCurto(a.linha)}</div>
-                          <div
-                            className="barra-dupla"
-                            title={`P mercado sem margem ${p1(a.pConsenso)} · P_true ${p1(a.pTrue)}`}
-                          >
-                            <span
-                              className="bd-mercado"
-                              style={{ width: `${a.pConsenso * 100}%` }}
-                            />
-                            <span className="bd-true" style={{ width: `${a.pTrue * 100}%` }} />
-                          </div>
-                        </div>
+                        <div className="mercado-nome">{rotuloCurto(a.linha)}</div>
                       </div>
                     </td>
                     <td>
@@ -158,9 +181,19 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                       {casas.length > 1 && <div className="miudo">{a.casaMelhorOdd}</div>}
                     </td>
                     <td>{n2(a.oddJusta)}</td>
-                    <td className={a.ev > 0 ? 'positivo' : 'negativo'}>
+                    <td>
+                      <Prob p={a.pConsenso} cor="mercado" />
+                    </td>
+                    <td>
+                      <Prob p={a.pTrue} cor="true" />
+                    </td>
+                    <td
+                      className={`ev-cel ${a.ev > 0 ? 'positivo' : 'negativo'}`}
+                      title={a.evMinimo === null ? undefined : `gate ${p1(a.evMinimo)}`}
+                    >
                       {a.ev > 0 ? '+' : ''}
                       {p1(a.ev)}
+                      <MedidorEv ev={a.ev} gate={a.evMinimo} />
                     </td>
                     <td>
                       <span className={`chip chip-${status.c}`}>

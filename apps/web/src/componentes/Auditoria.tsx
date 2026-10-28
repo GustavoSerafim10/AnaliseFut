@@ -6,6 +6,7 @@
  */
 import type { Derivado } from '../dados';
 import type { Rascunho } from '../estado';
+import { rotuloCurto } from './ComparativoOdds';
 import { Icone } from './ui';
 
 type Estado = 'ok' | 'alerta' | 'falha' | 'pendente';
@@ -31,9 +32,19 @@ export function etapasDoPipeline(r: Rascunho, d: Derivado): Etapa[] {
     .sort()
     .at(-1);
   const nivel = v?.referencia.nivel;
+  // avaliadas já vem ordenada pelo motor (folga sobre o gate)
+  const primeiro = v?.avaliadas[0];
+  const acimaDoGate = v?.avaliadas.filter((a) => a.evMinimo !== null && a.ev >= a.evMinimo).length;
+  const t = d.travas;
+  const travado = !!(t?.pausadoAte || t?.diaEncerrado);
+  const risco = [
+    v?.sensibilidade && `λ ${v.sensibilidade.classe.toLowerCase()}`,
+    m?.stake && `stake ${(m.stake.fracaoBanca * 100).toFixed(1).replace('.', ',')}%`,
+    travado && 'banca travada',
+  ].filter(Boolean);
   return [
     {
-      nome: 'Dados recebidos',
+      nome: 'Contexto',
       estado: !temJogo || d.errosOdds ? 'falha' : r.odds.length ? 'ok' : 'pendente',
       detalhe: !temJogo
         ? 'faltam times ou hora'
@@ -42,6 +53,13 @@ export function etapasDoPipeline(r: Rascunho, d: Derivado): Etapa[] {
           : r.odds.length
             ? quando(coleta) || `${r.odds.length} odds`
             : 'nenhuma odd lida',
+    },
+    {
+      nome: 'Modelo',
+      estado: d.lambda ? 'ok' : 'alerta',
+      detalhe: d.lambda
+        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)} · DQ ${d.dq.dq}${primeiro ? ` · ${primeiro.filtro}` : ''}`
+        : 'sem estatísticas: só mercado',
     },
     {
       nome: 'De-vig',
@@ -60,16 +78,21 @@ export function etapasDoPipeline(r: Rascunho, d: Derivado): Etapa[] {
             : `${nivel} · sem referência`,
     },
     {
-      nome: 'Blend modelo × mercado',
-      estado: d.resultado ? 'ok' : 'alerta',
-      detalhe: d.lambda
-        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)}${m ? ` · ${m.filtro}` : ''}`
-        : 'sem estatísticas',
+      nome: 'Value · gate',
+      estado: !v ? 'pendente' : 'ok',
+      detalhe: !v
+        ? '—'
+        : `${acimaDoGate} acima do gate${m?.oddMinima ? ` · odd ≥ ${n2(m.oddMinima)}` : ''}`,
     },
     {
-      nome: 'Price Gate',
-      estado: !v ? 'pendente' : m?.oddMinima ? 'ok' : 'alerta',
-      detalhe: m?.oddMinima ? `odd ≥ ${n2(m.oddMinima)}` : v ? 'sem candidato' : '—',
+      nome: 'Ranking',
+      estado: !v ? 'pendente' : primeiro ? 'ok' : 'alerta',
+      detalhe: primeiro ? `1º ${rotuloCurto(primeiro.linha)}` : v ? 'nenhum mercado' : '—',
+    },
+    {
+      nome: 'Risco',
+      estado: !v ? 'pendente' : travado ? 'alerta' : 'ok',
+      detalhe: !v ? '—' : risco.join(' · ') || (t ? 'travas ok' : 'travas desligadas'),
     },
     {
       nome: 'Decisão',

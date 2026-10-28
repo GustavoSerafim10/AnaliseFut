@@ -996,18 +996,19 @@ pre {
 /* ---------- grade da análise ---------- */
 .grade-analise {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
 }
 .grade-analise .coluna {
   display: grid;
   gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 @media (max-width: 960px) {
   .grade-analise {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2789,4 +2790,100 @@ main,
   color: var(--destaque);
   border-style: dashed;
   cursor: pointer;
+}
+
+/* ---------- comparativo: P mercado × P motor e EV contra o gate ---------- */
+.prob-cel {
+  display: grid;
+  gap: 4px;
+  min-width: 64px;
+}
+.prob-trilho,
+.medidor-ev {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(120, 170, 255, 0.1);
+  overflow: hidden;
+}
+.prob-barra,
+.medidor-barra {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 2px;
+  transform-origin: left;
+  animation: cresce 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.prob-mercado {
+  background: rgba(34, 211, 238, 0.7);
+}
+.prob-true {
+  background: var(--amarelo);
+  box-shadow: 0 0 6px rgba(255, 210, 63, 0.6);
+}
+.ev-cel {
+  min-width: 82px;
+}
+.medidor-ev {
+  width: 82px;
+  margin-top: 5px;
+  overflow: visible;
+  /* o zero no meio */
+  background:
+    linear-gradient(
+      90deg,
+      transparent calc(50% - 0.5px),
+      rgba(185, 199, 230, 0.5) 0 calc(50% + 0.5px),
+      transparent 0
+    ),
+    rgba(120, 170, 255, 0.1);
+}
+.medidor-barra.positivo {
+  background: var(--ok);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent);
+}
+.medidor-barra.negativo {
+  background: color-mix(in srgb, var(--erro) 70%, transparent);
+  transform-origin: right;
+}
+.medidor-gate {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--amarelo);
+}
+
+/* ---------- auditoria: 8 etapas em duas linhas de 4 ---------- */
+.pipeline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 6px;
+}
+.etapa:nth-child(4n + 1)::before {
+  display: none;
+}
+@media (max-width: 640px) {
+  .pipeline {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .etapa:nth-child(4)::before {
+    display: block;
+  }
+  .etapa-detalhe {
+    font-size: 11px;
+  }
+}
+
+/* balões das dicas nunca alargam a página no celular */
+.dica-termo .balao {
+  width: min(260px, calc(100vw - 32px));
+}
+/* no #root e não no body: o Chrome mobile ignora o overflow do body ao medir a página */
+#root {
+  overflow-x: clip;
 }
