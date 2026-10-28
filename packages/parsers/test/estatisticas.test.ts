@@ -313,3 +313,15 @@ describe('SuperScore Remo × Botafogo (OCR real, Média)', () => {
     expect(l.outros.some((x) => /OITO/.test(x.rotulo))).toBe(false);
   });
 });
+
+describe('SofaScore com print maior (zoom): print que termina no meio da tabela', () => {
+  const c = lerEstatisticas(fx('sofascore-remo-zoom.txt'), 'sofascore', {
+    casa: 'Remo',
+    fora: 'Botafogo',
+  }).campos;
+  it('"por jogo 10 15" (2ª linha de rótulo quebrado, última do print) vira grandes chances perdidas', () => {
+    expect(c.grandesChancesPerdidas).toMatchObject({ casa: 1.0, fora: 1.5 });
+    expect(c.chutesNoAlvo).toMatchObject({ casa: 3.9, fora: 5.3 }); // não recebe o "por jogo"
+    expect(c.grandesChances).toMatchObject({ casa: 1.6, fora: 2.1 });
+  });
+});

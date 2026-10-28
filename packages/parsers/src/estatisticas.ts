@@ -526,6 +526,9 @@ const LIXO_CURTO = (p: string) =>
 function acharCampo(rotulo: string): DefCampo | null | undefined {
   const exato = CAMPOS_STATS.find((d) => d.re.test(rotulo));
   if (exato) return exato;
+  // só "por jogo" / "por partida" (2ª linha de um rótulo quebrado) serve para qualquer campo:
+  // é ilegível, e no SofaScore a ordem das linhas resolve
+  if (rotulo.replace(/\b(por|jogo|partida)\b/g, '').trim().length < 3) return undefined;
   // por semelhança: a frase inteira, ou o fim dela ("ry once perdidas" ~ "... perdidas por jogo")
   let melhor: { campo: CampoStat | null; s: number } = { campo: null, s: 0 };
   for (const [campo, frase] of [...FRASES, ...FRASES_SUPERSCORE]) {
@@ -639,9 +642,19 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
         .reverse()
         .find((f) => f.def);
       const prox = filas.slice(fim + 1).find((f) => f.def);
-      if (ant?.def && prox?.def) {
-        const vagos = FRASES.slice(ordem(ant.def) + 1, ordem(prox.def));
-        if (vagos.length === fim - i + 1)
+      const n = fim - i + 1;
+      // entre dois conhecidos: os que faltam entre eles; na ponta do print (o print acabou no
+      // meio da tabela): os que vêm logo depois do último conhecido, ou logo antes do primeiro
+      const vagos =
+        ant?.def && prox?.def
+          ? FRASES.slice(ordem(ant.def) + 1, ordem(prox.def))
+          : ant?.def
+            ? FRASES.slice(ordem(ant.def) + 1, ordem(ant.def) + 1 + n)
+            : prox?.def
+              ? FRASES.slice(Math.max(0, ordem(prox.def) - n), ordem(prox.def))
+              : [];
+      {
+        if (vagos.length === n)
           vagos.forEach(([c], k) => {
             const f = filas[i + k];
             if (!c || !f.esq || !f.dir) return;
