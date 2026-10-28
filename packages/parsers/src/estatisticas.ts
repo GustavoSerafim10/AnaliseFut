@@ -45,7 +45,12 @@ export type CampoStat =
   | 'toquesAreaAdversaria'
   | 'interceptacoes'
   | 'desarmes'
-  | 'penaltisConcedidos';
+  | 'penaltisConcedidos'
+  | 'cortes'
+  | 'tirosDeMeta'
+  | 'laterais'
+  | 'passesCertos'
+  | 'bolasLongas';
 
 interface DefCampo {
   campo: CampoStat;
@@ -279,7 +284,92 @@ export const CAMPOS_STATS: DefCampo[] = [
     formato: 'decimal1',
     faixa: [0, 40],
   },
+  {
+    campo: 'cortes',
+    rotulo: 'Cortes por jogo',
+    re: /^cortes/,
+    formato: 'decimal1',
+    faixa: [3, 60],
+  },
+  {
+    campo: 'tirosDeMeta',
+    rotulo: 'Tiros de meta por jogo',
+    re: /tiros de meta/,
+    formato: 'decimal1',
+    faixa: [1, 20],
+  },
+  {
+    campo: 'laterais',
+    rotulo: 'Laterais por jogo',
+    re: /^laterais/,
+    formato: 'decimal1',
+    faixa: [5, 40],
+  },
+  {
+    campo: 'passesCertos',
+    rotulo: 'Passes certos por jogo',
+    re: /passes certos/,
+    formato: 'decimal1',
+    faixa: [80, 900],
+  },
+  {
+    campo: 'bolasLongas',
+    rotulo: 'Bolas longas certas por jogo',
+    re: /bolas longas/,
+    formato: 'decimal1',
+    faixa: [3, 80],
+  },
 ];
+
+/**
+ * Rótulos por extenso para reconhecer por semelhança o que o OCR escreveu errado
+ * ("Gals por partida", "Asgsistências", "Chutee certos"). null = rótulo conhecido que não
+ * é campo (fica em "outros"), para não virar o vizinho parecido.
+ */
+const FRASES: [CampoStat | null, string][] = [
+  ['nota', 'nota sofascore'],
+  ['partidas', 'partidas'],
+  ['golsMarcados', 'gols marcados'],
+  ['golsSofridos', 'gols sofridos'],
+  ['assistencias', 'assistencias'],
+  ['golsPorJogo', 'gols por partida'],
+  ['golsPorJogo', 'gols por jogo'],
+  ['chutesNoAlvo', 'chutes certos por jogo'],
+  ['grandesChances', 'grandes chances de gol por jogo'],
+  ['grandesChancesPerdidas', 'grandes chances perdidas por jogo'],
+  ['posse', 'posse de bola'],
+  ['passesCertos', 'passes certos por partida'],
+  ['bolasLongas', 'bolas longas certas por jogo'],
+  ['jogosSemSofrer', 'jogos sem sofrer gols'],
+  ['golsSofridosPorJogo', 'gols sofridos por jogo'],
+  ['interceptacoes', 'interceptacoes por jogo'],
+  ['desarmes', 'desarmes por jogo'],
+  [null, 'desarmes por partida'],
+  ['cortes', 'cortes por jogo'],
+  ['penaltisConcedidos', 'gols de penalti concedidos'],
+  ['defesasGoleiro', 'defesas por jogo'],
+  ['faltas', 'faltas por jogo'],
+  ['impedimentos', 'impedimentos por jogo'],
+  ['tirosDeMeta', 'tiros de meta por jogo'],
+  ['laterais', 'laterais por jogo'],
+  ['cartoesAmarelos', 'cartoes amarelos por partida'],
+  ['cartoesVermelhos', 'cartoes vermelhos'],
+];
+
+/** 0–1: 1 − distância de edição ÷ tamanho do maior. */
+function semelhanca(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (!m || !n) return 0;
+  let ant = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++)
+      cur[j] = Math.min(ant[j] + 1, cur[j - 1] + 1, ant[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    ant = cur;
+  }
+  return 1 - ant[n] / Math.max(m, n);
+}
 
 export const DEF_CAMPO: Record<CampoStat, DefCampo> = Object.fromEntries(
   CAMPOS_STATS.map((d) => [d.campo, d]),
@@ -367,6 +457,17 @@ function interpretar(tok: TokenNum, def: DefCampo): { valor: number; corrigido: 
   if (def.formato === 'decimal1' && !tok.temPonto)
     return { valor: tok.valor / 10, corrigido: true };
   // "44.0%" lido como "440%": percentual acima de 100 perdeu o ponto
+  // "13.4" lido como "1394": o ponto virou dígito; só quando /10 sai da faixa e /100 não daria
+  if (
+    def.formato === 'decimal1' &&
+    !tok.temPonto &&
+    tok.valor >= 1000 &&
+    tok.valor / 10 > def.faixa[1]
+  ) {
+    const s = String(tok.valor);
+    const v = Number(`${s.slice(0, 2)}.${s.slice(3)}`);
+    if (v >= def.faixa[0] && v <= def.faixa[1]) return { valor: v, corrigido: true };
+  }
   if (def.formato === 'percentual' && !tok.temPonto && tok.valor > 100)
     return { valor: tok.valor / 10, corrigido: true };
   if (def.formato === 'decimal2' && !tok.temPonto)
@@ -378,8 +479,21 @@ function interpretar(tok: TokenNum, def: DefCampo): { valor: number; corrigido: 
 const LIXO_CURTO = (p: string) =>
   p.length <= 3 && !/^(por|de|da|do|no|na|em|gol|xg|e)$/i.test(semAcento(p));
 
-function acharCampo(rotulo: string): DefCampo | undefined {
-  return CAMPOS_STATS.find((d) => d.re.test(rotulo));
+/** undefined = rótulo ilegível; null = rótulo conhecido que não é campo (vai para "outros"). */
+function acharCampo(rotulo: string): DefCampo | null | undefined {
+  const exato = CAMPOS_STATS.find((d) => d.re.test(rotulo));
+  if (exato) return exato;
+  // por semelhança: a frase inteira, ou o fim dela ("ry once perdidas" ~ "... perdidas por jogo")
+  let melhor: { campo: CampoStat | null; s: number } = { campo: null, s: 0 };
+  for (const [campo, frase] of FRASES) {
+    const s = Math.max(
+      semelhanca(rotulo, frase),
+      rotulo.length >= 8 ? semelhanca(rotulo, frase.slice(-rotulo.length)) - 0.05 : 0,
+    );
+    if (s > melhor.s) melhor = { campo, s };
+  }
+  if (melhor.s < 0.75) return undefined;
+  return melhor.campo ? DEF_CAMPO[melhor.campo] : null;
 }
 
 function detectarInversao(linhas: string[], jogo: NomesTimes): boolean {
@@ -412,9 +526,24 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
   if (colunasInvertidas)
     avisos.push(`${jogo.fora} aparece na coluna da esquerda: colunas trocadas automaticamente`);
 
+  // 1ª passada: rótulo e os dois valores de cada linha
+  const filas: {
+    bruto: string;
+    rotulo: string;
+    def: DefCampo | null | undefined;
+    esq?: TokenNum;
+    dir?: TokenNum;
+    avisoPosicao?: string;
+  }[] = [];
   for (const bruto of linhas) {
     const { nums, palavras } = tokenizar(bruto);
-    if (!palavras.length || !nums.length) continue;
+    if (!nums.length) continue;
+    if (!palavras.length) {
+      // SofaScore: rótulo inteiro perdido ("=e 16 21"); a ordem das linhas diz qual é
+      if (fonte === 'sofascore' && nums.length === 2)
+        filas.push({ bruto, rotulo: '', def: undefined, esq: nums[0], dir: nums[1] });
+      continue;
+    }
     const rot = rotuloPrincipal(palavras);
     let rotulo = corrigirRotulo(semAcento(rot.txt));
     let def = acharCampo(rotulo);
@@ -451,9 +580,45 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       else avisos.push(`"${bruto}": só um valor legível, não dá para saber de qual time`);
     }
     if (!esq && !dir) continue;
+    filas.push({ bruto, rotulo: rot.txt, def, esq, dir, avisoPosicao });
+  }
 
+  // SofaScore tem as linhas sempre na mesma ordem: rótulo perdido (os de duas linhas, como
+  // "Grandes chances de gol / por jogo", viram "=e 16 21") entre dois conhecidos é deduzido
+  if (fonte === 'sofascore') {
+    const ordem = (d: DefCampo) => FRASES.findIndex(([c]) => c === d.campo);
+    for (let i = 0; i < filas.length; i++) {
+      if (filas[i].def !== undefined || !filas[i].esq || !filas[i].dir) continue;
+      let fim = i;
+      while (fim + 1 < filas.length && filas[fim + 1].def === undefined) fim++;
+      const ant = filas
+        .slice(0, i)
+        .reverse()
+        .find((f) => f.def);
+      const prox = filas.slice(fim + 1).find((f) => f.def);
+      if (ant?.def && prox?.def) {
+        const vagos = FRASES.slice(ordem(ant.def) + 1, ordem(prox.def));
+        if (vagos.length === fim - i + 1)
+          vagos.forEach(([c], k) => {
+            const f = filas[i + k];
+            if (!c || !f.esq || !f.dir) return;
+            f.def = DEF_CAMPO[c];
+            f.avisoPosicao = `rótulo ilegível ("${f.rotulo}"): é ${DEF_CAMPO[c].rotulo} pela ordem das linhas do SofaScore, conferir`;
+          });
+      }
+      i = fim;
+    }
+  }
+
+  // 2ª passada: valores
+  for (const { bruto, rotulo, def, esq, dir, avisoPosicao } of filas) {
     if (!def) {
-      outros.push({ rotulo: rot.txt, casa: esq?.valor, fora: dir?.valor, bruto });
+      // cabeçalho da página (competição, temporada, menu) não é dado
+      const cabecalho =
+        !rotulo ||
+        /campeonato|temporada|serie|mais|tenis|basquete|volei/i.test(semAcento(rotulo)) ||
+        [esq, dir].some((t) => t && t.valor >= 1900);
+      if (!cabecalho) outros.push({ rotulo, casa: esq?.valor, fora: dir?.valor, bruto });
       continue;
     }
     if (campos[def.campo]?.casa !== undefined && campos[def.campo]?.fora !== undefined) continue; // repetido entre prints
@@ -489,12 +654,41 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
 /**
  * Total tem de bater com média × partidas ("Gols marcados 4" com 1,4 por jogo em 32 jogos é
  * o 44 com um dígito perdido). Sem bater, o total é descartado: a média serve de reserva.
+ * Antes disso, partidas que não batem com total ÷ média ("32 3": o 32 do visitante perdeu
+ * um dígito; 51 ÷ 1,6 ≈ 32) são repostas pela conta.
  */
 function coerencia(l: LeituraStats): LeituraStats {
   const pares: [CampoStat, CampoStat][] = [
     ['golsMarcados', 'golsPorJogo'],
     ['golsSofridos', 'golsSofridosPorJogo'],
   ];
+  for (const t of ['casa', 'fora'] as const) {
+    const jogos = l.campos.partidas?.[t];
+    const estimativas = pares
+      .map(([total, media]) => {
+        const vt = l.campos[total]?.[t];
+        const vm = l.campos[media]?.[t];
+        return vt !== undefined && vm ? vt / vm : undefined;
+      })
+      .filter((x): x is number => x !== undefined);
+    if (!jogos || !estimativas.length) continue;
+    const media = estimativas.reduce((a, b) => a + b, 0) / estimativas.length;
+    const concordam = estimativas.every((e) => Math.abs(e - media) <= 0.1 * media);
+    // a conta também tem de bater com as partidas do outro time (mesma competição): senão
+    // o errado é o total ("Gols marcados 4" ÷ 1,4 ≈ 3 não repõe 32 partidas)
+    const outro = l.campos.partidas?.[t === 'casa' ? 'fora' : 'casa'];
+    const bateOutro = outro !== undefined && Math.abs(outro - media) <= 0.15 * outro;
+    if (concordam && bateOutro && Math.abs(jogos - media) > 0.5 * media) {
+      l.campos.partidas = {
+        ...l.campos.partidas!,
+        [t]: Math.round(media),
+        avisos: [
+          ...l.campos.partidas!.avisos,
+          `${jogos} partidas não bate com gols ÷ média (≈ ${Math.round(media)}): reposto, conferir`,
+        ],
+      };
+    }
+  }
   for (const [total, media] of pares)
     for (const t of ['casa', 'fora'] as const) {
       const vt = l.campos[total]?.[t];

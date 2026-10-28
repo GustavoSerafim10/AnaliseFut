@@ -222,3 +222,36 @@ Entre os desfalques do Flamengo, Danilo está fora por fratura na mandíbula. No
     expect(r.trechos.some((t) => t.categoria === 'h2h')).toBe(true);
   });
 });
+
+describe('SofaScore Remo × Botafogo (OCR real, ampliação Lanczos em cinza)', () => {
+  const l = juntarLeiturasStats(
+    ['sofascore-remo-1.txt', 'sofascore-remo-2.txt'].map((f) =>
+      lerEstatisticas(fx(f), 'sofascore', { casa: 'Remo', fora: 'Botafogo' }),
+    ),
+  )!;
+  const c = l.campos;
+  it('rótulos com letra trocada reconhecidos por semelhança ("Gals por partida", "Gois marcados")', () => {
+    expect(c.golsPorJogo).toMatchObject({ casa: 1.1, fora: 1.4 });
+    expect(c.golsMarcados?.casa).toBe(34);
+    expect(c.golsSofridos).toMatchObject({ casa: 50, fora: 51 });
+    expect(c.golsSofridosPorJogo).toMatchObject({ casa: 1.6, fora: 1.6 });
+  });
+  it('rótulo de duas linhas perdido no OCR: deduzido pela ordem das linhas', () => {
+    expect(c.grandesChances).toMatchObject({ casa: 1.6, fora: 2.1 });
+    expect(c.grandesChancesPerdidas).toMatchObject({ casa: 1.0, fora: 1.5 });
+    expect(c.grandesChances!.avisos.join()).toContain('ordem das linhas');
+  });
+  it('partidas "32 3" reposta por gols ÷ média (51 ÷ 1,6 ≈ 32)', () => {
+    expect(c.partidas).toMatchObject({ casa: 32, fora: 32 });
+  });
+  it('lê também cortes, tiros de meta, laterais, faltas e interceptações', () => {
+    expect(c.cortes).toMatchObject({ casa: 26.3, fora: 25.6 });
+    expect(c.tirosDeMeta).toMatchObject({ casa: 8.3, fora: 8.2 });
+    expect(c.laterais).toMatchObject({ casa: 19.4, fora: 19.3 });
+    expect(c.faltas).toMatchObject({ casa: 11.5, fora: 13.4 });
+    expect(c.interceptacoes).toMatchObject({ casa: 9.7, fora: 7.9 });
+    expect(c.defesasGoleiro).toMatchObject({ casa: 3.8, fora: 3.8 });
+    expect(c.assistencias).toMatchObject({ casa: 20, fora: 29 });
+    expect(c.jogosSemSofrer).toMatchObject({ casa: 4, fora: 5 });
+  });
+});

@@ -1,0 +1,69 @@
+### POSICOES
+### MEIO y 591 0.89
+### MEIO y 221 0.89
+### MEIO y 357 0.45
+### MEIO x 638 0.13
+### MEIO x 366 0.13
+### MEIO x 501 0.10
+@299,32 < Futebol > Brasileiro-SéricA > REMxBOT > Escalações
+@520,84 Remo ® v7 21:30 q x) Botafogo
+@101,137 Detalhes
+@234,138 Escalações
+@381,136 Estatisticas
+@500,137 H2H
+@627,138 Classificação
+@322,186 REMO X BOTAFOGO - POSSÍVEIS ESCALAÇÕES
+@105,245 4-2-31
+@502,269 88 M Rangel
+@159,347 79 Marcelinho
+@388,347 13 O Marllon
+@617,348 18 D. Tchamba
+@847,347 6 Marlon
+@734,398 2
+@274,418 287 Welison
+@732,423 55 Z. Ricardo
+@802,471 =
+@198,493 21 A. Galeano
+@504,496 15V. Bueno
+@803,496 7 Jajá
+@503,566 196. Teliari
+@503,643 9 T. Soares
+@197,718 11 M. Martins
+@503,716 22H. Ziyech
+@809,718 6 C. Medina
+@274,792 75 Huguinho
+@733,792 25 Allan
+@160,866 15 GA. Telles
+@388,866 21 Marçal
+@617,866 S N. Ferraresi
+@846,865 2 Vitinho
+@105,937 4-2-31
+@503,941 12G. Batista
+@299,32 < Futebol > Braslleio-SérieA > REMXBOT > Escelações
+@521,81 em É) a 2130 o (Game
+@321,186 REMO X BOTAFOGO - POSSÍVEIS ESCALAÇÕES
+@105,245 42-51
+@503,275 88M. Rangel
+@157,349 79 Mercelinho
+@388,347 13 O Marion
+@618,348 18D. Tchamba
+@847,347 6 Merion
+@273,418 287. Wollson
+@731,419 55 Z Ricardo
+@197,496 21 A. Goloono
+@503,496 15V. Bueno
+@803,496 7 Jeph
+@503,571 190. Tellord
+@503,548 e
+@503,640 9 T.Soeres
+@197,718 11M. Martine
+@503,718 22H. Zyech
+@809,718 6C. Medina
+@273,792 75Huguinho
+@731,792 25 Allen
+@159,861 13 OA Toles
+@388,865 21 Merged
+@618,866 SN. Forraresl
+@846,865 2Vitinho
+@105,937 £231
+@503,941 120. Batists

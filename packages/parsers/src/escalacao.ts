@@ -35,7 +35,7 @@ export interface LeituraEscalacao {
 
 /** Palavras da interface do site que não são jogador. */
 const INTERFACE =
-  /^(escala\w*|provav\w*|confirmad\w*|substitut\w*|reservas?|banco|treinador|tecnico|formac\w*|ausentes?|lesionad\w*|suspens\w*|duvida|nota|media|campo|lista|mostrar|ver|mais|jogadores?|titulares?|gol(eiro)?|defensor|meio|atacante|minutos?|sofascore|valor|mercado|idade|altura|camisa|capitao|desconhecido|motivo|lesao|outro|prevista|previstas?|atualizad\w*|equipe|time|partida|jogo|sub|min)$/;
+  /^(escala\w*|provav\w*|confirmad\w*|substitut\w*|reservas?|banco|treinador|tecnico|formac\w*|ausentes?|lesionad\w*|suspens\w*|duvida|nota|media|campo|lista|mostrar|ver|mais|jogadores?|titulares?|gol(eiro)?|defensor|meio|atacante|minutos?|sofascore|valor|mercado|idade|altura|camisa|capitao|desconhecido|motivo|lesao|outro|prevista|previstas?|atualizad\w*|equipe|time|partida|jogo|sub|min|eles|este|esta|ele|ela|que|com|para)$/;
 
 const RE_FORMACAO = /\b([3-5])\s?-\s?(\d)\s?-\s?(\d)(?:\s?-\s?(\d))?\b/;
 
@@ -52,11 +52,21 @@ export function nomeDeJogador(linha: string): string | null {
   const partes: string[] = [];
   for (const t of tokens) {
     // "Ricar..." / "Ricar…": nome cortado pelo site; o ponto único fica (inicial "G.")
-    const limpo = t.replace(/^[.,;:'-]+|[,;:'-]+$/g, '').replace(/(\.{2,}|…)$/, '');
+    // "15V." / "22H.": número da camisa grudado na inicial
+    const limpo = t
+      .replace(/^\d+(?=[A-ZÀ-Ú])/, '')
+      .replace(/^[.,;:'-]+|[,;:'-]+$/g, '')
+      .replace(/(\.{2,}|…)$/, '')
+      // "Mathea." (reticências lidas como um ponto só): palavra de 4+ letras não é abreviação
+      .replace(/^([A-Za-zÀ-ú]{4,})\.$/, '$1');
     if (!limpo) continue;
     // abreviação ("G.", "Bu.") ou palavra com letra maiúscula + 2 letras ou mais
     const inicial = /^[A-ZÀ-Ú][a-zà-ú]{0,2}\.$/.test(limpo);
-    const palavra = /^[A-ZÀ-Ú][a-zà-úA-ZÀ-Ú'’-]{1,}$/.test(limpo) && !/\d/.test(limpo);
+    // toda em maiúsculas com 4+ letras é marca/interface ("FLASHSCORE"), não jogador
+    const palavra =
+      /^[A-ZÀ-Ú][a-zà-úA-ZÀ-Ú'’-]{1,}$/.test(limpo) &&
+      !/\d/.test(limpo) &&
+      !/^[A-ZÀ-Ú]{4,}$/.test(limpo);
     const particula = partes.length > 0 && /^(de|da|do|dos|das|di|van|von|el|al)$/i.test(limpo);
     if (inicial || palavra || particula) {
       if (palavra && INTERFACE.test(semAcento(limpo))) continue;
@@ -65,11 +75,18 @@ export function nomeDeJogador(linha: string): string | null {
       break; // o nome acabou (veio número, nota ou lixo)
     }
   }
-  while (partes.length && /^(de|da|do|dos|das|di|van|von|el|al)$/i.test(partes[partes.length - 1]))
+  // no fim: partícula solta ou pedaço de até 2 letras sem ponto ("Tiquinho Er", "Alan La")
+  while (
+    partes.length > 1 &&
+    (/^(de|da|do|dos|das|di|van|von|el|al)$/i.test(partes[partes.length - 1]) ||
+      /^[A-Za-zÀ-ú]{1,2}$/.test(partes[partes.length - 1]))
+  )
     partes.pop();
   const nome = partes.join(' ');
   const letras = nome.replace(/[^A-Za-zÀ-ú]/g, '');
   if (letras.length < 3) return null;
+  // só pedaços curtos ("Ne Be Ao") é ícone lido como texto
+  if (!partes.some((p) => p.replace(/[^A-Za-zÀ-ú]/g, '').length >= 3)) return null;
   // uma palavra só, curta e toda maiúscula costuma ser sigla/lixo ("VAR", "OK")
   if (partes.length === 1 && /^[A-ZÀ-Ú]{2,4}$/.test(nome)) return null;
   return nome;
@@ -194,35 +211,82 @@ function cortarExcesso(nomes: string[]): string[] {
   return r;
 }
 
+/** Nome mais limpo: palavras de 3+ letras e abreviações contam; pedaço curto solto desconta. */
+function qualidade(nome: string): number {
+  return nome
+    .split(' ')
+    .reduce(
+      (s, p) =>
+        s +
+        (/^[A-ZÀ-Ú][a-zà-ú]{0,2}\.$/.test(p) || p.replace(/\W/g, '').length >= 3 ? p.length : -4),
+      0,
+    );
+}
+
 /**
- * Formato com posição ("@x,y texto", milésimos da imagem) e a linha do meio de campo achada
- * na imagem. Campo em pé (meio em y): mandante em cima. Deitado (meio em x): à esquerda.
- * O campo é simétrico: vai do meio até o goleiro de cada lado; o que passar disso (placar,
- * abas, "Técnicos") fica de fora.
+ * Formato com posição ("@x,y texto", milésimos da imagem) e as candidatas a linha do meio de
+ * campo achadas na imagem (vale a que divide os nomes ao meio). Campo em pé (meio em y):
+ * mandante em cima. Deitado (meio em x): à esquerda. O campo é simétrico: vai do meio até o
+ * goleiro de cada lado; o que passar disso (placar, abas, "Técnicos") fica de fora.
  */
 function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
   const avisos: string[] = [];
-  const m = linhas.find((l) => l.startsWith(MARCA_MEIO))?.split(' ');
-  const eixo = m?.[2] === 'y' ? 'y' : 'x';
-  const meio = m ? Number(m[3]) : 500;
-  if (!m) avisos.push('linha do meio de campo não achada na imagem: times separados pelo centro');
-  const itens: { nome: string; a: number; b: number }[] = [];
-  const formacoes: { f: string; a: number }[] = [];
+  const candidatas = linhas
+    .filter((l) => l.startsWith(MARCA_MEIO))
+    .map((l) => {
+      const [, , eixo, pos, forca] = l.split(' ');
+      return {
+        eixo: eixo === 'y' ? ('y' as const) : ('x' as const),
+        pos: Number(pos),
+        forca: Number(forca ?? 1),
+      };
+    });
+  const nomes: { nome: string; x: number; y: number }[] = [];
+  const formacoes: { f: string; x: number; y: number }[] = [];
   for (const l of linhas) {
     const p = /^@(\d+),(\d+) (.*)$/.exec(l);
     if (!p) continue;
     const [x, y, texto] = [Number(p[1]), Number(p[2]), p[3]];
-    const a = eixo === 'y' ? y : x;
-    const b = eixo === 'y' ? x : y;
     const f = RE_FORMACAO.exec(texto);
-    if (f) formacoes.push({ f: f.slice(1).filter(Boolean).join('-'), a });
+    if (f) formacoes.push({ f: f.slice(1).filter(Boolean).join('-'), x, y });
     if (citaTime(texto, jogo.casa) || citaTime(texto, jogo.fora)) continue;
-    // "N.Ferrares" → "N. Ferrares"
-    const nome = nomeDeJogador(texto.replace(/\b([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 '));
-    if (nome) itens.push({ nome, a, b });
+    // "15 Vitor Bu. 19 Gabriel...": dois jogadores numa linha (o site já separa pela posição
+    // das palavras; isto cobre prints antigos); o segundo fica um pouco à direita
+    const trechos = texto.split(/\s(?=\d{1,2}\s+[A-ZÀ-Ú])/);
+    for (const [k, trecho] of trechos.entries()) {
+      // "N.Ferrares" → "N. Ferrares"
+      const nome = nomeDeJogador(trecho.replace(/\b([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 '));
+      if (!nome) continue;
+      const xi = x + (k - (trechos.length - 1) / 2) * 60;
+      // duas leituras da mesma imagem: o mesmo lugar é o mesmo jogador; fica o nome mais limpo
+      const igual = nomes.findIndex((i) => Math.abs(i.y - y) < 20 && Math.abs(i.x - xi) < 45);
+      if (igual < 0) nomes.push({ nome, x: xi, y });
+      else if (qualidade(nome) > qualidade(nomes[igual].nome)) nomes[igual] = { nome, x: xi, y };
+    }
   }
+  // a linha do meio é a candidata forte que divide os nomes ao meio (a divisória do cabeçalho
+  // deixa quase todos de um lado só)
+  const coord = (i: { x: number; y: number }, eixo: 'x' | 'y') => (eixo === 'y' ? i.y : i.x);
+  const nota = (c: (typeof candidatas)[number]) => {
+    const antes = nomes.filter((i) => coord(i, c.eixo) < c.pos).length;
+    return Math.min(antes, nomes.length - antes) * c.forca;
+  };
+  const melhor = candidatas.reduce<(typeof candidatas)[number] | undefined>(
+    (a, c) => (!a || nota(c) > nota(a) ? c : a),
+    undefined,
+  );
+  if (!melhor)
+    avisos.push('linha do meio de campo não achada na imagem: times separados pelo centro');
+  const eixo = melhor?.eixo ?? 'x';
+  const meio = melhor?.pos ?? 500;
+  const itens = nomes.map((i) => ({
+    nome: i.nome,
+    a: coord(i, eixo),
+    b: eixo === 'y' ? i.x : i.y,
+  }));
   const antes = itens.filter((i) => i.a < meio);
   const depois = itens.filter((i) => i.a >= meio);
+  // o campo é simétrico: vai do meio até o goleiro de cada lado; o que passar disso fica fora
   const alcance =
     antes.length && depois.length
       ? Math.min(
@@ -240,7 +304,7 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
   const lado = (xs: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => ({
     titulares: cortarExcesso([...new Set(ordenar(xs, doGol))]),
     reservas: [],
-    formacao: formacoes.find((f) => f.a < meio === ehAntes)?.f,
+    formacao: formacoes.find((f) => coord(f, eixo) < meio === ehAntes)?.f,
   });
   return {
     casa: lado(antes, 1, true),

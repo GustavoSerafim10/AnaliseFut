@@ -165,3 +165,29 @@ describe('escalação com posição e linha do meio (OCR atual)', () => {
     expect(l.fora.titulares).toContain('Tiquinho');
   });
 });
+
+describe('escalação: duas leituras (cinza + preto-e-branco) como o site faz', () => {
+  const ler = (f: string) =>
+    lerEscalacao(readFileSync(new URL(`./fixtures-reais/${f}`, import.meta.url), 'utf8'), {
+      casa: 'Remo',
+      fora: 'Botafogo',
+    });
+  it('SuperScore: a divisória do cabeçalho tem a mesma força, mas não divide os nomes; 22 de 22', () => {
+    const l = ler('superscore-escalacao-dupla.txt');
+    expect(l.casa.titulares).toHaveLength(11);
+    expect(l.fora.titulares).toHaveLength(11);
+    expect(l.casa.titulares[0]).toBe('M. Rangel');
+    expect(l.fora.titulares[0]).toBe('G. Batista');
+    expect(l.casa.titulares).toContain('V. Bueno'); // "15V. Bueno": camisa grudada
+    expect(l.fora.titulares).toContain('H. Ziyech');
+  });
+  it('Flashscore: lixo de selo fora; o que sobra é nome', () => {
+    const l = ler('flashscore-escalacao-dupla.txt');
+    expect(l.casa.titulares.length + l.fora.titulares.length).toBeGreaterThanOrEqual(19);
+    expect(l.casa.titulares).toContain('Gabriel'); // "15 Vitor Bu. 19 Gabriel...": separado
+    expect(l.fora.titulares).toContain('Tiquinho'); // "Tiquinho ... Er": sem a sílaba solta
+    expect([...l.casa.titulares, ...l.fora.titulares].some((n) => /FLASH|Ne Be/.test(n))).toBe(
+      false,
+    );
+  });
+});
