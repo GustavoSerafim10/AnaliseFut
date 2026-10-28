@@ -58,6 +58,8 @@ export interface Rascunho {
   /** textos de OCR por grupo: sofascore, superscore, classificacao, desfalques, escalacao, ultimas, odds:<casa> */
   prints: Record<string, Leitura[]>;
   flashscore: string;
+  /** o jogo não tem texto de análise no Flashscore (não conta como fonte) */
+  flashscoreSemTexto: boolean;
   /** correções manuais das estatísticas: `${campo}.${time}` → valor */
   correcoes: Record<string, number>;
   desfalqueAtaque: { casa: NivelDesfalque; fora: NivelDesfalque };
@@ -99,6 +101,7 @@ export function rascunhoNovo(): Rascunho {
     },
     prints: {},
     flashscore: '',
+    flashscoreSemTexto: false,
     correcoes: {},
     desfalqueAtaque: { casa: 'auto', fora: 'auto' },
     desfalqueDefesa: { casa: 'nenhum', fora: 'nenhum' },

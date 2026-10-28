@@ -19,7 +19,7 @@ import {
   gravarGaleria,
   type Figurinhas,
 } from './figurinhas';
-import { derivar } from './dados';
+import { derivar, temTextoFlashscore } from './dados';
 import { abaDoExemplo, ehExemplo, rascunhoExemplo } from './exemplo';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
 import {
@@ -127,7 +127,7 @@ export function App() {
         {
           aba: { id: 'flashscore' },
           rotulo: 'Flashscore',
-          marca: r.flashscore.trim() ? '✓' : undefined,
+          marca: r.flashscoreSemTexto ? '—' : temTextoFlashscore(r) ? '✓' : undefined,
         },
         { aba: { id: 'tabela' }, rotulo: 'Tabela e escalações' },
         { aba: { id: 'ultimas' }, rotulo: 'Últimas partidas' },

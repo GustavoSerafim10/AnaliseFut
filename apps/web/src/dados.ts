@@ -107,6 +107,15 @@ export interface Derivado {
   relatorio: Relatorio | null;
 }
 
+/**
+ * Texto do Flashscore de verdade: nem marcado "sem texto", nem uma anotação curta ("não tem
+ * texto"), que contaria como mais uma fonte de estatística sem dado nenhum.
+ */
+export function temTextoFlashscore(r: Rascunho): boolean {
+  const t = r.flashscore.trim();
+  return !r.flashscoreSemTexto && t.length >= 80;
+}
+
 const textos = (r: Rascunho, grupo: string) => (r.prints[grupo] ?? []).map((l) => l.texto);
 
 export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
@@ -128,7 +137,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   const escalacao = derivarEscalacao(r, nomes, desfalques);
   const escalacaoIncerta = r.config.escalacaoIncerta || escalacao.incerta;
   const clas = textos(r, 'classificacao').map((t) => lerClassificacao(t, nomes));
-  const flash = r.flashscore.trim() ? lerTextoFlashscore(r.flashscore, nomes) : null;
+  const flash = temTextoFlashscore(r) ? lerTextoFlashscore(r.flashscore, nomes) : null;
 
   // impacto dos desfalques: automático pelo texto do Flashscore, salvo escolha manual
   const impacto = {

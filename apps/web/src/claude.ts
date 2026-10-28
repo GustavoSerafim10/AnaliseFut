@@ -4,7 +4,7 @@
  */
 import { descreverAposta, relatorioEmTexto, type LinhaOdd } from '@pe/engine';
 import { CAMPOS_STATS } from '@pe/parsers';
-import type { Derivado } from './dados';
+import { temTextoFlashscore, type Derivado } from './dados';
 import type { Rascunho } from './estado';
 
 export function montarPromptClaude(r: Rascunho, d: Derivado): string {
@@ -49,7 +49,8 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
     for (const c of d.classificacao.filter((x) => x.doJogo))
       l.push(`- ${c.posicao}º ${c.time} (${c.pontos ?? '?'} pts)`);
   }
-  if (r.flashscore.trim()) l.push('', '# Texto de análise do Flashscore', r.flashscore.trim());
+  if (temTextoFlashscore(r)) l.push('', '# Texto de análise do Flashscore', r.flashscore.trim());
+  else if (r.flashscoreSemTexto) l.push('', '# Flashscore: o jogo não tem texto de análise');
   l.push('', '# Odds coletadas');
   for (const o of r.odds)
     l.push(
