@@ -72,9 +72,9 @@ export function rotuloCurto(l: LinhaOdd): string {
     case 'ultimo_gol':
     case 'primeiro_escanteio': {
       const nome = {
-        primeiro_gol: '1º gol',
+        primeiro_gol: 'Primeiro gol',
         ultimo_gol: 'Último gol',
-        primeiro_escanteio: '1º escanteio',
+        primeiro_escanteio: 'Primeiro escanteio',
       }[l.mercado];
       const quem = { casa: 'Mandante', fora: 'Visitante', nenhum: 'Nenhum' }[lado.toLowerCase()];
       t = `${nome} - ${quem ?? lado}`;
