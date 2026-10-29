@@ -458,7 +458,9 @@ function tokenizar(linha: string): { nums: TokenNum[]; palavras: { txt: string; 
     .split(/\s+/)
     .filter(Boolean)
     .forEach((tok, pos) => {
-      const t = tok.replace(/^[[(|~«»“”"']+|[\])|.,;:'"»”!?]+$/g, '');
+      let t = tok.replace(/^[[(|~«»“”"']+|[\])|.,;:'"»”!?]+$/g, '');
+      // "11" fino no selo vira letras ("ll", "Il", "l1.4"): só I/l/1 formando o número
+      if (/^[Il1]{2,}(?:[.,]\d{1,2})?$/.test(t) && /[Il]/.test(t)) t = t.replace(/[Il]/g, '1');
       const m = /^[A-Za-z]?(-?\d{1,4}(?:[.,]\d{1,2})?)(%)?$/.exec(t);
       if (m && !/^\d{1,2}:\d{2}$/.test(tok)) {
         nums.push({
@@ -699,6 +701,16 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       }
       const { valor, corrigido } = interpretar(tok, def);
       if (corrigido) v.avisos.push(`ponto decimal perdido no OCR: ${tok.valor} lido como ${valor}`);
+      // "11.4" lido como "1.4": o "1" fino do selo some; abaixo da faixa, com o "1" volta a caber
+      if (def.formato === 'decimal1' && !corrigido && tok.temPonto && valor < def.faixa[0]) {
+        const comUm = Number(`1${tok.valor}`);
+        if (comUm >= def.faixa[0] && comUm <= def.faixa[1]) {
+          v.avisos.push(
+            `${valor} fora da faixa: lido como ${comUm} (o "1" do início sumiu no OCR), conferir`,
+          );
+          return comUm;
+        }
+      }
       if (valor < def.faixa[0] || valor > def.faixa[1]) {
         // descartado: outro print (ou a correção à mão) completa o valor
         v.avisos.push(
@@ -759,6 +771,26 @@ function coerencia(l: LeituraStats): LeituraStats {
         ],
       };
     }
+  }
+  // dentro + fora da área = finalizações totais (SuperScore): "11.4" lido como "1.4" não fecha
+  // a soma, e o total menos o de fora repõe o valor
+  for (const t of ['casa', 'fora'] as const) {
+    const tot = l.campos.finalizacoes?.[t];
+    const dentro = l.campos.finalizacoesDentroArea?.[t];
+    const fora = l.campos.finalizacoesForaArea?.[t];
+    if (tot === undefined || dentro === undefined || fora === undefined) continue;
+    if (Math.abs(dentro + fora - tot) <= 0.2) continue;
+    const conta = Math.round((tot - fora) * 10) / 10;
+    l.campos.finalizacoesDentroArea = {
+      ...l.campos.finalizacoesDentroArea!,
+      [t]: conta > 0 ? conta : undefined,
+      avisos: [
+        ...l.campos.finalizacoesDentroArea!.avisos,
+        conta > 0
+          ? `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: reposto por ${conta}, conferir`
+          : `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: descartado, conferir`,
+      ],
+    };
   }
   for (const [total, media] of pares)
     for (const t of ['casa', 'fora'] as const) {

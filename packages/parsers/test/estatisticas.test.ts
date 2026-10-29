@@ -91,10 +91,10 @@ describe('cruzamento SofaScore × SuperScore', () => {
     expect(t.chutesNoAlvo!.casa.valor).toBeCloseTo((5.6 + 5.7) / 2, 6);
     expect(t.chutesNoAlvo!.casa.divergente).toBe(false);
   });
-  it('faltas: OCR do SuperScore leu 1.7 (era 11.7) → fora da faixa, descartado; vale o SofaScore', () => {
-    expect(sup.campos.faltas!.fora).toBeUndefined();
-    expect(sup.campos.faltas!.avisos.join()).toContain('descartado');
-    expect(t.faltas!.fora.valor).toBe(11.8);
+  it('faltas: OCR do SuperScore leu 1.7 (era 11.7) → abaixo da faixa, o "1" sumido volta', () => {
+    expect(sup.campos.faltas!.fora).toBe(11.7);
+    expect(sup.campos.faltas!.avisos.join()).toContain('o "1" do início sumiu');
+    expect(t.faltas!.fora.valor).toBeCloseTo((11.8 + 11.7) / 2, 6);
   });
   it('correção manual prevalece', () => {
     const c = consolidar({ sofascore: sofa, superscore: sup }, { 'golsMarcados.fora': 42 });
@@ -358,5 +358,38 @@ describe('valor posto pela posição que confere com média × partidas', () => 
     expect(l.campos.golsMarcados?.casa).toBe(34);
     expect(l.campos.golsMarcados!.avisos.join()).toContain('confirmado');
     expect(l.campos.golsMarcados!.avisos.join()).not.toContain('pela posição');
+  });
+});
+
+describe('prints reais Frosinone × Lecce (selos com "11")', () => {
+  const jogo = { casa: 'Frosinone', fora: 'Lecce' };
+  const sofa = juntarLeiturasStats(
+    ['sofascore-frosinone-1.txt', 'sofascore-frosinone-2.txt'].map((f) =>
+      lerEstatisticas(fx(f), 'sofascore', jogo),
+    ),
+  )!;
+  const sup = juntarLeiturasStats(
+    [1, 2, 3, 4].map((n) =>
+      lerEstatisticas(fx(`superscore-frosinone-${n}.txt`), 'superscore', jogo),
+    ),
+  )!;
+  it('"11.4" lido como "1.4" em faltas cobradas: o "1" volta (abaixo da faixa)', () => {
+    expect(sup.campos.faltasSofridas).toMatchObject({ casa: 11.4, fora: 9.5 });
+  });
+  it('"1.4" dentro da área não fecha com 18,3 totais − 6,9 fora: reposto por 11,4', () => {
+    expect(sup.campos.finalizacoesDentroArea).toMatchObject({ casa: 11.4, fora: 7.9 });
+    expect(sup.campos.finalizacoesDentroArea!.avisos.join()).toContain('não fecha');
+  });
+  it('"11" que vira "ll"/"Il" no selo é lido como 11', () => {
+    const l = lerEstatisticas('Assisténcias ll 7\nGols marcados Il 9', 'sofascore', jogo);
+    expect(l.campos.assistencias).toMatchObject({ casa: 11, fora: 7 });
+    expect(l.campos.golsMarcados?.casa).toBe(11);
+  });
+  it('restante do SofaScore e do SuperScore', () => {
+    expect(sofa.campos.assistencias).toMatchObject({ casa: 11, fora: 7 });
+    expect(sofa.campos.golsSofridosPorJogo).toMatchObject({ casa: 1.6, fora: 1.8 });
+    expect(sofa.campos.defesasGoleiro).toMatchObject({ casa: 4.1, fora: 4.0 });
+    expect(sup.campos.xg).toMatchObject({ casa: 1.6, fora: 1.4 });
+    expect(sup.campos.escanteios).toMatchObject({ casa: 5.9, fora: 4.5 });
   });
 });

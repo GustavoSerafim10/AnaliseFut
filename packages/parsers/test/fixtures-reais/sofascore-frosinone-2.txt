@@ -1,0 +1,18 @@
+Defendendo
+Jogos sem sofrer gols 2 2
+Gols sofridos por jogo 16 18
+Interceptagdes por jogo 119 85
+Desarmes por jogo 199 20.6
+Cortes por jogo 26.0 27.5
+Gols de pénalti concedidos 2 0
+Defesas por jogo 41 4.0
+Outros
+
+Desarmes por partida 51.5 (48.5%) 50.0 (48.4%)
+Faltas por jogo 156 126
+Impedimentos por jogo 29 19
+Tiros de meta por jogo 89 83
+Laterais por jogo 18.8 21.5
+Cartões amarelos por partida 20 18
+Cartões vermelhos 0 1
+
