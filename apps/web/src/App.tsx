@@ -263,7 +263,8 @@ export function App() {
               key={s.id}
               className={s.id === secaoAtiva?.id ? 'ativo' : ''}
               aria-current={s.id === secaoAtiva?.id ? 'page' : undefined}
-              onClick={() => s.abas[0] && setAba(s.abas[0].aba)}
+              // Mercado sem casa nenhuma (todas removidas): pergunta o nome de uma nova
+              onClick={() => (s.abas[0] ? setAba(s.abas[0].aba) : s.id === 'mercado' && novaCasa())}
             >
               <Icone nome={s.icone} tamanho={18} />
               {s.rotulo}
