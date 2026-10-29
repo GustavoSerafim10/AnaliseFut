@@ -3,11 +3,21 @@
  * dos dados de idioma na primeira vez. Mesmo tratamento do script `npm run ocr`
  * (calibrado com prints reais do SofaScore, SuperScore e Flashscore).
  */
-import { MARCA_MEIO, MARCA_POSICOES } from '@pe/parsers';
+import {
+  lerTabelaOcr,
+  linhasDoTesseract,
+  MARCA_MEIO,
+  MARCA_POSICOES,
+  NUMEROS_TABELA,
+  type ReconhecerOcr,
+} from '@pe/parsers';
 import { createWorker, PSM, type Worker } from 'tesseract.js';
 
-/** bloco: texto corrido (estatísticas, odds). lados: nomes com posição no campo (escalação). */
-export type ModoOcr = 'bloco' | 'lados';
+/**
+ * bloco: texto corrido (estatísticas, odds). lados: nomes com posição no campo (escalação).
+ * tabela: classificação lida coluna por coluna, com as cores dos últimos jogos e das zonas.
+ */
+export type ModoOcr = 'bloco' | 'lados' | 'tabela';
 
 let worker: Promise<Worker> | null = null;
 let aoProgredir: ((p: number) => void) | null = null;
@@ -154,6 +164,9 @@ interface Preparado {
   /** escalação: preto-e-branco pelo fundo, segunda leitura que pega o que o cinza perde */
   binario?: HTMLCanvasElement;
   meio?: ReturnType<typeof acharMeio>;
+  /** a imagem como veio (cores dos selos e das faixas de zona) */
+  original: ImageData;
+  escala: number;
 }
 
 /**
@@ -227,7 +240,7 @@ async function preprocessar(arquivo: File, modo: ModoOcr = 'bloco'): Promise<Pre
   for (let i = 0; i < px.length; i += 4)
     px[i] = px[i + 1] = px[i + 2] = inverter ? 255 - px[i] : px[i];
   ctx.putImageData(dados, 0, 0);
-  return { cinza, binario, meio };
+  return { cinza, binario, meio, original, escala };
 }
 
 export async function lerImagem(
@@ -237,10 +250,36 @@ export async function lerImagem(
 ): Promise<string> {
   const w = await obterWorker();
   try {
-    const { cinza, binario, meio } = await preprocessar(arquivo, modo);
+    const { cinza, binario, meio, original, escala } = await preprocessar(arquivo, modo);
     if (modo === 'bloco') {
       aoProgredir = progresso ?? null;
       return (await w.recognize(cinza)).data.text;
+    }
+    if (modo === 'tabela') {
+      // a página inteira vale 60% da barra; cada coluna relida, o resto
+      aoProgredir = (p) => progresso?.(p * 0.6);
+      const reconhecer: ReconhecerOcr = async (caixa, soNumeros) => {
+        await w.setParameters({ tessedit_char_whitelist: soNumeros ? NUMEROS_TABELA : '' });
+        const retangulo = caixa && {
+          left: Math.round(caixa.x0 * escala),
+          top: Math.round(caixa.y0 * escala),
+          width: Math.round((caixa.x1 - caixa.x0) * escala),
+          height: Math.round((caixa.y1 - caixa.y0) * escala),
+        };
+        const { data } = await w.recognize(cinza, retangulo ? { rectangle: retangulo } : {}, {
+          blocks: true,
+          text: true,
+        });
+        return linhasDoTesseract(data.blocks ?? [], escala);
+      };
+      return await lerTabelaOcr(
+        reconhecer,
+        { data: original.data, largura: original.width, altura: original.height },
+        (f) => {
+          aoProgredir = null;
+          progresso?.(0.6 + 0.4 * f);
+        },
+      );
     }
     // escalação: texto esparso (nomes espalhados pelo campo), cada linha com o seu centro
     // em milésimos da imagem; duas leituras (cinza e preto-e-branco) que o leitor junta pela
@@ -284,6 +323,7 @@ export async function lerImagem(
     return linhas.join('\n');
   } finally {
     aoProgredir = null;
-    if (modo !== 'bloco') await w.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+    if (modo === 'lados') await w.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+    if (modo === 'tabela') await w.setParameters({ tessedit_char_whitelist: '' });
   }
 }

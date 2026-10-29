@@ -7,7 +7,7 @@ interface Props {
   dica?: string;
   leituras: Leitura[];
   desabilitado?: boolean;
-  /** 'lados': lê metade esquerda e direita em separado (escalação) */
+  /** 'lados': nomes com posição no campo (escalação); 'tabela': classificação em colunas */
   modo?: ModoOcr;
   onLido: (l: Leitura) => void;
   onRemover: (indice: number) => void;

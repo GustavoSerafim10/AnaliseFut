@@ -1,5 +1,6 @@
 // Roda o mesmo OCR do site (Tesseract, por+eng) em imagens locais e imprime o texto.
 // Uso: npm run ocr -- caminho/print1.png caminho/print2.png
+//      npm run ocr -- --tabela classificacao.png   (leitura em colunas, como a do site)
 // Serve para transformar prints reais em fixtures de teste dos parsers.
 // Mesmo tratamento do site (apps/web/src/ocr.ts, modo "bloco"): amplia com Lanczos-3 (até 4x,
 // ~4000 px, no máximo ~16 Mpx), cinza, inverte tema escuro; Tesseract em modo bloco (psm 6).
@@ -7,8 +8,10 @@
 import { Buffer } from 'node:buffer';
 import sharp from 'sharp';
 import { createWorker } from 'tesseract.js';
+import { lerTabelaOcr, linhasDoTesseract, NUMEROS_TABELA } from '../src/tabelaOcr.ts';
 
-const arquivos = process.argv.slice(2);
+const tabela = process.argv.includes('--tabela');
+const arquivos = process.argv.slice(2).filter((a) => a !== '--tabela');
 if (!arquivos.length) {
   console.error('uso: npm run ocr -- imagem.png [mais imagens]');
   process.exit(1);
@@ -86,16 +89,37 @@ async function preprocessar(arq) {
   let soma = 0;
   for (const v of cinza) soma += v;
   if (soma / cinza.length < 128) for (let i = 0; i < cinza.length; i++) cinza[i] = 255 - cinza[i];
-  return sharp(Buffer.from(cinza), { raw: { width: W, height: H, channels: 1 } })
+  const png = await sharp(Buffer.from(cinza), { raw: { width: W, height: H, channels: 1 } })
     .png()
     .toBuffer();
+  return { png, original: { data, largura: w, altura: h }, escala: s };
 }
 
 const worker = await createWorker(['por', 'eng']);
 await worker.setParameters({ tessedit_pageseg_mode: '6' });
 for (const arq of arquivos) {
-  const { data } = await worker.recognize(await preprocessar(arq));
+  const { png, original, escala } = await preprocessar(arq);
   console.log(`===== ${arq} =====`);
-  console.log(data.text);
+  if (!tabela) {
+    console.log((await worker.recognize(png)).data.text);
+    continue;
+  }
+  const reconhecer = async (caixa, soNumeros) => {
+    await worker.setParameters({ tessedit_char_whitelist: soNumeros ? NUMEROS_TABELA : '' });
+    const opcoes = caixa
+      ? {
+          rectangle: {
+            left: Math.round(caixa.x0 * escala),
+            top: Math.round(caixa.y0 * escala),
+            width: Math.round((caixa.x1 - caixa.x0) * escala),
+            height: Math.round((caixa.y1 - caixa.y0) * escala),
+          },
+        }
+      : {};
+    const { data } = await worker.recognize(png, opcoes, { blocks: true, text: true });
+    return linhasDoTesseract(data.blocks ?? [], escala);
+  };
+  console.log(await lerTabelaOcr(reconhecer, original));
+  await worker.setParameters({ tessedit_char_whitelist: '' });
 }
 await worker.terminate();

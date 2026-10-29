@@ -1534,6 +1534,56 @@ table.consolidada input {
   font-weight: 600;
 }
 
+/* classificação: zonas com a cor da faixa do print, números centrados */
+table.classificacao th,
+table.classificacao td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+table.classificacao th:nth-child(n + 3),
+table.classificacao td:nth-child(n + 3) {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+table.classificacao .zona-pos {
+  padding-left: 10px;
+}
+.zona-titulo td {
+  padding-top: 12px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--suave);
+  border-bottom: none;
+}
+.zona-cor {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.celula-calculada {
+  font-style: italic;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.celula-conferir {
+  color: var(--alerta);
+  font-weight: 700;
+}
+.forma-mini {
+  display: inline-flex;
+  gap: 3px;
+}
+.forma-mini > span {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
 .linha-acoes {
   display: flex;
   flex-wrap: wrap;

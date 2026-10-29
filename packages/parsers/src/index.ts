@@ -16,6 +16,7 @@ export * from './parser1win';
 export * from './sanidade';
 export * from './estatisticas';
 export * from './contexto';
+export * from './tabelaOcr';
 export * from './consolidacao';
 export * from './escalacao';
 export * from './ultimas';

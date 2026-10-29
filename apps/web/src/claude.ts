@@ -46,8 +46,19 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   }
   if (d.classificacao.some((c) => c.doJogo)) {
     l.push('', '# Classificação');
-    for (const c of d.classificacao.filter((x) => x.doJogo))
-      l.push(`- ${c.posicao}º ${c.time} (${c.pontos ?? '?'} pts)`);
+    for (const c of d.classificacao.filter((x) => x.doJogo)) {
+      const partes = [`${c.pontos ?? '?'} pts`];
+      if (c.jogos !== undefined)
+        partes.push(
+          `${c.jogos} jogos (${c.vitorias ?? '?'}V ${c.empates ?? '?'}E ${c.derrotas ?? '?'}D)`,
+        );
+      if (c.golsPro !== undefined) partes.push(`gols ${c.golsPro}:${c.golsContra}`);
+      if (c.saldo !== undefined) partes.push(`saldo ${c.saldo > 0 ? '+' : ''}${c.saldo}`);
+      if (c.forma)
+        partes.push(`últimos ${c.forma.length} no print (esq. → dir.): ${c.forma.join(' ')}`);
+      if (c.zona?.nome) partes.push(`zona ${c.zona.nome}`);
+      l.push(`- ${c.posicao}º ${c.time}: ${partes.join(', ')}`);
+    }
   }
   if (temTextoFlashscore(r)) l.push('', '# Texto de análise do Flashscore', r.flashscore.trim());
   else if (r.flashscoreSemTexto) l.push('', '# Flashscore: o jogo não tem texto de análise');
