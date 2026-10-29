@@ -109,7 +109,7 @@ export function Indicadores({ d }: { d: Derivado }) {
         termo="devig"
         destaque={d.mercado1x2 ? '1X2' : indisponivel}
       >
-        {d.mercado1x2 && <Tres p={d.mercado1x2} />}
+        {d.mercado1x2 ? <Tres p={d.mercado1x2} /> : d.motivoSem1x2 && <span>{d.motivoSem1x2}</span>}
       </Card>
       <Card
         icone="raio"

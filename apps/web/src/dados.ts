@@ -116,6 +116,8 @@ export interface Derivado {
   relatorio: Relatorio | null;
   /** 1X2 do mercado sem margem, direto das odds válidas: não depende das estatísticas do modelo */
   mercado1x2: Prob1X2 | null;
+  /** por que o 1X2 do mercado não saiu (não lido, lido com erro, lado faltando) */
+  motivoSem1x2: string | null;
 }
 
 /**
@@ -355,8 +357,28 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     travas,
     resultado,
     relatorio,
-    mercado1x2: resultado?.previsao?.p1x2.mercado ?? mercado1x2De(oddsValidas),
+    ...(() => {
+      const m = resultado?.previsao?.p1x2.mercado ?? mercado1x2De(oddsValidas);
+      return {
+        mercado1x2: m,
+        motivoSem1x2: m ? null : motivoSem1x2(r.odds as LinhaOdd[], problemasOdds),
+      };
+    })(),
   };
+}
+
+/** Diz na tela por que o P mercado ficou vazio, com as odds lidas: dá para corrigir na aba Mercado */
+function motivoSem1x2(linhas: LinhaOdd[], problemas: ProblemaLinha[]): string {
+  const doMercado = linhas
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => l.mercado === '1X2' && l.periodo === 'FT');
+  if (!doMercado.length) return '1X2 não lido nos prints: confira na aba Mercado';
+  const lidas = doMercado.map(({ l }) => `${l.lado} @ ${l.odd}`).join(' · ');
+  const erro = problemas.find(
+    (p) => p.nivel === 'erro' && doMercado.some(({ i }) => i === p.indice),
+  );
+  if (erro) return `1X2 lido com erro (${lidas}): ${erro.mensagem}`;
+  return `1X2 incompleto (${lidas}): faltam lados para tirar a margem`;
 }
 
 /** P mercado do 1X2 (mesma de-vig do motor V3.3) quando o motor não rodou por falta de estatística */
