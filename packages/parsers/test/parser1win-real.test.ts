@@ -156,3 +156,24 @@ describe('1win — Frosinone × Lecce', () => {
     expect(erros.has(errado((l) => l.mercado === 'total' && l.linha === 11.5))).toBe(true);
   });
 });
+
+describe('mercados combinados não viram 1X2', () => {
+  const ctxF = {
+    jogo: { casa: 'Frosinone', fora: 'Lecce' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T14:30:00-03:00',
+  };
+  it('"1X2 e os dois times devem marcar" (Frosinone a zero @ 4) fica fora do 1X2', () => {
+    const t = [
+      '1X2 e os dois times devem marcar',
+      'Ambas as equipes não marcarão e empate 23.0 Ambos Os Times Vão Marcar E Empatar 4.5',
+      'Frosinone A Zero 4.0 Frosinone E Ambos Vão Marcar 2.75',
+      'Lecce A Zero 11.0 Lecce E Ambos Vão Marcar 6.0',
+    ].join('\n');
+    expect(parse1win(t, ctxF).linhas.filter((l) => l.mercado === '1X2')).toEqual([]);
+  });
+  it('"Total e ambos os times marcam" não vira ambos marcam', () => {
+    const t = 'Total e ambos os times marcam\nAbaixo De 2.5 E Não 4.0 Abaixo De 2.5 E Sim 8.5';
+    expect(parse1win(t, ctxF).linhas.filter((l) => l.mercado === 'ambas')).toEqual([]);
+  });
+});

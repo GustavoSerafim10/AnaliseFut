@@ -23,6 +23,12 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
     /vitoria antecipada|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|red card|penalidade|penalti/,
     'outro',
   ],
+  // combinados ("1X2 e os dois times devem marcar", "Resultado e Total", "Total e ambos os
+  // times marcam") não são o 1X2 nem o ambos: Frosinone a zero @ 4 virava "1 @ 4"
+  [
+    /(1x2|resultado|total|gols?) e (os )?(dois|ambos)|e (os )?(dois|ambos) (os )?times|resultado e total|numero exato/,
+    'outro',
+  ],
   [/cart(ao|oes).*handicap|handicap.*cart(ao|oes)/, 'cartoes_ah'],
   // só cartões AMARELOS têm modelo; primeiro cartão e dupla chance de cartões não
   [/primeiro cartao|(dupla|hipotese).*cart|cart.*(dupla|hipotese)|vermelho/, 'outro'],

@@ -1,5 +1,5 @@
 import { chaveSelecao, type LinhaOdd, type TipoMercado } from '@pe/engine';
-import { juntarLinhas, lerOddsCasa } from '@pe/parsers';
+import { checarSanidade, juntarLinhas, lerOddsCasa } from '@pe/parsers';
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
@@ -45,15 +45,24 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
     );
   const leitura = lerTodos(r.prints[grupo] ?? []);
 
-  /** Acrescenta só odds novas: não sobrescreve as já existentes (nem as que você corrigiu). */
+  /**
+   * Acrescenta só odds novas: não sobrescreve as já existentes (nem as que você corrigiu),
+   * salvo as marcadas com erro: uma leitura nova (ou o leitor corrigido) toma o lugar delas.
+   */
   const adicionarLinhas = (novas: OddLine[]) =>
     setR((x) => {
       const chave = (o: OddLine) => `${o.casa.toLowerCase()}#${chaveSelecao(o as LinhaOdd)}`;
-      const existentes = new Set(x.odds.map(chave));
-      const extras = juntarLinhas(novas.map((o) => ({ ...o, casa }))).linhas.filter(
-        (o) => !existentes.has(chave(o)),
+      const lidas = juntarLinhas(novas.map((o) => ({ ...o, casa }))).linhas;
+      const comErro = new Set(
+        checarSanidade(x.odds as LinhaOdd[])
+          .filter((p) => p.nivel === 'erro')
+          .map((p) => p.indice),
       );
-      return { ...x, odds: [...x.odds, ...extras] };
+      const novasChaves = new Set(lidas.map(chave));
+      const mantidas = x.odds.filter((o, i) => !(comErro.has(i) && novasChaves.has(chave(o))));
+      const existentes = new Set(mantidas.map(chave));
+      const extras = lidas.filter((o) => !existentes.has(chave(o)));
+      return { ...x, odds: [...mantidas, ...extras] };
     });
   const mudar = (i: number, m: Partial<OddLine>) =>
     setR((x) => ({ ...x, odds: x.odds.map((l, j) => (j === i ? { ...l, ...m } : l)) }));
