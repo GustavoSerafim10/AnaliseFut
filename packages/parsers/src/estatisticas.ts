@@ -3,7 +3,7 @@
  * equipe – Média"). Lê TODAS as linhas "rótulo + 2 valores"; as conhecidas viram campos do
  * modelo, as demais ficam em `outros`. Nunca inventa: valor ilegível fica vazio e é sinalizado.
  */
-import type { NomesTimes } from '@pe/engine';
+import type { NomesTimes, Time } from '@pe/engine';
 import { semAcento } from './texto';
 import { similaridadeTime, tokensDoNome } from './times';
 
@@ -411,6 +411,16 @@ export const DEF_CAMPO: Record<CampoStat, DefCampo> = Object.fromEntries(
   CAMPOS_STATS.map((d) => [d.campo, d]),
 ) as Record<CampoStat, DefCampo>;
 
+/** aviso de um time só ("[casa] ..."): o vermelho da tabela fica só na célula dele */
+export const avisoDoTime = (time: Time, m: string) => `[${time}] ${m}`;
+
+/** avisos que valem para o time (os da linha toda e os dele), sem a marca do time */
+export function avisosDoTime(avisos: string[], time: Time): string[] {
+  return avisos
+    .filter((a) => !/^\[(casa|fora)\] /.test(a) || a.startsWith(`[${time}] `))
+    .map((a) => a.replace(/^\[(casa|fora)\] /, ''));
+}
+
 export interface ValorLido {
   casa?: number;
   fora?: number;
@@ -691,21 +701,22 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
     if (campos[def.campo]?.casa !== undefined && campos[def.campo]?.fora !== undefined) continue; // repetido entre prints
 
     const v: ValorLido = { bruto, avisos: avisoPosicao ? [avisoPosicao] : [] };
-    const aplicar = (tok: TokenNum | undefined): number | undefined => {
+    const aplicar = (tok: TokenNum | undefined, time: Time): number | undefined => {
       if (!tok) return undefined;
+      const aviso = (m: string) => v.avisos.push(avisoDoTime(time, m));
       // SuperScore sempre mostra "1.1": um dígito só, sem ponto, perdeu pedaço (pode ser 1.1,
       // 0.1, 1.0...); fica vazio em vez de virar 0,1
       if (fonte === 'superscore' && def.formato === 'decimal1' && tok.digitos === 1) {
-        v.avisos.push(`"${tok.valor}" ilegível (o site mostra uma casa decimal): conferir`);
+        aviso(`"${tok.valor}" ilegível (o site mostra uma casa decimal): conferir`);
         return undefined;
       }
       const { valor, corrigido } = interpretar(tok, def);
-      if (corrigido) v.avisos.push(`ponto decimal perdido no OCR: ${tok.valor} lido como ${valor}`);
+      if (corrigido) aviso(`ponto decimal perdido no OCR: ${tok.valor} lido como ${valor}`);
       // "11.4" lido como "1.4": o "1" fino do selo some; abaixo da faixa, com o "1" volta a caber
       if (def.formato === 'decimal1' && !corrigido && tok.temPonto && valor < def.faixa[0]) {
         const comUm = Number(`1${tok.valor}`);
         if (comUm >= def.faixa[0] && comUm <= def.faixa[1]) {
-          v.avisos.push(
+          aviso(
             `${valor} fora da faixa: lido como ${comUm} (o "1" do início sumiu no OCR), conferir`,
           );
           return comUm;
@@ -713,15 +724,15 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
       }
       if (valor < def.faixa[0] || valor > def.faixa[1]) {
         // descartado: outro print (ou a correção à mão) completa o valor
-        v.avisos.push(
+        aviso(
           `${valor} fora da faixa plausível (${def.faixa[0]}–${def.faixa[1]}): descartado, conferir`,
         );
         return undefined;
       }
       return valor;
     };
-    const ve = aplicar(esq);
-    const vd = aplicar(dir);
+    const ve = aplicar(esq, colunasInvertidas ? 'fora' : 'casa');
+    const vd = aplicar(dir, colunasInvertidas ? 'casa' : 'fora');
     v.casa = colunasInvertidas ? vd : ve;
     v.fora = colunasInvertidas ? ve : vd;
     const anterior = campos[def.campo];
@@ -767,7 +778,10 @@ function coerencia(l: LeituraStats): LeituraStats {
         [t]: Math.round(media),
         avisos: [
           ...l.campos.partidas!.avisos,
-          `${jogos} partidas não bate com gols ÷ média (≈ ${Math.round(media)}): reposto, conferir`,
+          avisoDoTime(
+            t,
+            `${jogos} partidas não bate com gols ÷ média (≈ ${Math.round(media)}): reposto, conferir`,
+          ),
         ],
       };
     }
@@ -786,9 +800,12 @@ function coerencia(l: LeituraStats): LeituraStats {
       [t]: conta > 0 ? conta : undefined,
       avisos: [
         ...l.campos.finalizacoesDentroArea!.avisos,
-        conta > 0
-          ? `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: reposto por ${conta}, conferir`
-          : `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: descartado, conferir`,
+        avisoDoTime(
+          t,
+          conta > 0
+            ? `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: reposto por ${conta}, conferir`
+            : `${dentro} + ${fora} fora da área não fecha ${tot} finalizações: descartado, conferir`,
+        ),
       ],
     };
   }
@@ -808,7 +825,10 @@ function coerencia(l: LeituraStats): LeituraStats {
             ...v,
             avisos: [
               ...v.avisos.filter((a) => !a.includes('pela posição')),
-              `${vt} confirmado (o outro valor da linha ficou ilegível): bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)})`,
+              avisoDoTime(
+                t,
+                `${vt} confirmado (o outro valor da linha ficou ilegível): bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)})`,
+              ),
             ],
           };
         continue;
@@ -818,7 +838,10 @@ function coerencia(l: LeituraStats): LeituraStats {
         [t]: undefined,
         avisos: [
           ...l.campos[total]!.avisos,
-          `${vt} não bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)}): descartado, conferir`,
+          avisoDoTime(
+            t,
+            `${vt} não bate com ${vm} por jogo × ${jogos} jogos (≈ ${Math.round(esperado)}): descartado, conferir`,
+          ),
         ],
       };
     }

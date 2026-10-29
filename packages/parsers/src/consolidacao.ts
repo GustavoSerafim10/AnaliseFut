@@ -5,6 +5,7 @@
  */
 import type { Estatistica, EstatisticasTime, StatsContagem, Time } from '@pe/engine';
 import {
+  avisosDoTime,
   CAMPOS_STATS,
   DEF_CAMPO,
   type CampoStat,
@@ -50,7 +51,7 @@ export function consolidar(
         const n = v?.[time];
         if (n !== undefined) {
           porFonte[f] = n;
-          avisos.push(...(v?.avisos ?? []).map((a) => `${f}: ${a}`));
+          avisos.push(...avisosDoTime(v?.avisos ?? [], time).map((a) => `${f}: ${a}`));
         }
       }
       const manual = correcoes[`${def.campo}.${time}`];

@@ -393,3 +393,19 @@ describe('prints reais Frosinone × Lecce (selos com "11")', () => {
     expect(sup.campos.escanteios).toMatchObject({ casa: 5.9, fora: 4.5 });
   });
 });
+
+describe('aviso de um time só não pinta a célula do outro', () => {
+  const jogo = { casa: 'Frosinone', fora: 'Lecce' };
+  const sup = juntarLeiturasStats(
+    [1, 2, 3, 4].map((n) =>
+      lerEstatisticas(fx(`superscore-frosinone-${n}.txt`), 'superscore', jogo),
+    ),
+  )!;
+  const t = consolidar({ superscore: sup });
+  it('11,4 do Frosinone em conferência; 9,5 e 7,9 do Lecce limpos', () => {
+    expect(t.faltasSofridas!.casa.avisos.join()).toContain('sumiu no OCR');
+    expect(t.faltasSofridas!.fora.avisos).toEqual([]);
+    expect(t.finalizacoesDentroArea!.casa.avisos.join()).toContain('não fecha');
+    expect(t.finalizacoesDentroArea!.fora.avisos).toEqual([]);
+  });
+});
