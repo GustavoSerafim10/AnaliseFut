@@ -53,6 +53,12 @@ const LINHA_MAXIMA: Partial<Record<TipoMercado, number>> = {
   AH_europeu: 4,
 };
 
+const HANDICAPS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
+  'AH',
+  'escanteios_ah',
+  'cartoes_ah',
+]);
+
 const TOTAIS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'total',
   'escanteios_total',
@@ -174,6 +180,29 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
           ord[j],
           'alerta',
           `linhas fora de ordem: ${over ? 'over' : 'under'} ${linhas[ord[j]].linha} @ ${atual} vs ${linhas[ord[j - 1]].linha} @ ${ant}`,
+        );
+    }
+  }
+
+  // handicap: quanto mais a linha ajuda o lado apostado, menor a odd. "Fiorentina -3.5 @ 1.85"
+  // junto de "-1.5 @ 2.32" é impossível (era o handicap de CHUTES lido como de escanteios) → erro
+  const handicaps = new Map<string, number[]>();
+  linhas.forEach((l, i) => {
+    if (!HANDICAPS.has(l.mercado) || l.linha === undefined) return;
+    const k = `${l.casa.toLowerCase()}#${l.mercado}#${l.periodo}#${normalizarLado(l.lado)}`;
+    handicaps.set(k, [...(handicaps.get(k) ?? []), i]);
+  });
+  for (const idx of handicaps.values()) {
+    const ord = [...idx].sort((a, b) => (linhas[a].linha as number) - (linhas[b].linha as number));
+    for (let j = 1; j < ord.length; j++) {
+      const [a, b] = [linhas[ord[j - 1]], linhas[ord[j]]];
+      if (b.linha !== a.linha && b.odd > a.odd)
+        [ord[j - 1], ord[j]].forEach((i) =>
+          add(
+            i,
+            'erro',
+            `handicap fora de ordem: ${a.linha} @ ${a.odd} e ${b.linha} @ ${b.odd} (a linha mais fácil não pode pagar mais): uma das duas foi lida errado`,
+          ),
         );
     }
   }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checarSanidade, juntarLinhas, parse1win, parse1winVarios } from '../src';
+import { ehBarraDeAbas } from '../src/sinonimos';
 
 const fx = (nome: string) =>
   readFileSync(new URL(`./fixtures-reais/${nome}`, import.meta.url), 'utf8');
@@ -175,5 +176,70 @@ describe('mercados combinados não viram 1X2', () => {
   it('"Total e ambos os times marcam" não vira ambos marcam', () => {
     const t = 'Total e ambos os times marcam\nAbaixo De 2.5 E Não 4.0 Abaixo De 2.5 E Sim 8.5';
     expect(parse1win(t, ctxF).linhas.filter((l) => l.mercado === 'ambas')).toEqual([]);
+  });
+});
+
+// Fiorentina × Atalanta (29/10/2026): o handicap de CHUTES virou handicap de escanteios e
+// chegou a WATCHLIST (Atalanta +3.5 escanteios @ 1.85, EV 6,2%)
+describe('1win — Fiorentina × Atalanta', () => {
+  const ctxF = {
+    jogo: { casa: 'Fiorentina', fora: 'Atalanta' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T16:45:00-03:00',
+  };
+  const textos = Array.from({ length: 10 }, (_, i) => fx(`1win-fiorentina-${i + 53}.txt`));
+  const { linhas: ls } = juntarLinhas(parse1winVarios(textos, ctxF).linhas);
+  it('"Handicap asiático. Chutes" não é a barra de abas nem handicap de escanteios', () => {
+    expect(ehBarraDeAbas('Handicap asiatico. Chutes A')).toBe(false);
+    expect(ehBarraDeAbas('Todos Principal Totais Handicap metade')).toBe(true);
+    expect(
+      ls.filter((l) => l.mercado === 'escanteios_ah').map((l) => [l.lado, l.linha, l.odd]),
+    ).toEqual([
+      ['casa', -1.5, 2.32],
+      ['fora', 1.5, 1.52],
+    ]);
+  });
+  it('primeiro gol com os quadros em outra ordem (Atalanta | Sem Gol | Fiorentina)', () => {
+    const pg = Object.fromEntries(
+      ls.filter((l) => l.mercado === 'primeiro_gol').map((l) => [l.lado, l.odd]),
+    );
+    expect(pg).toEqual({ fora: 2, nenhum: 17, casa: 1.8 });
+  });
+  it('handicap fora de ordem (−3.5 pagando menos que −1.5) é erro', () => {
+    const base = { casa: '1win', periodo: 'FT' as const, mercado: 'escanteios_ah' as const };
+    const fantasma = [
+      { ...base, lado: 'casa', linha: -1.5, odd: 2.32 },
+      { ...base, lado: 'fora', linha: 1.5, odd: 1.52 },
+      { ...base, lado: 'casa', linha: -3.5, odd: 1.85 },
+      { ...base, lado: 'fora', linha: 3.5, odd: 1.85 },
+    ];
+    const erros = checarSanidade(fantasma).filter(
+      (p) => p.nivel === 'erro' && p.mensagem.includes('fora de ordem'),
+    );
+    expect(new Set(erros.map((p) => p.indice))).toEqual(new Set([0, 1, 2, 3]));
+  });
+  it('handicaps reais em ordem não acusam nada', () => {
+    const erros = checarSanidade(ls).filter((p) => p.mensagem.includes('handicap fora de ordem'));
+    expect(erros).toEqual([]);
+  });
+});
+
+describe('horário de coleta com a barra de status ilegível', () => {
+  const ctxF = {
+    jogo: { casa: 'Fiorentina', fora: 'Atalanta' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T12:00:00-03:00',
+  };
+  it('a hora do jogo na linha da data ("2026, 16:45") não vira horário de coleta', () => {
+    expect(parse1win(fx('1win-fiorentina-56.txt'), ctxF).horarioColeta).toBe(
+      '2026-10-29T12:00:00-03:00',
+    );
+  });
+  it('print sem hora pega a hora dos outros prints do lote (9:34), não 16:45', () => {
+    const textos = Array.from({ length: 10 }, (_, i) => fx(`1win-fiorentina-${i + 53}.txt`));
+    const { linhas } = parse1winVarios(textos, ctxF);
+    const ah = linhas.find((l) => l.mercado === 'escanteios_ah' && l.linha === -1.5)!;
+    expect(ah.horarioColeta).toMatch(/T09:3[34]:00/);
+    expect(linhas.some((l) => l.horarioColeta?.includes('T16:45'))).toBe(false);
   });
 });

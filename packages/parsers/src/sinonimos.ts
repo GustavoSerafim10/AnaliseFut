@@ -68,6 +68,9 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
 /** Barra de abas da casa ("Todos Principal Totais Handicap metade"): não é título de mercado. */
 export function ehBarraDeAbas(linha: string): boolean {
   const t = semAcento(linha);
+  // título da 1win separa as partes com ". " ("Handicap asiático. Chutes"): não é a barra, e
+  // sem isso o bloco de chutes herdava o "Handicap de escanteios" de cima
+  if (/[a-z]\.\s+[a-z]/.test(t)) return false;
   const abas = [
     'todos',
     'principal',

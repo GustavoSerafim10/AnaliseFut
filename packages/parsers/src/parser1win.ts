@@ -262,9 +262,40 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
   }
 }
 
-/** Horário do print: primeiro "HH:MM" legível (barra de status). */
+const escaparRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Ordem dos lados pela posição dos rótulos ("Atalanta Sem Gol Fiorentina"): a 1win muda a ordem
+ * dos quadros de um jogo para outro. null quando algum rótulo não aparece (fica a ordem padrão).
+ */
+function ordemPelosRotulos(rotulos: string, lados: string[], jogo: NomesTimes): string[] | null {
+  const t = semAcento(rotulos);
+  const nome = (n: string) => new RegExp(escaparRe(semAcento(n).split(/[\s-]+/)[0]));
+  const pos = (lado: string) => {
+    const l = lado.toLowerCase();
+    if (l === '1' || l === 'casa') return t.search(nome(jogo.casa));
+    if (l === '2' || l === 'fora') return t.search(nome(jogo.fora));
+    if (l === 'x') return t.search(/empate|draw/);
+    if (l === 'nenhum') return t.search(/sem (gol|escanteio)|nenhum/);
+    return -1;
+  };
+  const ps = lados.map(pos);
+  if (ps.some((p) => p < 0) || new Set(ps).size !== ps.length) return null;
+  return lados
+    .map((l, i) => ({ l, p: ps[i] }))
+    .sort((a, b) => a.p - b.p)
+    .map((x) => x.l);
+}
+
+/**
+ * Horário do print: primeiro "HH:MM" legível (barra de status). A linha da data do jogo
+ * ("29 de out. de 2026, 16:45") traz o horário do INÍCIO: com a barra de status ilegível, a
+ * odd parecia coletada na hora do jogo.
+ */
 function horarioDoTexto(linhas: string[], ctx: ContextoParser): string | undefined {
   for (const l of linhas.slice(0, 4)) {
+    if (/\b(19|20)\d{2}\b|\bde (jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i.test(l))
+      continue;
     const m = /(?:^|\s)([01]?\d|2[0-3]):([0-5]\d)(?:\s|$)/.exec(l);
     if (m) return `${ctx.data}T${m[1].padStart(2, '0')}:${m[2]}:00${ctx.fuso ?? '-03:00'}`;
   }
@@ -390,7 +421,12 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     const ordem = ORDEM_PADRAO[mercado.mercado];
     if (ordem && tokens.every((t) => lerNumero(t) !== null) && tokens.length === ordem.length) {
       let lados = [...ordem];
-      if (rotulosPendentes && mercado.mercado !== 'DC') {
+      const pelaPosicao =
+        rotulosPendentes && mercado.mercado !== 'DC'
+          ? ordemPelosRotulos(rotulosPendentes, ordem, ctx.jogo)
+          : null;
+      if (pelaPosicao) lados = pelaPosicao;
+      else if (rotulosPendentes && mercado.mercado !== 'DC') {
         const t = semAcento(rotulosPendentes);
         const pc = t.search(new RegExp(semAcento(ctx.jogo.casa).split(/\s+/)[0]));
         const pf = t.search(new RegExp(semAcento(ctx.jogo.fora).split(/[\s-]+/)[0]));
@@ -458,9 +494,23 @@ export function parse1winVarios(
   textos: string[],
   ctx: ContextoParser & { horariosPadrao?: (string | undefined)[] },
 ): ResultadoParser {
+  const padrao = (i: number) => ctx.horariosPadrao?.[i] ?? ctx.horarioPadrao;
+  // print sem a hora da barra de status: vale a do print colado mais perto dele (tirados juntos),
+  // não a hora em que foi colado
+  const proprios = textos.map((t) => horarioDoTexto(normalizar1win(t).split('\n'), ctx));
+  const comHora = proprios.flatMap((h, j) => (h ? [{ h, j }] : []));
+  const vizinho = (i: number) => {
+    if (!comHora.length) return undefined;
+    const t = Date.parse(padrao(i) ?? '');
+    const dist = (j: number) => {
+      const tj = Date.parse(padrao(j) ?? '');
+      return Number.isFinite(t) && Number.isFinite(tj) ? Math.abs(t - tj) : 0;
+    };
+    return comHora.reduce((a, b) => (dist(b.j) < dist(a.j) ? b : a)).h;
+  };
   const ctxDe = (i: number): ContextoParser => ({
     ...ctx,
-    horarioPadrao: ctx.horariosPadrao?.[i] ?? ctx.horarioPadrao,
+    horarioPadrao: proprios[i] ?? vizinho(i) ?? padrao(i),
   });
   const res = textos.map((t, i) => parse1win(t, ctxDe(i)));
   const conhecidas = new Map<string, MercadoDetectado>();
