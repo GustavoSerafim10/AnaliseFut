@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { juntarLinhas, parse1win, parse1winVarios } from '../src';
+import { checarSanidade, juntarLinhas, parse1win, parse1winVarios } from '../src';
 
 const fx = (nome: string) =>
   readFileSync(new URL(`./fixtures-reais/${nome}`, import.meta.url), 'utf8');
@@ -126,5 +126,33 @@ describe('1win — prints reais', () => {
     // "Vencer a partir de desvantagem" (34.0) e "red card: Sim 3.36" não podem virar outro mercado
     expect(linhas.some((l) => l.odd === 34.0)).toBe(false);
     expect(odd({ mercado: 'ambas', lado: 'sim' })).toEqual([2.08]);
+  });
+});
+
+// Frosinone × Lecce (29/10/2026): 12 prints do celular; o 1X2 chega limpo ao motor
+describe('1win — Frosinone × Lecce', () => {
+  const ctxF = {
+    jogo: { casa: 'Frosinone', fora: 'Lecce' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T14:30:00-03:00',
+  };
+  const textos = Array.from({ length: 12 }, (_, i) => fx(`1win-frosinone-${i + 9}.txt`));
+  const { linhas: ls } = juntarLinhas(parse1winVarios(textos, ctxF).linhas);
+  const erros = new Set(
+    checarSanidade(ls)
+      .filter((p) => p.nivel === 'erro')
+      .map((p) => p.indice),
+  );
+  it('1X2 lido e sem erro de sanidade', () => {
+    const x = ls.map((l, i) => ({ l, i })).filter(({ l }) => l.mercado === '1X2');
+    expect(x.map(({ l }) => l.odd)).toEqual([1.72, 4.18, 4.39]);
+    expect(x.some(({ i }) => erros.has(i))).toBe(false);
+  });
+  it('leituras erradas do OCR ficam de fora (Lecce -0,75 @ 9.9, "acima de 11,5" gols)', () => {
+    const errado = (f: (l: (typeof ls)[number]) => boolean) => ls.findIndex((l) => f(l));
+    expect(
+      erros.has(errado((l) => l.mercado === 'AH' && l.periodo === '1T' && l.odd === 9.9)),
+    ).toBe(true);
+    expect(erros.has(errado((l) => l.mercado === 'total' && l.linha === 11.5))).toBe(true);
   });
 });

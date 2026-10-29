@@ -10,6 +10,7 @@ import {
   avaliarDQ,
   detectarMovimentos,
   pesoModelo,
+  precificar,
   calcularLambdaContagem,
   calcularLambdaModelo,
   gerarRelatorio,
@@ -18,6 +19,7 @@ import {
   type Estatistica,
   type LambdasContagem,
   type LinhaOdd,
+  type Prob1X2,
   type Relatorio,
   type ResultadoLambdaContagem,
   type ResultadoAnalise,
@@ -112,6 +114,8 @@ export interface Derivado {
   travas?: TravasBanca;
   resultado: ResultadoAnalise | null;
   relatorio: Relatorio | null;
+  /** 1X2 do mercado sem margem, direto das odds válidas: não depende das estatísticas do modelo */
+  mercado1x2: Prob1X2 | null;
 }
 
 /**
@@ -351,7 +355,18 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     travas,
     resultado,
     relatorio,
+    mercado1x2: resultado?.previsao?.p1x2.mercado ?? mercado1x2De(oddsValidas),
   };
+}
+
+/** P mercado do 1X2 (mesma de-vig do motor V3.3) quando o motor não rodou por falta de estatística */
+function mercado1x2De(linhas: LinhaOdd[]): Prob1X2 | null {
+  const { selecoes } = precificar(linhas);
+  const p = (lado: string) => selecoes.find((x) => x.chave === `1X2|FT|-|-|${lado}`)?.pMercado;
+  const [casa, empate, fora] = [p('1'), p('x'), p('2')];
+  return casa !== undefined && empate !== undefined && fora !== undefined
+    ? { casa, empate, fora }
+    : null;
 }
 
 /** Escalação: a lida dos prints, salvo o que você digitou à mão; cruza com os desfalques. */
