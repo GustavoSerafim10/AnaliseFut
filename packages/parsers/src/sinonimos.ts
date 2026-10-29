@@ -20,9 +20,12 @@ export interface MercadoDetectado {
  */
 export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [
-    /vitoria antecipada|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|red card|penalidade|penalti/,
+    /vitoria antecipada|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
     'outro',
   ],
+  // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -
+  // Cruzeiro. Par/Impar"; o " - " some na normalização da 1win) não têm modelo
+  [/goal time|tempo mais competitivo|em qual tempo|gols?( -)? [^.]+\. ?(par|impar)/, 'outro'],
   // combinados ("1X2 e os dois times devem marcar", "Resultado e Total", "Total e ambos os
   // times marcam") não são o 1X2 nem o ambos: Frosinone a zero @ 4 virava "1 @ 4"
   [
@@ -97,7 +100,8 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
   const periodo = detectarPeriodo(t);
 
   // "Aston Villa total", "Escanteios. CR Flamengo total", "Cartões amarelos. CR Flamengo total"
-  if (/\btotal\b/.test(t)) {
+  // (par/ímpar dos gols de um time não é o total dele)
+  if (/\btotal\b/.test(t) && !/par ?\/ ?impar|impar ?\/ ?par/.test(t)) {
     const time = reconhecerTime(
       t.replace(
         /escanteios?|cantos?|cart(ao|oes)|amarelos?|total|individual|de gols|do time|da equipe/g,

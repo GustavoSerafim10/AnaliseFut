@@ -66,6 +66,9 @@ const ORDEM_PADRAO: Partial<Record<TipoMercado, string[]>> = {
   ultimo_gol: ['casa', 'fora', 'nenhum'],
 };
 
+/** título de mercado da 1win: termina na setinha de recolher, lida como "A", "a", "~" ou "^" */
+const TITULO_COM_SETA = /[A-Za-zÀ-ú]{3,}.*\s[Aa~^»]$/;
+
 const CONFIANCA_OCR = 0.6;
 const CONFIANCA_CORRIGIDA = 0.45;
 
@@ -363,6 +366,12 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       const titulo = detectarTituloMercado(bruta, ctx.jogo);
       if (titulo) {
         mercado = titulo;
+        colunas = null;
+        rotulosPendentes = null;
+      } else if (TITULO_COM_SETA.test(bruta)) {
+        // título que o motor não conhece: as odds dele não podem cair no mercado de cima
+        // ("Vencer Ambos Os Tempos" depois do primeiro gol: "Atlético Mineiro 8.0" virava 1º gol @ 8)
+        mercado = { mercado: 'outro', periodo: 'FT' };
         colunas = null;
         rotulosPendentes = null;
       } else {

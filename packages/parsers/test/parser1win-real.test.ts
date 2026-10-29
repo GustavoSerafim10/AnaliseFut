@@ -243,3 +243,40 @@ describe('horário de coleta com a barra de status ilegível', () => {
     expect(linhas.some((l) => l.horarioColeta?.includes('T16:45'))).toBe(false);
   });
 });
+
+// Atlético-MG × Cruzeiro (29/10): os prints da 1win não vieram como arquivo; o texto segue o
+// formato do OCR dos prints reais (título termina na setinha lida como "A")
+describe('título que o motor não conhece não herda o mercado de cima', () => {
+  const ctxA = {
+    jogo: { casa: 'Atlético Mineiro', fora: 'Cruzeiro' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T13:42:00-03:00',
+  };
+  const texto = [
+    'O time que marcar o primeiro gol A',
+    'Atlético Mineiro Cruzeiro Sem Gol',
+    '2.0 1.91 12.0',
+    '1st goal time A',
+    '1-10 4.33 11-20 4.75',
+    '81 - Tempo Integral 21.0 Sem Gol 12.0',
+    'Vencer Ambos Os Tempos A',
+    'tico Mineiro eiro 8.0',
+    'Total de gols - Atlético Mineiro. Par/Impar A',
+    'Impar 1.91 Par 1.8',
+  ].join('\n');
+  const { linhas } = parse1win(texto, ctxA);
+  it('"Vencer Ambos Os Tempos" não vira primeiro gol @ 8', () => {
+    const pg = linhas.filter((l) => l.mercado === 'primeiro_gol');
+    expect(pg.filter((l) => l.lado === 'casa').map((l) => l.odd)).toEqual([2]);
+    expect(pg.some((l) => l.odd === 8)).toBe(false);
+  });
+  it('par/ímpar dos gols de um time não é o do jogo nem o total do time', () => {
+    expect(linhas.some((l) => l.mercado === 'par_impar' || l.mercado === 'total_time')).toBe(
+      false,
+    );
+  });
+  it('o par/ímpar do jogo segue lido', () => {
+    const { linhas: pi } = parse1win('Impar/Par A\nImpar 2.03 Par 1.83', ctxA);
+    expect(pi.map((l) => `${l.lado} ${l.odd}`)).toEqual(['impar 2.03', 'par 1.83']);
+  });
+});
