@@ -134,13 +134,13 @@ export function Indicadores({ d }: { d: Derivado }) {
         titulo="Data Quality"
         termo="dq"
         tom="amarelo"
-        destaque={d.dq.dq}
+        destaque={d.dqFinal.dq}
         rodape={
-          <Barra valor={NOTA_DQ[d.dq.dq] ?? 0} cor="linear-gradient(90deg,#22c55e,#a3e635)" />
+          <Barra valor={NOTA_DQ[d.dqFinal.dq] ?? 0} cor="linear-gradient(90deg,#22c55e,#a3e635)" />
         }
       >
         {d.modeloCasa.stats && d.modeloFora.stats
-          ? 'estatísticas consolidadas'
+          ? `estatísticas ${d.dq.dq}${d.dqFinal.dq !== d.dq.dq ? ` · ${d.dqFinal.motivos.join('; ')}` : ''}`
           : 'sem estatísticas'}
       </Card>
     </div>

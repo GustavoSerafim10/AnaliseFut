@@ -433,10 +433,10 @@ export function AbaAnalise({
       <h3>Modelo</h3>
       <div className="caixa">
         <p>
-          Data Quality calculada: <strong>{d.dq.dq}</strong>
+          Data Quality: <strong>{d.dqFinal.dq}</strong> (estatísticas {d.dq.dq})
         </p>
         <ul className="miudo">
-          {d.dq.motivos.map((m) => (
+          {[...d.dq.motivos, ...d.dqFinal.motivos].map((m) => (
             <li key={m}>{m}</li>
           ))}
         </ul>

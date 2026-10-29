@@ -86,7 +86,7 @@ export function GrafoDecisao({ d }: { d: Derivado }) {
     {
       titulo: 'Modelo',
       sub: d.lambda
-        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)} · DQ ${d.dq.dq}`
+        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)} · DQ ${d.dqFinal.dq}`
         : 'sem estatísticas',
       ok: !!d.lambda,
     },

@@ -5,6 +5,7 @@
  * V3.3 entra como apoio (filtro, nichos e previsão) quando há estatísticas.
  */
 import {
+  ajustarDQ,
   analisarJogo,
   analisarV4,
   avaliarDQ,
@@ -98,6 +99,8 @@ export interface Derivado {
   avisosClassificacao: string[];
   flash: LeituraFlashscore | null;
   dq: { dq: DQ; motivos: string[] };
+  /** DQ final, a mesma do motor e do relatório: a das estatísticas limitada pelas odds (1 casa só → C) */
+  dqFinal: { dq: DQ; motivos: string[] };
   destaques: string[];
   problemasOdds: ProblemaLinha[];
   errosOdds: number;
@@ -345,6 +348,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     avisosClassificacao: clas.flatMap((c) => c.avisos),
     flash,
     dq,
+    dqFinal: ajustarDQ(dq.dq, oddsValidas),
     destaques: destaquesComparativos(tabela, nomes),
     problemasOdds,
     errosOdds,

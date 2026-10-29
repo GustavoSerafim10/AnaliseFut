@@ -66,7 +66,7 @@ export function etapasDoPipeline(r: Rascunho, d: Derivado): Etapa[] {
       nome: 'Modelo',
       estado: d.lambda ? 'ok' : 'alerta',
       detalhe: d.lambda
-        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)} · DQ ${d.dq.dq}${primeiro ? ` · ${primeiro.filtro}` : ''}`
+        ? `λ ${n2(d.lambda.lambdas.casa)} × ${n2(d.lambda.lambdas.fora)} · DQ ${d.dqFinal.dq}${primeiro ? ` · ${primeiro.filtro}` : ''}`
         : 'sem estatísticas: só mercado',
     },
     {
