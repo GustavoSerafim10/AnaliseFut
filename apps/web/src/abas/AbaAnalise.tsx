@@ -255,7 +255,9 @@ export function AbaAnalise({
                   </dd>
                   <dt>Odd justa</dt>
                   <dd>{dec(res.melhor.oddJusta)}</dd>
-                  <dt>Odd mínima p/ entrar</dt>
+                  <dt title="usa o lado pessimista da probabilidade do modelo: por isso fica acima da odd mínima da decisão final">
+                    Odd mínima (P pessimista)
+                  </dt>
                   <dd>{dec(res.melhor.priceGate?.oddMinima)}</dd>
                   <dt>Probabilidade (final)</dt>
                   <dd>{pct(res.melhor.pFinal)}</dd>

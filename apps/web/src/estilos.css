@@ -1087,6 +1087,10 @@ pre {
 .decisao-numeros dd small.negativo {
   color: var(--erro);
 }
+/* EV positivo, mas abaixo do gate: não é prejuízo, só não paga o risco */
+.decisao-numeros dd.abaixo-gate {
+  color: var(--alerta);
+}
 .decisao-analise {
   padding: 12px 14px;
   border-radius: 12px;

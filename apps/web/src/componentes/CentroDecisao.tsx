@@ -43,6 +43,8 @@ const ESTADO: Record<Decisao, { classe: string; icone: NomeIcone; titulo: string
   };
 
 const p1 = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
+/** EV com sinal, como no comparativo ("+3,8%"): vermelho sem sinal parecia negativo */
+const p1s = (x: number) => `${x > 0 ? '+' : ''}${p1(x)}`;
 const n2 = (x: number) => x.toFixed(2).replace('.', ',');
 const hora = (iso?: string) => (iso ? iso.slice(11, 16) : '—');
 
@@ -139,8 +141,16 @@ export function CentroDecisao({ d }: { d: Derivado }) {
             <dt>
               EV <Dica termo="ev" />
             </dt>
-            <dd className={m.evMinimo !== null && m.ev >= m.evMinimo ? 'positivo' : 'negativo'}>
-              <Numero valor={m.ev} formato={p1} />
+            <dd
+              className={
+                m.ev < 0
+                  ? 'negativo'
+                  : m.evMinimo !== null && m.ev >= m.evMinimo
+                    ? 'positivo'
+                    : 'abaixo-gate'
+              }
+            >
+              <Numero valor={m.ev} formato={p1s} />
               <small> gate {m.evMinimo === null ? '—' : p1(m.evMinimo)}</small>
             </dd>
           </div>
@@ -153,7 +163,7 @@ export function CentroDecisao({ d }: { d: Derivado }) {
               {margem !== null && (
                 <small className={margem >= 0 ? 'positivo' : 'negativo'}>
                   {' '}
-                  margem {p1(margem)}
+                  {margem >= 0 ? `folga ${p1(margem)}` : `faltam ${p1(-margem)} na odd`}
                 </small>
               )}
             </dd>
