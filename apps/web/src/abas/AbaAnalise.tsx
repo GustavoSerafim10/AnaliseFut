@@ -1,4 +1,10 @@
-import { NOME_ESTATISTICA, NOMES_TESE, relatorioEmTexto, type ResultadoAnalise } from '@pe/engine';
+import {
+  NOME_ESTATISTICA,
+  NOMES_TESE,
+  relatorioEmTexto,
+  type Relatorio,
+  type ResultadoAnalise,
+} from '@pe/engine';
 import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
@@ -10,6 +16,7 @@ import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
+import type { Derivado } from '../dados';
 import type { PropsAba } from './tipos';
 
 const CLASSE: Record<ResultadoAnalise['decisao'], string> = {
@@ -32,6 +39,38 @@ const ESSENCIAIS: CampoStat[] = [
   'escanteios',
   'cartoesAmarelos',
 ];
+
+/**
+ * Texto do "Copiar análise": a decisão final (V4.0) primeiro e o relatório do motor de apoio
+ * (V3.3) depois. Sem isso o texto abria com o melhor mercado do modelo sozinho, que a V4.0 pode
+ * ter tirado da decisão (liga principal sem referência: Athletico @ 2.97 com EV 2,5%).
+ */
+function textoAnalise(d: Derivado, rel: Relatorio, res: ResultadoAnalise): string {
+  const v4 = d.v4;
+  if (!v4) return relatorioEmTexto(rel);
+  const sem = (t: string) => t.replace('Ganha se: ', '');
+  const m = v4.melhor;
+  const linhas = [
+    `DECISÃO FINAL (V4.0): ${v4.rotulo}${v4.motivos[0] ? ` — ${v4.motivos[0]}` : ''}`,
+  ];
+  if (m)
+    linhas.push(
+      `- melhor mercado: ${sem(m.descricao)} @ ${m.melhorOdd} (${m.casaMelhorOdd}), EV ${pct(m.ev)}${m.evMinimo !== null ? `, gate ${pct(m.evMinimo)}` : ''}`,
+    );
+  linhas.push(`- ${v4.avaliadas.length} mercados avaliados, ${v4.descartados.length} descartados`);
+  const fora = res.melhor && v4.descartados.find((x) => x.chave === res.melhor!.chave);
+  if (fora)
+    linhas.push(
+      `- o melhor do motor de apoio ("${sem(fora.descricao)}") fica fora da decisão: ${fora.motivo}`,
+    );
+  return [
+    ...linhas,
+    '',
+    'MOTOR DE APOIO (V3.3, modelo + mercado):',
+    '',
+    relatorioEmTexto(rel),
+  ].join('\n');
+}
 
 async function copiar(texto: string, aviso: (m: string) => void) {
   try {
@@ -292,7 +331,7 @@ export function AbaAnalise({
           </div>
 
           <div className="linha-acoes">
-            <button onClick={() => copiar(relatorioEmTexto(rel), setCopiado)}>
+            <button onClick={() => copiar(textoAnalise(d, rel, res), setCopiado)}>
               📋 Copiar análise
             </button>
             <button
