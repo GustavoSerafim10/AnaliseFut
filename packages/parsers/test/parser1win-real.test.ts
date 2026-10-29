@@ -271,12 +271,56 @@ describe('título que o motor não conhece não herda o mercado de cima', () => 
     expect(pg.some((l) => l.odd === 8)).toBe(false);
   });
   it('par/ímpar dos gols de um time não é o do jogo nem o total do time', () => {
-    expect(linhas.some((l) => l.mercado === 'par_impar' || l.mercado === 'total_time')).toBe(
-      false,
-    );
+    expect(linhas.some((l) => l.mercado === 'par_impar' || l.mercado === 'total_time')).toBe(false);
   });
   it('o par/ímpar do jogo segue lido', () => {
     const { linhas: pi } = parse1win('Impar/Par A\nImpar 2.03 Par 1.83', ctxA);
     expect(pi.map((l) => `${l.lado} ${l.odd}`)).toEqual(['impar 2.03', 'par 1.83']);
+  });
+});
+
+// Vasco × Flamengo (29/10): 1win no tema claro
+describe('1win — tema claro (Vasco × Flamengo)', () => {
+  const ctxV = {
+    jogo: { casa: 'Vasco', fora: 'Flamengo' },
+    data: '2026-10-29',
+    horarioPadrao: '2026-10-29T14:35:00-03:00',
+  };
+  const ls = juntarLinhas(
+    parse1winVarios(
+      [79, 80, 83, 87].map((n) => fx(`1win-vasco-${n}.txt`)),
+      ctxV,
+    ).linhas,
+  ).linhas;
+  const oddV = (f: Partial<(typeof ls)[number]>) =>
+    ls
+      .filter((l) => Object.entries(f).every(([k, v]) => l[k as keyof typeof l] === v))
+      .map((l) => l.odd);
+  it('"CRFlamengo" grudado: o lado do Flamengo no handicap é lido', () => {
+    const fla = (linha: number) => oddV({ mercado: 'AH', periodo: 'FT', lado: 'fora', linha });
+    expect([fla(1), fla(0.25), fla(0), fla(-0.25), fla(-1.25)]).toEqual([
+      [1.06],
+      [1.29],
+      [1.37],
+      [1.61],
+      [2.92],
+    ]);
+  });
+  it('"AcimaDed.5": a linha ilegível é a da mesma fileira (4.5)', () => {
+    expect(oddV({ mercado: 'cartoes_total', linha: 4.5, lado: 'over' })).toEqual([1.6]);
+    expect(oddV({ mercado: 'cartoes_total', linha: 4.5, lado: 'under' })).toEqual([2.2]);
+  });
+  it('"Corners. 1st half. Result" é o resultado de escanteios do 1º tempo', () => {
+    expect(oddV({ mercado: 'escanteios_1x2', periodo: '1T', lado: '1' })).toEqual([2.15]);
+    expect(oddV({ mercado: 'escanteios_1x2', periodo: '1T', lado: '2' })).toEqual([1.83]);
+  });
+  it('corrida de escanteios e último escanteio não entram', () => {
+    expect(
+      ls.filter((l) => l.mercado.startsWith('escanteios_total')).map((l) => l.periodo),
+    ).toEqual(['1T', '1T']);
+  });
+  it('primeiro gol: "Vencer Ambos Os Tempos" (17.0 lido "177.0") não entra', () => {
+    expect(oddV({ mercado: 'primeiro_gol', lado: 'casa' })).toEqual([2.4]);
+    expect(oddV({ mercado: 'primeiro_gol', lado: 'fora' })).toEqual([1.62]);
   });
 });

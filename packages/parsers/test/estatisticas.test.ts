@@ -409,3 +409,17 @@ describe('aviso de um time só não pinta a célula do outro', () => {
     expect(t.finalizacoesDentroArea!.fora.avisos).toEqual([]);
   });
 });
+
+// Vasco × Flamengo (29/10): o "3.4" das grandes chances do Flamengo (selo destacado) saiu "3"
+describe('um dígito sozinho em campo com casa decimal fica vazio (SofaScore)', () => {
+  const nomes = { casa: 'Vasco', fora: 'Flamengo' };
+  const sofa = lerEstatisticas(fx('sofascore-vasco-1.txt'), 'sofascore', nomes);
+  it('"3" não vira 0,3; "23" segue 2,3', () => {
+    expect(sofa.campos.grandesChances?.casa).toBe(2.3);
+    expect(sofa.campos.grandesChances?.fora).toBeUndefined();
+  });
+  it('a consolidação fica com o 3,4 do SuperScore', () => {
+    const sup = lerEstatisticas(fx('superscore-vasco-1.txt'), 'superscore', nomes);
+    expect(consolidar({ sofascore: sofa, superscore: sup }).grandesChances?.fora.valor).toBe(3.4);
+  });
+});

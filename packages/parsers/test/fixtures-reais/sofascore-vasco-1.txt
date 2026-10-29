@@ -1,0 +1,23 @@
+No x = x =
+Adicionar outra equipe
+Vasco da Gama Flamengo
+O Brasil © Brasil
+\ Campeonato Brasileiro Série A v 2026 v O Campeonato Brasileiro Série A
+Geral
+Nota Sofascore 6.79 6.97
+Partidas 31 32
+Gols marcados 39 64
+Gols sofridos 45 27
+Assisténcias 26 53
+Atacando
+Gols por partida 13 20
+Chutes certos por jogo 5.4 5.8
+Grandes chances de gol por 23 3
+Jogo
+Sm chances perdidas 15 21
+Passe
+
+Posse de bola 54.6% 57.5%
+Passes certos por partida 385.3 (85.0%) 500.0 (88.6%)
+Bolas longas certas por jogo 14.8 (49.0%) 17.3(60.3%)
+

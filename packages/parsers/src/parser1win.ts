@@ -91,6 +91,9 @@ export function normalizar1win(texto: string): string {
       .replace(/([ \t])[Oo](?=[ \t]+\d)/g, '$10')
       // "Atlético-MG1 1.49" → "Atlético-MG 1 1.49"
       .replace(/(-[A-Za-zÀ-ú]{2,})(\d)/g, '$1 $2')
+      // tema claro: "CRFlamengo -0.25 1.61" (sigla grudada) e "CR Flamengo1 1.06" (linha grudada)
+      .replace(/\b(CR|EC|SC|CA|SE|FC|AC|CD|AD|RB)(?=[A-ZÀ-Ú][a-zà-ú]{2,})/g, '$1 ')
+      .replace(/([A-ZÀ-Ú][a-zà-ú]{2,})([+-]?\d+(?:\.\d+)?)(?=[ \t]|$)/gm, '$1 $2')
       // travessões soltos entre seleções
       .replace(/[ \t][—–-][ \t]/g, ' ')
   );
@@ -457,6 +460,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     const precisaLinha = COM_LINHA.has(mercado.mercado);
     let rotulo: string[] = [];
     let linha: number | undefined;
+    let linhaDaFileira: number | undefined;
     let emitiu = false;
     for (const tok of tokens) {
       const n = lerNumero(tok);
@@ -468,8 +472,14 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         continue;
       }
       if (precisaLinha && linha === undefined && rotulo.length > 0) {
-        linha = n;
-        continue;
+        // "AcimaDed.5 1.6": a linha grudou no rótulo e saiu ilegível; nas colunas
+        // Menos | Mais a fileira tem uma linha só, a do lado de lá
+        if (linhaDaFileira !== undefined && /^(abaixo|acima)de\S*\d/i.test(rotulo.join('')))
+          linha = linhaDaFileira;
+        else {
+          linha = n;
+          continue;
+        }
       }
       const lado = interpretarLado(mercado, rotulo.join(' '), ctx.jogo);
       const o = lerOdd(tok);
@@ -477,6 +487,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         emitir(lado, o, precisaLinha ? linha : undefined);
         emitiu = true;
       }
+      linhaDaFileira = linha ?? linhaDaFileira;
       rotulo = [];
       linha = undefined;
     }

@@ -26,6 +26,8 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -
   // Cruzeiro. Par/Impar"; o " - " some na normalização da 1win) não têm modelo
   [/goal time|tempo mais competitivo|em qual tempo|gols?( -)? [^.]+\. ?(par|impar)/, 'outro'],
+  // corrida de escanteios ("Primeira a executar N cantos") e último escanteio também não
+  [/a executar|ultimo canto|ultimo escanteio/, 'outro'],
   // combinados ("1X2 e os dois times devem marcar", "Resultado e Total", "Total e ambos os
   // times marcam") não são o 1X2 nem o ambos: Frosinone a zero @ 4 virava "1 @ 4"
   [
@@ -40,7 +42,7 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [/cart(ao|oes)|amarelo/, 'outro'],
   [/primeiro escanteio|1o escanteio|primeiro canto/, 'primeiro_escanteio'],
   [/handicap de escanteios|escanteios?.*handicap|cantos?.*handicap/, 'escanteios_ah'],
-  [/escanteios?.*resultado|cantos?.*resultado/, 'escanteios_1x2'],
+  [/escanteios?.*resultado|cantos?.*resultado|corners?.*result/, 'escanteios_1x2'],
   [/(escanteios?|cantos?)[. ]*(total|mais\/menos|over)?/, 'escanteios_total'],
   [/chutes|finalizac|impediment|laterais|tiros de meta/, 'outro'],
   [/resultado correto|placar (exato|correto)|resultado exato/, 'placar_exato'],

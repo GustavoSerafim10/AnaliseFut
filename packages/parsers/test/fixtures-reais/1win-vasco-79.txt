@@ -1,0 +1,24 @@
+14:35 4 All =
+Cartões/Penalidades Intervalos Faltas Chutes
+Will a red card be shown? A
+Sim 3.38 Nao 1.28
+Sera marcada uma penalidade? A
+Sim 3.16 Nao 1.28
+Primeiro cartao A
+Sem Cartao CR Vasco da Gama CR Flamengo
+51.0 1.83 1.83
+Cartoes amarelos. Resultado do jogo O A
+CR Vasco da Gama Empate CR Flamengo
+2.25 4.4 2.3
+Hipótese dupla. Cartões amarelos © A
+CR Vasco da Gama Ou CR Vasco da Gama Ou Empate Ou CR
+Empate CR Flamengo Flamengo
+1.48 1.13 59
+Total. Cartões amarelos © A
+Menos Mais
+Abaixo De 4.5 2.2 AcimaDed.5 1.6
+Abaixo De 5.5 1.6 AcimaDe5.5 2.2
+Cartoes amarelos. CR Vasco da Gama total © A
+(Ta
+wienos vials
+

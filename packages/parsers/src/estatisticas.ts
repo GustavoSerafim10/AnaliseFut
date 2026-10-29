@@ -704,9 +704,10 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
     const aplicar = (tok: TokenNum | undefined, time: Time): number | undefined => {
       if (!tok) return undefined;
       const aviso = (m: string) => v.avisos.push(avisoDoTime(time, m));
-      // SuperScore sempre mostra "1.1": um dígito só, sem ponto, perdeu pedaço (pode ser 1.1,
-      // 0.1, 1.0...); fica vazio em vez de virar 0,1
-      if (fonte === 'superscore' && def.formato === 'decimal1' && tok.digitos === 1) {
+      // SuperScore e SofaScore sempre mostram "1.1": um dígito só, sem ponto, perdeu pedaço
+      // (pode ser 1.1, 0.1, 1.0...); fica vazio em vez de virar 0,1 (no SofaScore o "3.4" das
+      // grandes chances do Flamengo saiu "3" e virava 0,3)
+      if (def.formato === 'decimal1' && tok.digitos === 1 && !tok.temPonto) {
         aviso(`"${tok.valor}" ilegível (o site mostra uma casa decimal): conferir`);
         return undefined;
       }
