@@ -6,6 +6,9 @@ import {
   calibracao,
   clvDe,
   exportarJson,
+  filtrar,
+  painel,
+  situacao,
   importarJson,
   marco,
   travasDoHistorico,
@@ -130,5 +133,31 @@ describe('histórico na V4.0', () => {
   });
   it('marcos: cedo demais antes de 100 apostas com fechamento', () => {
     expect(marco(balanco([]))).toContain('cedo demais');
+  });
+});
+
+describe('painel do histórico', () => {
+  it('conta green/red/pendentes, winrate, ROI e a curva acumulada', () => {
+    const lista = [
+      entrada('20', 'BET', 1.9, [2, 0]),
+      entrada('21', 'NO_BET', 2.0, [0, 1]),
+      entrada('22', 'NO_BET', 1.5),
+    ];
+    expect(filtrar(lista, 'apostas').map((e) => e.id)).toEqual(['20']);
+    expect(filtrar(lista, 'papel').map((e) => e.id)).toEqual(['21', '22']);
+    const p = painel(lista);
+    expect(p).toMatchObject({ entradas: 3, green: 1, red: 1, pendentes: 1, winrate: 0.5 });
+    expect(p.unidades).toBeCloseTo(-0.1);
+    expect(p.roi).toBeCloseTo(-0.05);
+    expect(p.oddMedia).toBeCloseTo(1.8);
+    expect(p.curva.map((c) => c.acumulado)).toEqual([expect.closeTo(0.9), expect.closeTo(-0.1)]);
+  });
+
+  it('marcação à mão vale só quando o placar não apura', () => {
+    const semPlacar = { ...entrada('22', 'NO_BET', 1.5), manual: 'green' as const };
+    expect(situacao(semPlacar)).toBe('green');
+    expect(painel([semPlacar]).unidades).toBeCloseTo(0.5);
+    const comPlacar = { ...entrada('20', 'BET', 1.9, [0, 2]), manual: 'green' as const };
+    expect(situacao(comPlacar)).toBe('red');
   });
 });

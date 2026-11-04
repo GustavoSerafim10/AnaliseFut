@@ -77,7 +77,11 @@ export interface EntradaHistorico {
   rascunho: Rascunho;
   resumo: ResumoAnalise;
   resultado?: ResultadoJogo;
+  /** green/red marcado à mão: vale quando o site não apura sozinho (1º escanteio, mercado do 1º tempo...) */
+  manual?: Manual;
 }
+
+export type Manual = 'green' | 'red' | 'devolvida';
 
 export function carregarHistorico(): EntradaHistorico[] {
   try {
@@ -220,9 +224,30 @@ export function salvarNoHistorico(
 export const temPlacar = (e: EntradaHistorico) =>
   Number.isFinite(e.resultado?.casa) && Number.isFinite(e.resultado?.fora);
 
-export function apurar(e: EntradaHistorico): Apuracao | null {
+/** só pelo placar (sem a marcação à mão) */
+export function apurarAuto(e: EntradaHistorico): Apuracao | null {
   if (!e.resultado || !e.resumo.entrada || !temPlacar(e)) return null;
   return apurarAposta(e.resumo.entrada.linha as LinhaOdd, e.resultado);
+}
+
+const VALOR_MANUAL: Record<Manual, number> = { green: 1, red: -1, devolvida: 0 };
+const ROTULO_MANUAL: Record<Manual, string> = {
+  green: 'ganhou',
+  red: 'perdeu',
+  devolvida: 'devolvida',
+};
+
+/** A apuração pelo placar manda; a marcação à mão cobre o que o placar não resolve. */
+export function apurar(e: EntradaHistorico): Apuracao | null {
+  const auto = apurarAuto(e);
+  if (auto?.ok || !e.manual || !e.resumo.entrada) return auto;
+  const r = VALOR_MANUAL[e.manual];
+  return {
+    ok: true,
+    resultado: r,
+    lucro: r > 0 ? e.resumo.entrada.odd - 1 : r,
+    rotulo: `${ROTULO_MANUAL[e.manual]} (marcado à mão)`,
+  };
 }
 
 /** CLV da entrada contra o fechamento (justo, se vieram os outros lados). */
@@ -308,6 +333,97 @@ export function travasDoHistorico(
   return calcularTravas(bancaInicial, apostas, agora);
 }
 
+export type FiltroPainel = 'apostas' | 'papel' | 'todas';
+
+/** BET = dinheiro de verdade; "no papel" = a melhor entrada das análises descartadas. */
+export function filtrar(lista: EntradaHistorico[], f: FiltroPainel): EntradaHistorico[] {
+  return lista.filter((e) => {
+    if (!e.resumo.entrada) return false;
+    if (f === 'apostas') return e.resumo.decisao === 'BET';
+    if (f === 'papel') return e.resumo.decisao !== 'BET';
+    return true;
+  });
+}
+
+export type Situacao = 'green' | 'red' | 'devolvida' | 'pendente';
+
+export function situacao(e: EntradaHistorico): Situacao {
+  const a = apurar(e);
+  if (!a?.ok) return 'pendente';
+  return a.resultado > 0 ? 'green' : a.resultado < 0 ? 'red' : 'devolvida';
+}
+
+export interface PontoCurva {
+  id: string;
+  jogo: string;
+  data: string;
+  lucro: number;
+  acumulado: number;
+}
+
+export interface Painel {
+  entradas: number;
+  green: number;
+  red: number;
+  devolvidas: number;
+  pendentes: number;
+  /** green ÷ (green + red); meio ganho conta como green, meia perda como red */
+  winrate: number | null;
+  unidades: number;
+  roi: number | null;
+  evMedio: number | null;
+  oddMedia: number | null;
+  /** unidades acumuladas na ordem dos jogos (só as apuradas) */
+  curva: PontoCurva[];
+}
+
+export function painel(lista: EntradaHistorico[]): Painel {
+  const p: Painel = {
+    entradas: lista.length,
+    green: 0,
+    red: 0,
+    devolvidas: 0,
+    pendentes: 0,
+    winrate: null,
+    unidades: 0,
+    roi: null,
+    evMedio: null,
+    oddMedia: null,
+    curva: [],
+  };
+  let somaEv = 0;
+  let somaOdd = 0;
+  const ordem = [...lista].sort((a, b) => a.resumo.inicio.localeCompare(b.resumo.inicio));
+  for (const e of ordem) {
+    const ent = e.resumo.entrada!;
+    somaEv += ent.ev;
+    somaOdd += ent.odd;
+    const s = situacao(e);
+    if (s === 'pendente') {
+      p.pendentes++;
+      continue;
+    }
+    p[s === 'devolvida' ? 'devolvidas' : s]++;
+    const a = apurar(e) as Extract<Apuracao, { ok: true }>;
+    p.unidades += a.lucro;
+    p.curva.push({
+      id: e.id,
+      jogo: e.resumo.jogo,
+      data: e.resumo.inicio.slice(0, 10),
+      lucro: a.lucro,
+      acumulado: p.unidades,
+    });
+  }
+  const apuradas = p.green + p.red + p.devolvidas;
+  if (p.green + p.red) p.winrate = p.green / (p.green + p.red);
+  if (apuradas) p.roi = p.unidades / apuradas;
+  if (lista.length) {
+    p.evMedio = somaEv / lista.length;
+    p.oddMedia = somaOdd / lista.length;
+  }
+  return p;
+}
+
 export interface Calibracao {
   jogos: number;
   brier1x2: { modelo: number; mercado: number } | null;
@@ -379,7 +495,11 @@ export function importarJson(
     const ja = mapa.get(e.id);
     if (!ja) novas++;
     if (!ja || e.salvoEm >= ja.salvoEm)
-      mapa.set(e.id, { ...e, resultado: e.resultado ?? ja?.resultado });
+      mapa.set(e.id, {
+        ...e,
+        resultado: e.resultado ?? ja?.resultado,
+        manual: e.manual ?? ja?.manual,
+      });
   }
   const lista = [...mapa.values()].sort((a, b) => b.resumo.inicio.localeCompare(a.resumo.inicio));
   return { lista, novas };

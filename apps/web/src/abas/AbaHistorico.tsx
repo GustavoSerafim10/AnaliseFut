@@ -1,17 +1,48 @@
 import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
 import { useState } from 'react';
 import { dec, isoLocal, num, pct, type Rascunho } from '../estado';
+import { CartoesPainel, CurvaUnidades } from '../componentes/PainelHistorico';
 import {
   apurar,
+  apurarAuto,
   balanco,
   calibracao,
   clvDe,
   exportarJson,
   importarJson,
+  filtrar,
   marco,
+  painel,
+  situacao,
+  temPlacar,
   type Balanco,
   type EntradaHistorico,
+  type FiltroPainel,
+  type Manual,
+  type Situacao,
 } from '../historico';
+
+const FILTROS: Record<FiltroPainel, { nome: string; dica: string }> = {
+  apostas: { nome: 'Apostas', dica: 'Só as BET: o que o motor aprovou (dinheiro de verdade).' },
+  papel: {
+    nome: 'No papel',
+    dica: 'A melhor entrada das análises descartadas (NO BET, WATCHLIST, INVESTIGAR), como se tivesse sido apostada. Se render mais que as apostas, os gates estão barrando entradas boas.',
+  },
+  todas: { nome: 'Todas', dica: 'Apostas e entradas no papel juntas.' },
+};
+
+const SELO: Record<Situacao, string> = {
+  green: '🟢 GREEN',
+  red: '🔴 RED',
+  devolvida: '⚪ DEVOLVIDA',
+  pendente: '⏳ PENDENTE',
+};
+
+const BOTOES_MANUAL: [Manual, string][] = [
+  ['green', 'Green'],
+  ['red', 'Red'],
+  ['devolvida', 'Devolvida'],
+];
 
 const CLASSE: Record<string, string> = {
   BET: 'bet',
@@ -154,6 +185,12 @@ export function AbaHistorico({
 }: Props) {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'alerta'; texto: string } | null>(null);
   const [json, setJson] = useState('');
+  const [filtro, setFiltro] = useState<FiltroPainel>(() =>
+    historico.some((e) => e.resumo.decisao === 'BET') ? 'apostas' : 'papel',
+  );
+  const daVez = filtrar(historico, filtro);
+  const pn = painel(daVez);
+  const lista = filtro === 'todas' ? historico : daVez;
   const bets = historico.filter((e) => e.resumo.decisao === 'BET');
   const comEntrada = historico.filter((e) => e.resumo.entrada);
   const cal = calibracao(historico);
@@ -186,6 +223,17 @@ export function AbaHistorico({
         referência: o <strong>CLV</strong> diz se há vantagem muito antes do lucro. Nunca julgue por
         green/red. O histórico fica neste aparelho: exporte para backup ou para o celular.
       </p>
+
+      <div className="abas-mini">
+        {(Object.keys(FILTROS) as FiltroPainel[]).map((f) => (
+          <button key={f} className={f === filtro ? 'ativo' : ''} onClick={() => setFiltro(f)}>
+            {FILTROS[f].nome} ({filtrar(historico, f).length})
+          </button>
+        ))}
+      </div>
+      <p className="miudo">{FILTROS[filtro].dica}</p>
+      <CartoesPainel p={pn} />
+      <CurvaUnidades p={pn} titulo={`Unidades acumuladas · ${FILTROS[filtro].nome}`} />
 
       <div className="caixa">
         <h3>Banca separada</h3>
@@ -231,77 +279,113 @@ export function AbaHistorico({
         )}
       </div>
 
-      <LinhaBalanco
-        titulo={`Apostas (BET): ${bets.length}`}
-        b={balanco(bets)}
-        dica="1 unidade por aposta. CLV positivo = você pega odds melhores que o fechamento justo."
-      />
-      {(['S1', 'S2', 'S3', 'S4'] as Estrategia[]).map((s) => {
-        const daS = bets.filter((e) => e.resumo.entrada?.estrategia === s);
-        if (!daS.length) return null;
-        const b = balanco(daS);
-        return (
-          <LinhaBalanco
-            key={s}
-            titulo={`${NOMES_ESTRATEGIA[s]}: ${daS.length}`}
-            b={b}
-            dica={marco(b)}
-          />
-        );
-      })}
-      <LinhaBalanco
-        titulo={`Todas as melhores entradas, no papel: ${comEntrada.length}`}
-        b={balanco(comEntrada)}
-        dica="Inclui WATCHLIST, INVESTIGAR e NO BET como se tivessem sido apostadas: mostra se os gates estão barrando entradas boas ou ruins."
-      />
-      <div className="caixa">
-        <h3>Modelo × mercado (Brier, {cal.jogos} jogos)</h3>
-        {cal.brier1x2 || cal.brierOU ? (
-          <dl className="numeros">
-            {cal.brier1x2 && (
-              <>
-                <dt>1X2</dt>
-                <dd>
-                  modelo {cal.brier1x2.modelo.toFixed(3)} × mercado{' '}
-                  {cal.brier1x2.mercado.toFixed(3)}
-                </dd>
-              </>
-            )}
-            {cal.brierOU && (
-              <>
-                <dt>Over/Under 2.5</dt>
-                <dd>
-                  modelo {cal.brierOU.modelo.toFixed(3)} × mercado {cal.brierOU.mercado.toFixed(3)}
-                </dd>
-              </>
-            )}
-          </dl>
-        ) : (
-          <p className="miudo">Registre placares de jogos analisados (inclusive NO BET).</p>
-        )}
-        <p className="dica">
-          Menor = melhor. Se o modelo não ganhar do mercado em ~100 jogos, reduzir o peso dele.
-        </p>
-      </div>
+      <details className="caixa">
+        <summary>
+          <strong>CLV, estratégias e calibração</strong>
+        </summary>
+        <LinhaBalanco
+          titulo={`Apostas (BET): ${bets.length}`}
+          b={balanco(bets)}
+          dica="1 unidade por aposta. CLV positivo = você pega odds melhores que o fechamento justo."
+        />
+        {(['S1', 'S2', 'S3', 'S4'] as Estrategia[]).map((s) => {
+          const daS = bets.filter((e) => e.resumo.entrada?.estrategia === s);
+          if (!daS.length) return null;
+          const b = balanco(daS);
+          return (
+            <LinhaBalanco
+              key={s}
+              titulo={`${NOMES_ESTRATEGIA[s]}: ${daS.length}`}
+              b={b}
+              dica={marco(b)}
+            />
+          );
+        })}
+        <LinhaBalanco
+          titulo={`Todas as melhores entradas, no papel: ${comEntrada.length}`}
+          b={balanco(comEntrada)}
+          dica="Inclui WATCHLIST, INVESTIGAR e NO BET como se tivessem sido apostadas: mostra se os gates estão barrando entradas boas ou ruins."
+        />
+        <div className="caixa">
+          <h3>Modelo × mercado (Brier, {cal.jogos} jogos)</h3>
+          {cal.brier1x2 || cal.brierOU ? (
+            <dl className="numeros">
+              {cal.brier1x2 && (
+                <>
+                  <dt>1X2</dt>
+                  <dd>
+                    modelo {cal.brier1x2.modelo.toFixed(3)} × mercado{' '}
+                    {cal.brier1x2.mercado.toFixed(3)}
+                  </dd>
+                </>
+              )}
+              {cal.brierOU && (
+                <>
+                  <dt>Over/Under 2.5</dt>
+                  <dd>
+                    modelo {cal.brierOU.modelo.toFixed(3)} × mercado{' '}
+                    {cal.brierOU.mercado.toFixed(3)}
+                  </dd>
+                </>
+              )}
+            </dl>
+          ) : (
+            <p className="miudo">Registre placares de jogos analisados (inclusive NO BET).</p>
+          )}
+          <p className="dica">
+            Menor = melhor. Se o modelo não ganhar do mercado em ~100 jogos, reduzir o peso dele.
+          </p>
+        </div>
+      </details>
+
+      <h3>
+        Entradas · {FILTROS[filtro].nome} ({lista.length})
+      </h3>
 
       {historico.length === 0 && <p>Nenhuma análise salva ainda.</p>}
-      {historico.map((e) => {
+      {historico.length > 0 && lista.length === 0 && (
+        <p className="miudo">Nenhuma entrada neste filtro.</p>
+      )}
+      {lista.map((e) => {
         const ap = apurar(e);
+        const auto = apurarAuto(e);
         const ent = e.resumo.entrada;
         const c = clvDe(e);
+        const sit = ent ? situacao(e) : null;
         return (
-          <details key={e.id} className="caixa">
+          <details key={e.id} className="caixa linha-historico">
             <summary>
-              <span className={`selo ${CLASSE[e.resumo.decisao ?? ''] ?? 'nobet'}`}>
-                {e.resumo.rotulo}
-              </span>{' '}
-              <strong>{e.resumo.jogo}</strong>{' '}
-              <span className="miudo">
-                {e.resumo.inicio.slice(0, 10).split('-').reverse().join('/')}
-                {e.resumo.competicao && ` · ${e.resumo.competicao}`}
-                {ap && ` · ${e.resultado!.casa}–${e.resultado!.fora}`}
-                {ap?.ok && ` · ${ap.rotulo} (${ap.lucro >= 0 ? '+' : ''}${dec(ap.lucro)} un.)`}
-                {c !== null && ` · CLV ${pct(c)}`}
+              {sit && <span className={`selo-resultado ${sit}`}>{SELO[sit]}</span>}
+              <span className="lh-data">
+                {e.resumo.inicio.slice(0, 10).split('-').reverse().slice(0, 2).join('/')}
+              </span>
+              <span className="lh-jogo">
+                <strong>{e.resumo.jogo}</strong>
+                {temPlacar(e) && (
+                  <span className="lh-placar">
+                    {e.resultado!.casa}–{e.resultado!.fora}
+                  </span>
+                )}
+                <span className="miudo">
+                  <span className={`selo ${CLASSE[e.resumo.decisao ?? ''] ?? 'nobet'}`}>
+                    {e.resumo.rotulo}
+                  </span>
+                  {e.resumo.competicao && ` ${e.resumo.competicao}`}
+                </span>
+              </span>
+              <span className="lh-entrada">
+                {ent ? (
+                  <>
+                    {ent.descricao} <b>@ {ent.odd}</b>
+                    <span className="miudo">
+                      EV {pct(ent.ev)}
+                      {ap?.ok && ` · ${ap.lucro >= 0 ? '+' : ''}${dec(ap.lucro)} un.`}
+                      {c !== null && ` · CLV ${pct(c)}`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="miudo">sem entrada candidata</span>
+                )}
               </span>
             </summary>
             {ent ? (
@@ -323,6 +407,20 @@ export function AbaHistorico({
               ))}
             </ul>
             {ap && !ap.ok && <div className="caixa alerta">Apuração: {ap.falta}</div>}
+            {ent && !auto?.ok && (
+              <div className="marcar-manual">
+                <span className="miudo">Marcar à mão:</span>
+                {BOTOES_MANUAL.map(([m, nome]) => (
+                  <button
+                    key={m}
+                    className={`mini ${m} ${e.manual === m ? 'ativo' : ''}`}
+                    onClick={() => mudar(e.id, { manual: e.manual === m ? undefined : m })}
+                  >
+                    {nome}
+                  </button>
+                ))}
+              </div>
+            )}
             <h4>Resultado e fechamento</h4>
             <FormResultado
               key={e.resultado?.registradoEm ?? 'novo'}
