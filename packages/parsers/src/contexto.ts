@@ -84,6 +84,17 @@ export function lerDesfalques(
             .replace(/(\s+[A-Za-zÀ-ú])+$/, '')
             .trim();
     if (!nome || !/^[A-ZÀ-Ú]/.test(nome)) continue;
+    // "Lesi" / "Les": "Lesionado" cortado na borda do print; é situação, não jogador
+    const palavra = semAcento(nome).toLowerCase();
+    if (
+      !nome.includes(' ') &&
+      palavra.length >= 3 &&
+      ['lesionado', 'suspenso', 'duvidoso', 'machucado'].some((s) => s.startsWith(palavra))
+    ) {
+      if (desfalques.length && !desfalques[desfalques.length - 1].situacao)
+        desfalques[desfalques.length - 1].situacao = nome;
+      continue;
+    }
     if (!atual) {
       avisos.push(`"${nome}": não sei de qual time é (faltou o cabeçalho do time no print)`);
       continue;

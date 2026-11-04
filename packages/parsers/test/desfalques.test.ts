@@ -56,3 +56,24 @@ describe('desfalques do SuperScore com a página inteira no print', () => {
     expect(nomes(r, 'fora')).toEqual(['Danilo Santos', 'Kaio', 'Jordan Barrera', 'Alvaro Montoro']);
   });
 });
+
+describe('situação cortada na borda do print', () => {
+  it('"Lesi" / "Les" são "Lesionado" cortado, não jogadores (Athletico × Vasco, 04/11)', () => {
+    const texto = [
+      'CAP X VAS JOGADORES AUSENTES',
+      'Vasco da Gama >',
+      '85 Mateus Carvalho',
+      'Lesi',
+      '23 Carlos Cuesta',
+      'Les',
+      '11 Andrés Gómez',
+      'Duvidoso',
+    ].join('\n');
+    const r = lerDesfalques(texto, { casa: 'Athletico', fora: 'Vasco' });
+    expect(nomes(r, 'fora')).toEqual(['Mateus Carvalho', 'Carlos Cuesta', 'Andrés Gómez']);
+  });
+  it('nome de verdade que começa parecido continua sendo jogador', () => {
+    const r = lerDesfalques('Vasco >\n9 Lesley Silva', { casa: 'Athletico', fora: 'Vasco' });
+    expect(nomes(r, 'fora')).toEqual(['Lesley Silva']);
+  });
+});
