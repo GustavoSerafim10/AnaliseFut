@@ -95,3 +95,4 @@ export function juntarLinhas(...listas: OddLine[][]): { linhas: OddLine[]; dupli
   }
   return { linhas: [...mapa.values()], duplicadas };
 }
+export * from './resultado';

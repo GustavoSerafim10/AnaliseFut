@@ -1,7 +1,9 @@
+import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
 import { useState } from 'react';
-import { dec, isoLocal, num, pct, type Rascunho } from '../estado';
+import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { FormAposta } from '../componentes/FormAposta';
+import { UploadPrints } from '../componentes/UploadPrints';
 import { CartoesPainel, CurvaUnidades } from '../componentes/PainelHistorico';
 import {
   apurar,
@@ -100,27 +102,48 @@ function par(c: string, f: string): ParPlacar | undefined {
 
 function FormResultado({
   e,
+  lido,
   onSalvar,
 }: {
   e: EntradaHistorico;
+  /** leitura do print do SofaScore: preenche o que veio, marca o que faltou */
+  lido?: ResultadoLido;
   onSalvar: (r: EntradaHistorico['resultado']) => void;
 }) {
   const r = e.resultado;
-  const s = (x?: number) => (x === undefined ? '' : String(x));
+  const s = (x?: number) => (x === undefined || !Number.isFinite(x) ? '' : String(x));
+  const ou = (l: ParLido | undefined, k: 'casa' | 'fora', antes?: number) => s(l?.[k] ?? antes);
   const [v, setV] = useState({
-    casa: s(r?.casa),
-    fora: s(r?.fora),
-    htCasa: s(r?.intervalo?.casa),
-    htFora: s(r?.intervalo?.fora),
-    escCasa: s(r?.escanteios?.casa),
-    escFora: s(r?.escanteios?.fora),
-    carCasa: s(r?.cartoes?.casa),
-    carFora: s(r?.cartoes?.fora),
+    casa: ou(lido?.placar, 'casa', r?.casa),
+    fora: ou(lido?.placar, 'fora', r?.fora),
+    htCasa: ou(lido?.intervalo, 'casa', r?.intervalo?.casa),
+    htFora: ou(lido?.intervalo, 'fora', r?.intervalo?.fora),
+    escCasa: ou(lido?.escanteios, 'casa', r?.escanteios?.casa),
+    escFora: ou(lido?.escanteios, 'fora', r?.escanteios?.fora),
+    carCasa: ou(lido?.amarelos, 'casa', r?.cartoes?.casa),
+    carFora: ou(lido?.amarelos, 'fora', r?.cartoes?.fora),
     fechamento: s(r?.oddFechamento),
     outros: (r?.fechamentoOutros ?? []).join(' '),
   });
+  const LIDOS: Partial<Record<keyof typeof v, ParLido | undefined>> = lido
+    ? {
+        casa: lido.placar,
+        fora: lido.placar,
+        htCasa: lido.intervalo,
+        htFora: lido.intervalo,
+        escCasa: lido.escanteios,
+        escFora: lido.escanteios,
+        carCasa: lido.amarelos,
+        carFora: lido.amarelos,
+      }
+    : {};
+  /** campo que o print devia trazer e veio vazio: borda vermelha para conferir */
+  const faltou = (k: keyof typeof v) =>
+    k in LIDOS &&
+    v[k] === '' &&
+    LIDOS[k]?.[k.endsWith('Fora') || k === 'fora' ? 'fora' : 'casa'] === undefined;
   const campo = (k: keyof typeof v, rotulo: string, dica?: string) => (
-    <label>
+    <label className={faltou(k) ? 'celula-duvida' : undefined}>
       {rotulo}
       <input
         inputMode="decimal"
@@ -178,6 +201,55 @@ function FormResultado({
         lados, o CLV sai contra o preço justo, sem margem.
       </p>
     </div>
+  );
+}
+
+/** Colar o print do SofaScore (estatísticas + fluxo) e o formulário vem preenchido. */
+function ResultadoComPrint({
+  e,
+  onSalvar,
+}: {
+  e: EntradaHistorico;
+  onSalvar: (r: EntradaHistorico['resultado']) => void;
+}) {
+  const [leituras, setLeituras] = useState<Leitura[]>([]);
+  const lido = leituras.length ? lerResultado(leituras.map((l) => l.texto)) : undefined;
+  const par = (p?: ParLido) => `${p?.casa ?? '?'}–${p?.fora ?? '?'}`;
+  return (
+    <>
+      <UploadPrints
+        rotulo="📷 Colar print do resultado (SofaScore)"
+        dica="Estatísticas da partida (Visão geral, até os cartões) + Fluxo da partida (traz FT e HT). De preferência no computador, página larga."
+        leituras={leituras}
+        onLido={(l) => setLeituras((x) => [...x, l])}
+        onRemover={(i) => setLeituras((x) => x.filter((_, j) => j !== i))}
+      />
+      {lido && (
+        <div className={`caixa ${lido.faltando.length ? 'alerta' : 'ok'}`}>
+          Lido: placar <b>{par(lido.placar)}</b> · intervalo <b>{par(lido.intervalo)}</b> ·
+          escanteios <b>{par(lido.escanteios)}</b> · amarelos <b>{par(lido.amarelos)}</b>
+          {lido.vermelhos && (
+            <>
+              {' '}
+              · vermelhos <b>{par(lido.vermelhos)}</b>
+            </>
+          )}
+          <br />
+          {lido.faltando.length
+            ? `Não consegui ler: ${lido.faltando.join('; ')}. Confira esse campo (fica em vermelho quando está vazio).`
+            : 'Tudo lido. Confira e clique em Salvar.'}
+        </div>
+      )}
+      <FormResultado
+        key={`${e.resultado?.registradoEm ?? 'novo'}-${leituras.length}`}
+        e={e}
+        lido={lido}
+        onSalvar={(r) => {
+          onSalvar(r);
+          setLeituras([]);
+        }}
+      />
+    </>
   );
 }
 
@@ -476,11 +548,7 @@ export function AbaHistorico({
               </div>
             )}
             <h4>Resultado e fechamento</h4>
-            <FormResultado
-              key={e.resultado?.registradoEm ?? 'novo'}
-              e={e}
-              onSalvar={(resultado) => mudar(e.id, { resultado })}
-            />
+            <ResultadoComPrint e={e} onSalvar={(resultado) => mudar(e.id, { resultado })} />
             <div className="linha-acoes">
               <button onClick={() => abrir(e.rascunho)}>Abrir a análise</button>
               <button
