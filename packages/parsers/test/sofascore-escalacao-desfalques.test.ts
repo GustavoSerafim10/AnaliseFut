@@ -38,3 +38,20 @@ describe('SofaScore sem nome de time no print: esquerda = mandante, direita = vi
     expect(r.avisos).toEqual([]);
   });
 });
+
+describe('campo do site repete o desenho do print', () => {
+  const r = lerEscalacao(fx('escalacao-sofascore-athletico'), jogo);
+  it('formação pelas colunas do campo (o OCR leu "4-2-5-1" no navegador)', () => {
+    expect(r.casa.formacao).toBe('3-4-2-1');
+    expect(r.fora.formacao).toBe('4-2-3-1');
+  });
+  it('posições: mandante na metade esquerda, visitante na direita, centroavante perto do meio', () => {
+    const p = (l: 'casa' | 'fora', n: string) => r[l].posicoes!.find((x) => x.nome === n)!;
+    expect(r.casa.posicoes!.every((x) => x.x < 50)).toBe(true);
+    expect(r.fora.posicoes!.every((x) => x.x > 50)).toBe(true);
+    expect(p('casa', 'Viveros').x).toBeGreaterThan(p('casa', 'Aquirre').x);
+    expect(p('fora', 'B. Duarte').x).toBeLessThan(p('fora', 'Renan').x);
+    // mesma coluna no print, mesma coluna no site
+    expect(p('casa', 'L. Esquivel').x).toBe(p('casa', 'A. Dias').x);
+  });
+});

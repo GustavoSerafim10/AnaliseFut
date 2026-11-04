@@ -66,6 +66,10 @@ export interface EscalacaoTime {
   reservas: string[];
   formacao?: string;
   tecnico?: string;
+  /** posição de cada titular no print (% do campo deitado), quando o print tinha o campo */
+  posicoes?: { nome: string; x: number; y: number }[];
+  /** formação escolhida à mão: o campo passa a ser montado por ela */
+  formacaoEscolhida?: boolean;
   origem: 'print' | 'manual' | 'vazio';
 }
 
@@ -410,15 +414,18 @@ function derivarEscalacao(
       .filter(Boolean);
     const doPrint = lida?.[t];
     const formacao = r.formacaoManual?.[t] || doPrint?.formacao;
+    const formacaoEscolhida = !!r.formacaoManual?.[t];
     if (manual.length)
       return {
         ...doPrint,
         formacao,
+        formacaoEscolhida,
         titulares: manual,
         reservas: doPrint?.reservas ?? [],
         origem: 'manual',
       };
-    if (doPrint?.titulares.length) return { ...doPrint, formacao, origem: 'print' };
+    if (doPrint?.titulares.length)
+      return { ...doPrint, formacao, formacaoEscolhida, origem: 'print' };
     return { titulares: [], reservas: [], formacao, origem: 'vazio' };
   };
   const casa = time('casa');

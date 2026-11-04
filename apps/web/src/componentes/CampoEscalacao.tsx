@@ -25,7 +25,14 @@ export interface TimeNoCampo {
   nome: string;
   titulares: string[];
   formacao?: string;
+  /** posição de cada um no print (% do campo deitado): o campo repete o desenho do print */
+  posicoes?: { nome: string; x: number; y: number }[];
+  /** formação escolhida à mão: monta pela formação mesmo havendo posições */
+  formacaoEscolhida?: boolean;
 }
+
+const igual = (a: string, b: string) =>
+  a.replace(/[^A-Za-zÀ-ú]/g, '').toLowerCase() === b.replace(/[^A-Za-zÀ-ú]/g, '').toLowerCase();
 
 interface Vaga {
   nome: string;
@@ -49,8 +56,33 @@ function iniciais(nome: string): string {
   return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0].slice(0, 2)).toUpperCase();
 }
 
-/** Posições em % do campo. Com 10 nomes, falta o goleiro (o leitor não pegou): vaga "?". */
+/**
+ * Com as posições do print: cada titular onde estava no print. Quem não tem posição (o goleiro
+ * que você digitou no começo da lista) vai para o gol; os 10 de linha sem goleiro deixam "?".
+ */
+function vagasDoPrint(t: TimeNoCampo, lado: 'casa' | 'fora'): Vaga[] | null {
+  const pos = t.posicoes ?? [];
+  if (t.formacaoEscolhida || pos.length < 8) return null;
+  const gol = lado === 'casa' ? 4 : 96;
+  const r: Vaga[] = [];
+  let semPosicao = 0;
+  for (const [i, nome] of t.titulares.entries()) {
+    const p = pos.find((q) => igual(q.nome, nome));
+    const prof = p ? Math.abs(50 - p.x) : 0;
+    if (p) r.push({ nome, x: p.x, y: p.y, fileira: Math.round((50 - prof) / 10) });
+    else if (i === 0) r.push({ nome, x: gol, y: 50, fileira: 0 });
+    else semPosicao++;
+  }
+  // 10 de linha e nenhum goleiro na lista: o lugar dele fica marcado
+  if (!r.some((v) => v.x === gol) && t.titulares.length - semPosicao <= 10)
+    r.push({ nome: '?', x: gol, y: 50, fileira: 0 });
+  return semPosicao > 2 ? null : r;
+}
+
+/** Pela formação. Com 10 nomes, falta o goleiro (o leitor não pegou): vaga "?". */
 function vagas(t: TimeNoCampo, lado: 'casa' | 'fora'): Vaga[] {
+  const doPrint = vagasDoPrint(t, lado);
+  if (doPrint) return doPrint;
   const f = fileiras(t.formacao);
   const n = t.titulares.length;
   const goleiro = n >= 11 ? t.titulares[0] : '?';

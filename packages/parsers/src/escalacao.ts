@@ -21,7 +21,33 @@ export interface LadoEscalacao {
   reservas: string[];
   formacao?: string;
   tecnico?: string;
+  /**
+   * onde cada titular está no print, em % do campo inteiro deitado (x: 0 = gol do mandante,
+   * 100 = gol do visitante; y: 0 = lateral de cima): o campo do site repete o desenho do print
+   */
+  posicoes?: { nome: string; x: number; y: number }[];
 }
+
+/**
+ * Formação pelas colunas do campo: jogadores na mesma distância do meio (±25 milésimos) são a
+ * mesma fileira; do gol para frente, sem o goleiro. Só vale com os 10 de linha.
+ */
+function formacaoPelasColunas(dist: number[], comGoleiro: boolean): string | undefined {
+  const xs = [...dist].sort((p, q) => q - p);
+  if (comGoleiro) xs.shift();
+  if (xs.length !== 10) return undefined;
+  const grupos: number[] = [];
+  let ultimo = Infinity;
+  for (const d of xs) {
+    if (ultimo - d > 25) grupos.push(1);
+    else grupos[grupos.length - 1]++;
+    ultimo = d;
+  }
+  return grupos.length >= 3 && grupos.length <= 5 ? grupos.join('-') : undefined;
+}
+
+const formacaoValida = (f?: string) =>
+  !!f && f.split('-').reduce((a, n) => a + Number(n), 0) === 10;
 
 export interface LeituraEscalacao {
   casa: LadoEscalacao;
@@ -152,6 +178,7 @@ function juntarLado(a: LadoEscalacao, b: LadoEscalacao): LadoEscalacao {
     reservas: [...a.reservas, ...b.reservas.filter((n) => !ja.has(n))],
     formacao: a.formacao ?? b.formacao,
     tecnico: a.tecnico ?? b.tecnico,
+    posicoes: a.posicoes ?? b.posicoes,
   };
 }
 
@@ -311,11 +338,36 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
       .filter(noCampo)
       .sort((p, q) => (Math.abs(p.a - q.a) > 15 ? doGol * (p.a - q.a) : p.b - q.b))
       .map((i) => i.nome);
-  const lado = (xs: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => ({
-    titulares: cortarExcesso([...new Set(ordenar(xs, doGol))]),
-    reservas: [],
-    formacao: formacoes.find((f) => coord(f, eixo) < meio === ehAntes)?.f,
-  });
+  // posição no campo do site: profundidade = distância do meio (o mais fundo dos dois times
+  // vira a linha do gol), lateral = faixa ocupada pelos jogadores
+  const emCampo = itens.filter(noCampo);
+  const fundo = Math.max(1, ...emCampo.map((i) => Math.abs(i.a - meio)));
+  const bMin = Math.min(...emCampo.map((i) => i.b));
+  const bMax = Math.max(...emCampo.map((i) => i.b));
+  const lado = (xs: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => {
+    const titulares = cortarExcesso([...new Set(ordenar(xs, doGol))]);
+    const doLado = xs.filter(noCampo).filter((i) => titulares.includes(i.nome));
+    const dist = doLado.map((i) => Math.abs(i.a - meio));
+    const lida = formacoes.find((f) => coord(f, eixo) < meio === ehAntes)?.f;
+    const pelasColunas = formacaoPelasColunas(dist, titulares.length >= 11);
+    return {
+      titulares,
+      reservas: [],
+      // as colunas do print valem mais que o número lido (o OCR troca 3 por 5)
+      formacao: pelasColunas ?? (formacaoValida(lida) ? lida : undefined),
+      posicoes: doLado.map((i) => {
+        const prof = Math.abs(i.a - meio) / fundo;
+        // o goleiro (11 lidos: o mais fundo) fica no gol; os de linha vão até a entrada da área
+        const ehGoleiro = titulares.length >= 11 && Math.abs(i.a - meio) === Math.max(...dist);
+        const x = ehGoleiro ? 4 : 50 - 3 - prof * 33;
+        return {
+          nome: i.nome,
+          x: Math.round((ehAntes ? x : 100 - x) * 10) / 10,
+          y: Math.round((8 + ((i.b - bMin) / Math.max(1, bMax - bMin)) * 84) * 10) / 10,
+        };
+      }),
+    };
+  };
   return {
     casa: lado(antes, 1, true),
     fora: lado(depois, -1, false),

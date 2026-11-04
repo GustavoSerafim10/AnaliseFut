@@ -252,8 +252,8 @@ export function AbaTabela({ r, setR, d }: PropsAba) {
       </div>
       {(esc.casa.titulares.length > 0 || esc.fora.titulares.length > 0) && (
         <CampoEscalacao
-          casa={{ nome: nome('casa'), titulares: esc.casa.titulares, formacao: esc.casa.formacao }}
-          fora={{ nome: nome('fora'), titulares: esc.fora.titulares, formacao: esc.fora.formacao }}
+          casa={{ nome: nome('casa'), ...esc.casa }}
+          fora={{ nome: nome('fora'), ...esc.fora }}
           onFormacao={(lado, f) =>
             setR((y) => ({ ...y, formacaoManual: { ...y.formacaoManual, [lado]: f } }))
           }
