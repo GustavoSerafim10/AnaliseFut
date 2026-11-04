@@ -409,10 +409,17 @@ function derivarEscalacao(
       .map((l) => l.trim())
       .filter(Boolean);
     const doPrint = lida?.[t];
+    const formacao = r.formacaoManual?.[t] || doPrint?.formacao;
     if (manual.length)
-      return { ...doPrint, titulares: manual, reservas: doPrint?.reservas ?? [], origem: 'manual' };
-    if (doPrint?.titulares.length) return { ...doPrint, origem: 'print' };
-    return { titulares: [], reservas: [], origem: 'vazio' };
+      return {
+        ...doPrint,
+        formacao,
+        titulares: manual,
+        reservas: doPrint?.reservas ?? [],
+        origem: 'manual',
+      };
+    if (doPrint?.titulares.length) return { ...doPrint, formacao, origem: 'print' };
+    return { titulares: [], reservas: [], formacao, origem: 'vazio' };
   };
   const casa = time('casa');
   const fora = time('fora');

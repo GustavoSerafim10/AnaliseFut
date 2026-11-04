@@ -1,5 +1,6 @@
 import type { CampoClassificacao, LinhaClassificacao } from '@pe/parsers';
 import { Fragment, type ReactNode } from 'react';
+import { CampoEscalacao } from '../componentes/CampoEscalacao';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { acoesPrints, type PropsAba } from './tipos';
 
@@ -249,6 +250,15 @@ export function AbaTabela({ r, setR, d }: PropsAba) {
           );
         })}
       </div>
+      {(esc.casa.titulares.length > 0 || esc.fora.titulares.length > 0) && (
+        <CampoEscalacao
+          casa={{ nome: nome('casa'), titulares: esc.casa.titulares, formacao: esc.casa.formacao }}
+          fora={{ nome: nome('fora'), titulares: esc.fora.titulares, formacao: esc.fora.formacao }}
+          onFormacao={(lado, f) =>
+            setR((y) => ({ ...y, formacaoManual: { ...y.formacaoManual, [lado]: f } }))
+          }
+        />
+      )}
       {esc.conferida && (
         <div className="caixa ok miudo">
           ✅ Escalação conferida (conta para DQ A)

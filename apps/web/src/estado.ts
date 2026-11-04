@@ -71,6 +71,8 @@ export interface Rascunho {
   banca: string;
   /** escalação digitada/corrigida à mão (um jogador por linha); vazio = a lida dos prints */
   escalacaoManual: { casa: string; fora: string };
+  /** formação escolhida à mão para o campo (vazio = a lida do print) */
+  formacaoManual?: { casa?: string; fora?: string };
   /** auto = o que o print diz ("prováveis"/"confirmadas") */
   statusEscalacao: 'auto' | 'provavel' | 'confirmada';
   /** V4.0: entrada motivada por notícia (escalação, lesão) → estratégia S2 */

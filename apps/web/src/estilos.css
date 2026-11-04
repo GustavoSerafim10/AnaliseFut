@@ -3926,3 +3926,226 @@ button.cl-linha:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- campo das escalações ---------- */
+.campo-topo {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.campo-formacao {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  font-size: 13px;
+}
+.campo-formacao span {
+  font-family: var(--fonte-tecnica);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.campo-formacao.casa span {
+  color: var(--amarelo);
+}
+.campo-formacao.fora {
+  text-align: right;
+}
+.campo-formacao.fora span {
+  color: var(--ciano);
+}
+.campo {
+  position: relative;
+  max-width: 920px;
+  margin: 0 auto;
+  aspect-ratio: 105 / 64;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.06), transparent 65%),
+    repeating-linear-gradient(
+      90deg,
+      #0e3b2f 0 calc(100% / 14),
+      #10443a calc(100% / 14) calc(100% / 7)
+    );
+}
+.campo-linhas span {
+  position: absolute;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+}
+.campo-meio {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-width: 0 0 0 2px !important;
+}
+.campo-circulo {
+  left: 50%;
+  top: 50%;
+  width: 17%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.campo-area {
+  top: 21%;
+  bottom: 21%;
+  width: 15.7%;
+}
+.campo-pequena {
+  top: 37%;
+  bottom: 37%;
+  width: 5.2%;
+}
+.campo-area.esquerda,
+.campo-pequena.esquerda {
+  left: -2px;
+}
+.campo-area.direita,
+.campo-pequena.direita {
+  right: -2px;
+}
+.jogador-campo {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: 92px;
+  transform: translate(-50%, -50%);
+  animation: entra-campo 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) var(--atraso, 0ms) both;
+}
+.jogador-campo.fora {
+  animation-name: entra-campo-fora;
+}
+.jogador-bola {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-family: var(--fonte-tecnica);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sobre-primaria);
+  background: var(--amarelo);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+.jogador-campo.fora .jogador-bola {
+  background: var(--ciano);
+  color: #03202a;
+}
+.jogador-campo.vazio .jogador-bola {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--texto);
+  border-style: dashed;
+}
+.jogador-nome {
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(3, 10, 24, 0.72);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jogador-campo.vazio .jogador-nome {
+  color: var(--suave);
+  font-style: italic;
+}
+@keyframes entra-campo {
+  from {
+    opacity: 0;
+    transform: translate(calc(-50% - 28px), -50%) scale(0.85);
+  }
+}
+@keyframes entra-campo-fora {
+  from {
+    opacity: 0;
+    transform: translate(calc(-50% + 28px), -50%) scale(0.85);
+  }
+}
+@keyframes entra-campo-celular {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jogador-campo {
+    animation: none;
+  }
+}
+@media (max-width: 700px) {
+  /* celular: campo em pé, mandante em cima */
+  .campo {
+    aspect-ratio: 64 / 105;
+    max-width: 420px;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.06), transparent 65%),
+      repeating-linear-gradient(
+        180deg,
+        #0e3b2f 0 calc(100% / 14),
+        #10443a calc(100% / 14) calc(100% / 7)
+      );
+  }
+  .campo-meio {
+    left: 0;
+    right: 0;
+    top: 50%;
+    bottom: auto;
+    border-width: 2px 0 0 0 !important;
+  }
+  .campo-circulo {
+    width: 28%;
+  }
+  .campo-area {
+    left: 21% !important;
+    right: 21% !important;
+    top: auto;
+    bottom: auto;
+    width: auto;
+    height: 15.7%;
+  }
+  .campo-pequena {
+    left: 37% !important;
+    right: 37% !important;
+    top: auto;
+    bottom: auto;
+    width: auto;
+    height: 5.2%;
+  }
+  .campo-area.esquerda,
+  .campo-pequena.esquerda {
+    top: -2px;
+  }
+  .campo-area.direita,
+  .campo-pequena.direita {
+    bottom: -2px;
+  }
+  .jogador-campo {
+    left: var(--vx);
+    top: var(--vy);
+    width: 76px;
+  }
+  .jogador-campo,
+  .jogador-campo.fora {
+    animation-name: entra-campo-celular;
+  }
+  .jogador-bola {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+  .jogador-nome {
+    font-size: 9px;
+    padding: 0 3px;
+  }
+}
