@@ -339,6 +339,15 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
   const emitir = (lado: Lado, o: OddLida, linha?: number) => {
     if (!mercado) return;
+    // "VascodaGama15 1.67": handicap de 15 não existe; é 1.5 com o ponto perdido
+    if (
+      linha !== undefined &&
+      HANDICAPS.has(mercado.mercado) &&
+      Number.isInteger(linha) &&
+      Math.abs(linha) >= 10 &&
+      Math.abs(linha) % 10 === 5
+    )
+      linha = linha / 10;
     const nova: OddLine = {
       casa,
       mercado: mercado.mercado,

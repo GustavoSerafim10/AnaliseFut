@@ -324,3 +324,30 @@ describe('1win — tema claro (Vasco × Flamengo)', () => {
     expect(oddV({ mercado: 'primeiro_gol', lado: 'fora' })).toEqual([1.62]);
   });
 });
+
+// Athletico-PR × Vasco (04/11): "Escanteios. Athletico Paranaense totais" (plural) era lido como
+// total do JOGO acima de 5,5 → P_true ~63% contra ~50% do mercado → EV falso de +16%
+describe('1win — escanteios por time com "totais" no plural', () => {
+  const t = fx('1win-athletico-escanteios.txt');
+  const ls = parse1winVarios([t], {
+    jogo: { casa: 'Athlético Pr', fora: 'Vasco' },
+    data: '2026-11-04',
+  }).linhas;
+  const odd = (f: Record<string, unknown>) =>
+    ls
+      .filter((l) => Object.entries(f).every(([k, v]) => l[k as keyof typeof l] === v))
+      .map((l) => l.odd);
+  it('escanteios do time, não do jogo', () => {
+    expect(odd({ mercado: 'escanteios_time', time: 'casa', lado: 'over', linha: 5.5 })).toEqual([
+      1.85,
+    ]);
+    expect(odd({ mercado: 'escanteios_time', time: 'fora', lado: 'over', linha: 4.5 })).toEqual([
+      1.77,
+    ]);
+    expect(odd({ mercado: 'escanteios_total', linha: 5.5 })).toEqual([]);
+    expect(odd({ mercado: 'escanteios_total', lado: 'over', linha: 10.5 })).toEqual([1.95]);
+  });
+  it('"VascodaGama15" no handicap de escanteios é +1.5', () => {
+    expect(odd({ mercado: 'escanteios_ah', lado: 'fora', linha: 1.5 })).toEqual([1.67]);
+  });
+});

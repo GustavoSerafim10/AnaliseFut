@@ -1,0 +1,40 @@
+Todos Principal Totais Handicap metade Jogade
+
+1º escanteio A
+
+Athletico Paranaense 1.71 Vasco da Gama 1.98
+
+Escanteios. Resultado do jogo A
+
+Athletico Paranaense Empate Vasco da Gama
+1.58 8.2 2.35
+
+Escanteios. Totais A
+Menos Mais
+
+Abaixo De 9.5 2.26 AcimaDe95 1.54
+
+Abaixo De 10.5 1.73 Acima De 10.5 1.95
+
+Abaixo De 11.5 1.45 AcimaDe 11.5 2.5
+
+Handicap de escanteios A
+
+Athletico Paranaense Vasco da Gama
+
+Athletico Paranaense -1.5 2.03 VascodaGama15 1.67
+
+Escanteios. Athletico Paranaense totais A
+Menos Mais
+
+Abaixo De 5.5 1.82 AcimaDe5.5 1.85
+
+Escanteios. Vasco da Gama totais A
+Menos Mais
+
+Abaixo De 4.5 1.9  AcimaDe 45 1.77
+
+Primeira a executar N cantos A
+
+Nenhum 7 Nenhum 9 Nenhum 3
+

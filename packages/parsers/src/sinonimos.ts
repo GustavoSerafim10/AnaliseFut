@@ -105,10 +105,11 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
 
   // "Aston Villa total", "Escanteios. CR Flamengo total", "Cartões amarelos. CR Flamengo total"
   // (par/ímpar dos gols de um time não é o total dele)
-  if (/\btotal\b/.test(t) && !/par ?\/ ?impar|impar ?\/ ?par/.test(t)) {
+  // ("Escanteios. Athletico Paranaense totais": a 1win também escreve no plural)
+  if (/\btota(l|is)\b/.test(t) && !/par ?\/ ?impar|impar ?\/ ?par/.test(t)) {
     const time = reconhecerTime(
       t.replace(
-        /escanteios?|cantos?|cart(ao|oes)|amarelos?|total|individual|de gols|do time|da equipe/g,
+        /escanteios?|cantos?|cart(ao|oes)|amarelos?|totais|total|individual|de gols|do time|da equipe/g,
         ' ',
       ),
       jogo,
