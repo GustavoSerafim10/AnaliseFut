@@ -88,3 +88,20 @@ describe('leitura atual do site (camisa grudada separada pela posição das pala
     expect(x('Lescano') - x('Duarte')).toBeGreaterThan(5);
   });
 });
+
+describe('lixo do OCR completando 11 (print do usuário, 04/11 à noite)', () => {
+  const base = fx('escalacao-sofascore-athletico-4');
+  const comLixo = base.replace('@357,767 21 Leozinho', '@357,767 21 Leozinho\n@352,742 Ta');
+  it('a defesa na mesma coluna não vira goleiro; o goleiro vem do canto e o lixo sai', () => {
+    for (const t of [base, comLixo]) {
+      const r = lerEscalacao(t, { casa: 'Athlético Pr', fora: 'Vasco' });
+      expect(r.casa.titulares[0]).toBe('Mycael');
+      expect(r.casa.titulares).toHaveLength(11);
+      expect(r.casa.titulares).not.toContain('Ta');
+      expect(r.casa.formacao).toBe('3-4-2-1');
+      const noGol = r.casa.posicoes!.filter((p) => p.x < 10).map((p) => p.nome);
+      expect(noGol).toEqual(['Mycael']);
+      expect(r.fora.titulares[0]).toBe('L. Jardim');
+    }
+  });
+});
