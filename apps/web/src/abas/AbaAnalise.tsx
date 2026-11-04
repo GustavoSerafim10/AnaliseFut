@@ -12,11 +12,13 @@ import { Auditoria } from '../componentes/Auditoria';
 import { CentroDecisao } from '../componentes/CentroDecisao';
 import { ComparativoOdds } from '../componentes/ComparativoOdds';
 import { Distribuicao } from '../componentes/Distribuicao';
+import { FormAposta } from '../componentes/FormAposta';
 import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { Derivado } from '../dados';
+import { resumir, type ApostaFeita } from '../historico';
 import type { PropsAba } from './tipos';
 
 const CLASSE: Record<ResultadoAnalise['decisao'], string> = {
@@ -86,9 +88,18 @@ export function AbaAnalise({
   setR,
   d,
   onSalvar,
+  onEntrar,
   salvoNoHistorico,
-}: PropsAba & { onSalvar: () => void; salvoNoHistorico: boolean }) {
+  apostaFeita,
+}: PropsAba & {
+  onSalvar: () => void;
+  onEntrar: (a: ApostaFeita) => void;
+  salvoNoHistorico: boolean;
+  apostaFeita?: ApostaFeita;
+}) {
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [entrando, setEntrando] = useState(false);
+  const resumo = d.v4 || d.resultado ? resumir(r, d) : null;
   const [salvo, setSalvo] = useState(false);
   const res = d.resultado;
   const rel = d.relatorio;
@@ -208,7 +219,34 @@ export function AbaAnalise({
             >
               💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
             </button>
+            {resumo?.entrada && !apostaFeita && (
+              <button
+                className={resumo.decisao === 'BET' ? 'primario' : ''}
+                onClick={() => setEntrando(true)}
+              >
+                ✅ Entrei nessa aposta
+              </button>
+            )}
           </div>
+          {apostaFeita && (
+            <p className="dica">
+              Você entrou: @ {apostaFeita.odd} na {apostaFeita.casa}
+              {apostaFeita.valor !== undefined && ` (R$ ${dec(apostaFeita.valor)})`}. O resultado se
+              registra na aba Histórico.
+            </p>
+          )}
+          {entrando && resumo?.entrada && !apostaFeita && (
+            <FormAposta
+              entrada={resumo.entrada}
+              decisao={resumo.decisao}
+              onCancelar={() => setEntrando(false)}
+              onConfirmar={(ap) => {
+                onEntrar(ap);
+                setEntrando(false);
+                setSalvo(true);
+              }}
+            />
+          )}
           {salvo && (
             <p className="dica">
               Salvo ✓ Depois do jogo, registre o placar e o fechamento da referência na aba

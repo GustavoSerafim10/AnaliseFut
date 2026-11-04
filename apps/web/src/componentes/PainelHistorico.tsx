@@ -41,11 +41,11 @@ function Cartao({
 
 const tomDe = (x: number | null) => (x === null || x === 0 ? undefined : x > 0 ? 'ok' : 'erro');
 
-export function CartoesPainel({ p }: { p: Painel }) {
+export function CartoesPainel({ p, rotulo = 'Entradas' }: { p: Painel; rotulo?: string }) {
   const vazio = <span className="kpi-vazio">—</span>;
   return (
     <div className="faixa-kpi">
-      <Cartao icone="bola" titulo="Entradas" valor={p.entradas}>
+      <Cartao icone="bola" titulo={rotulo} valor={p.entradas}>
         <span>
           apuradas <b>{p.entradas - p.pendentes}</b>
         </span>

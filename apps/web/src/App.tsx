@@ -28,6 +28,7 @@ import {
   gravarBancaInicial,
   gravarHistorico,
   salvarNoHistorico,
+  type ApostaFeita,
   travasDoHistorico,
   type EntradaHistorico,
 } from './historico';
@@ -89,12 +90,12 @@ export function App() {
     );
   };
 
-  function salvarAnalise() {
+  function salvarAnalise(aposta?: ApostaFeita) {
     if (demo) {
       alert('Isto é só o jogo de exemplo: nada é salvo no histórico.');
       return;
     }
-    const { lista, id } = salvarNoHistorico(historico, r, d);
+    const { lista, id } = salvarNoHistorico(historico, r, d, aposta);
     setHistorico(lista);
     setR((x) => ({ ...x, idHistorico: id }));
   }
@@ -341,8 +342,10 @@ export function App() {
         {aba.id === 'analise' && (
           <AbaAnalise
             {...props}
-            onSalvar={salvarAnalise}
+            onSalvar={() => salvarAnalise()}
+            onEntrar={salvarAnalise}
             salvoNoHistorico={!!historico.find((e) => e.id === r.idHistorico)}
+            apostaFeita={historico.find((e) => e.id === r.idHistorico)?.aposta}
           />
         )}
         {aba.id === 'historico' && (

@@ -77,11 +77,27 @@ export interface EntradaHistorico {
   rascunho: Rascunho;
   resumo: ResumoAnalise;
   resultado?: ResultadoJogo;
+  /** só existe quando o usuário ENTROU de verdade (botão "Entrei"); sem isto é só análise */
+  aposta?: ApostaFeita;
   /** green/red marcado à mão: vale quando o site não apura sozinho (1º escanteio, mercado do 1º tempo...) */
   manual?: Manual;
 }
 
 export type Manual = 'green' | 'red' | 'devolvida';
+
+/** A aposta que o usuário fez de fato, com a odd e a casa que pegou (podem diferir da análise). */
+export interface ApostaFeita {
+  odd: number;
+  casa: string;
+  /** valor em R$ (opcional: sem ele a entrada conta em unidades, mas não entra nas travas) */
+  valor?: number;
+  feitaEm: string;
+}
+
+export const entrou = (e: EntradaHistorico) => !!e.aposta && !!e.resumo.entrada;
+
+/** odd que vale para apurar: a que o usuário pegou, senão a da análise */
+export const oddDe = (e: EntradaHistorico) => e.aposta?.odd ?? e.resumo.entrada?.odd ?? 0;
 
 export function carregarHistorico(): EntradaHistorico[] {
   try {
@@ -203,6 +219,7 @@ export function salvarNoHistorico(
   lista: EntradaHistorico[],
   r: Rascunho,
   d: Derivado,
+  aposta?: ApostaFeita,
 ): { lista: EntradaHistorico[]; id: string } {
   const id =
     r.idHistorico ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -213,6 +230,8 @@ export function salvarNoHistorico(
     rascunho: { ...r, idHistorico: id },
     resumo: resumir(r, d),
     resultado: anterior?.resultado,
+    aposta: aposta ?? anterior?.aposta,
+    manual: anterior?.manual,
   };
   return {
     lista: anterior ? lista.map((e) => (e.id === id ? entrada : e)) : [entrada, ...lista],
@@ -227,7 +246,8 @@ export const temPlacar = (e: EntradaHistorico) =>
 /** só pelo placar (sem a marcação à mão) */
 export function apurarAuto(e: EntradaHistorico): Apuracao | null {
   if (!e.resultado || !e.resumo.entrada || !temPlacar(e)) return null;
-  return apurarAposta(e.resumo.entrada.linha as LinhaOdd, e.resultado);
+  const linha = { ...e.resumo.entrada.linha, odd: oddDe(e) } as LinhaOdd;
+  return apurarAposta(linha, e.resultado);
 }
 
 const VALOR_MANUAL: Record<Manual, number> = { green: 1, red: -1, devolvida: 0 };
@@ -245,7 +265,7 @@ export function apurar(e: EntradaHistorico): Apuracao | null {
   return {
     ok: true,
     resultado: r,
-    lucro: r > 0 ? e.resumo.entrada.odd - 1 : r,
+    lucro: r > 0 ? oddDe(e) - 1 : r,
     rotulo: `${ROTULO_MANUAL[e.manual]} (marcado à mão)`,
   };
 }
@@ -254,7 +274,7 @@ export function apurar(e: EntradaHistorico): Apuracao | null {
 export function clvDe(e: EntradaHistorico): number | null {
   const fech = e.resultado?.oddFechamento;
   if (!fech || !e.resumo.entrada) return null;
-  return clvJusto(e.resumo.entrada.odd, fech, e.resultado?.fechamentoOutros).clv;
+  return clvJusto(oddDe(e), fech, e.resultado?.fechamentoOutros).clv;
 }
 
 export interface Balanco {
@@ -313,8 +333,9 @@ export function marco(b: Balanco): string {
   return 'CLV positivo em 100+ apostas: seguir até 300 para validar';
 }
 
+/** apostas com valor em R$: alimentam as travas da banca */
 export const apostasFeitas = (lista: EntradaHistorico[]) =>
-  lista.filter((e) => e.resumo.decisao === 'BET' && e.resumo.entrada?.stakeValor);
+  lista.filter((e) => entrou(e) && (e.aposta!.valor ?? 0) > 0);
 
 export function travasDoHistorico(
   lista: EntradaHistorico[],
@@ -324,8 +345,8 @@ export function travasDoHistorico(
   const apostas: ApostaBanca[] = apostasFeitas(lista).map((e) => {
     const a = apurar(e);
     return {
-      feitaEm: e.salvoEm,
-      stake: e.resumo.entrada!.stakeValor!,
+      feitaEm: e.aposta!.feitaEm,
+      stake: e.aposta!.valor!,
       lucro: a?.ok ? a.lucro : undefined,
       apuradaEm: e.resultado?.registradoEm,
     };
@@ -333,17 +354,17 @@ export function travasDoHistorico(
   return calcularTravas(bancaInicial, apostas, agora);
 }
 
-export type FiltroPainel = 'apostas' | 'papel' | 'todas';
+/** as entradas de verdade (botão "Entrei"), base do painel */
+export const minhasEntradas = (lista: EntradaHistorico[]) => lista.filter(entrou);
 
-/** BET = dinheiro de verdade; "no papel" = a melhor entrada das análises descartadas. */
-export function filtrar(lista: EntradaHistorico[], f: FiltroPainel): EntradaHistorico[] {
-  return lista.filter((e) => {
-    if (!e.resumo.entrada) return false;
-    if (f === 'apostas') return e.resumo.decisao === 'BET';
-    if (f === 'papel') return e.resumo.decisao !== 'BET';
-    return true;
-  });
-}
+/** a melhor entrada das análises em que o usuário não entrou, "no papel" */
+export const soNoPapel = (lista: EntradaHistorico[]) =>
+  lista.filter((e) => !e.aposta && e.resumo.entrada);
+
+export type FiltroPainel = 'entradas' | 'papel';
+
+export const filtrar = (lista: EntradaHistorico[], f: FiltroPainel) =>
+  f === 'entradas' ? minhasEntradas(lista) : soNoPapel(lista);
 
 export type Situacao = 'green' | 'red' | 'devolvida' | 'pendente';
 
@@ -397,7 +418,7 @@ export function painel(lista: EntradaHistorico[]): Painel {
   for (const e of ordem) {
     const ent = e.resumo.entrada!;
     somaEv += ent.ev;
-    somaOdd += ent.odd;
+    somaOdd += oddDe(e);
     const s = situacao(e);
     if (s === 'pendente') {
       p.pendentes++;
@@ -499,6 +520,7 @@ export function importarJson(
         ...e,
         resultado: e.resultado ?? ja?.resultado,
         manual: e.manual ?? ja?.manual,
+        aposta: e.aposta ?? ja?.aposta,
       });
   }
   const lista = [...mapa.values()].sort((a, b) => b.resumo.inicio.localeCompare(a.resumo.inicio));

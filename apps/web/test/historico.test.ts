@@ -101,6 +101,7 @@ describe('histórico na V4.0', () => {
     e.resumo.entrada!.estrategia = 'S1';
     e.salvoEm = `2026-10-${id}T15:00:00-03:00`;
     e.resultado!.registradoEm = `2026-10-${id}T22:00:00-03:00`;
+    e.aposta = { odd: 2.0, casa: '1win', valor: stakeValor, feitaEm: e.salvoEm };
     return e;
   };
   it('travas da banca saem das apostas registradas', () => {
@@ -139,11 +140,12 @@ describe('histórico na V4.0', () => {
 describe('painel do histórico', () => {
   it('conta green/red/pendentes, winrate, ROI e a curva acumulada', () => {
     const lista = [
-      entrada('20', 'BET', 1.9, [2, 0]),
+      { ...entrada('20', 'BET', 1.8, [2, 0]), aposta: { odd: 1.9, casa: '1win', feitaEm: 'x' } },
       entrada('21', 'NO_BET', 2.0, [0, 1]),
       entrada('22', 'NO_BET', 1.5),
     ];
-    expect(filtrar(lista, 'apostas').map((e) => e.id)).toEqual(['20']);
+    // só conta como entrada o que tem "Entrei"; a odd que vale é a que o usuário pegou
+    expect(filtrar(lista, 'entradas').map((e) => e.id)).toEqual(['20']);
     expect(filtrar(lista, 'papel').map((e) => e.id)).toEqual(['21', '22']);
     const p = painel(lista);
     expect(p).toMatchObject({ entradas: 3, green: 1, red: 1, pendentes: 1, winrate: 0.5 });
@@ -159,5 +161,23 @@ describe('painel do histórico', () => {
     expect(painel([semPlacar]).unidades).toBeCloseTo(0.5);
     const comPlacar = { ...entrada('20', 'BET', 1.9, [0, 2]), manual: 'green' as const };
     expect(situacao(comPlacar)).toBe('red');
+  });
+});
+
+describe('entrada de verdade × análise', () => {
+  it('BET sem "Entrei" fica no papel e não entra nas travas', () => {
+    const e = entrada('20', 'BET', 2.0, [0, 1]);
+    e.resumo.entrada!.stakeValor = 100;
+    expect(filtrar([e], 'entradas')).toHaveLength(0);
+    expect(filtrar([e], 'papel')).toHaveLength(1);
+    expect(travasDoHistorico([e], 1000, '2026-10-22T10:00:00-03:00').bancaAtual).toBe(1000);
+  });
+  it('importar mantém a entrada já marcada no aparelho', () => {
+    const marcada = {
+      ...entrada('20', 'BET', 2.0),
+      aposta: { odd: 2.1, casa: 'bet365', feitaEm: 'x' },
+    };
+    const r = importarJson(exportarJson([entrada('20', 'BET', 2.0)]), [marcada]);
+    expect('lista' in r && r.lista[0].aposta?.odd).toBe(2.1);
   });
 });

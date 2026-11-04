@@ -6,3 +6,6 @@ coverage/
 *.log
 *.traineddata
 .DS_Store
+
+# prints reais para calibrar o OCR (não vão para o GitHub)
+prints-locais/

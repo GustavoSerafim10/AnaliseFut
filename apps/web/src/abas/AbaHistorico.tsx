@@ -1,6 +1,7 @@
 import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
 import { useState } from 'react';
 import { dec, isoLocal, num, pct, type Rascunho } from '../estado';
+import { FormAposta } from '../componentes/FormAposta';
 import { CartoesPainel, CurvaUnidades } from '../componentes/PainelHistorico';
 import {
   apurar,
@@ -12,6 +13,7 @@ import {
   importarJson,
   filtrar,
   marco,
+  minhasEntradas,
   painel,
   situacao,
   temPlacar,
@@ -22,13 +24,17 @@ import {
   type Situacao,
 } from '../historico';
 
-const FILTROS: Record<FiltroPainel, { nome: string; dica: string }> = {
-  apostas: { nome: 'Apostas', dica: 'Só as BET: o que o motor aprovou (dinheiro de verdade).' },
+const FILTROS: Record<FiltroPainel, { nome: string; dica: string; selo: string }> = {
+  entradas: {
+    nome: 'Minhas entradas',
+    dica: 'Só as apostas em que você entrou de verdade (botão "Entrei nessa aposta"), com a odd que você pegou.',
+    selo: '',
+  },
   papel: {
     nome: 'No papel',
-    dica: 'A melhor entrada das análises descartadas (NO BET, WATCHLIST, INVESTIGAR), como se tivesse sido apostada. Se render mais que as apostas, os gates estão barrando entradas boas.',
+    dica: 'Jogos só analisados: a melhor entrada de cada análise, como se tivesse sido apostada. Mostra se o motor está barrando entradas boas (ex.: NO BET que teria dado green).',
+    selo: 'seria ',
   },
-  todas: { nome: 'Todas', dica: 'Apostas e entradas no papel juntas.' },
 };
 
 const SELO: Record<Situacao, string> = {
@@ -186,12 +192,14 @@ export function AbaHistorico({
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'alerta'; texto: string } | null>(null);
   const [json, setJson] = useState('');
   const [filtro, setFiltro] = useState<FiltroPainel>(() =>
-    historico.some((e) => e.resumo.decisao === 'BET') ? 'apostas' : 'papel',
+    minhasEntradas(historico).length ? 'entradas' : 'papel',
   );
+  const [entrandoEm, setEntrandoEm] = useState<string | null>(null);
   const daVez = filtrar(historico, filtro);
   const pn = painel(daVez);
-  const lista = filtro === 'todas' ? historico : daVez;
-  const bets = historico.filter((e) => e.resumo.decisao === 'BET');
+  // no papel entram também as análises sem entrada candidata (só para registrar o placar)
+  const lista = filtro === 'entradas' ? daVez : historico.filter((e) => !e.aposta);
+  const bets = minhasEntradas(historico);
   const comEntrada = historico.filter((e) => e.resumo.entrada);
   const cal = calibracao(historico);
 
@@ -232,7 +240,7 @@ export function AbaHistorico({
         ))}
       </div>
       <p className="miudo">{FILTROS[filtro].dica}</p>
-      <CartoesPainel p={pn} />
+      <CartoesPainel p={pn} rotulo={filtro === 'entradas' ? 'Entradas' : 'Análises'} />
       <CurvaUnidades p={pn} titulo={`Unidades acumuladas · ${FILTROS[filtro].nome}`} />
 
       <div className="caixa">
@@ -284,7 +292,7 @@ export function AbaHistorico({
           <strong>CLV, estratégias e calibração</strong>
         </summary>
         <LinhaBalanco
-          titulo={`Apostas (BET): ${bets.length}`}
+          titulo={`Minhas entradas: ${bets.length}`}
           b={balanco(bets)}
           dica="1 unidade por aposta. CLV positivo = você pega odds melhores que o fechamento justo."
         />
@@ -339,12 +347,16 @@ export function AbaHistorico({
       </details>
 
       <h3>
-        Entradas · {FILTROS[filtro].nome} ({lista.length})
+        {FILTROS[filtro].nome} ({lista.length})
       </h3>
 
       {historico.length === 0 && <p>Nenhuma análise salva ainda.</p>}
       {historico.length > 0 && lista.length === 0 && (
-        <p className="miudo">Nenhuma entrada neste filtro.</p>
+        <p className="miudo">
+          {filtro === 'entradas'
+            ? 'Nenhuma entrada ainda. Quando apostar, use "Entrei nessa aposta" na Análise (ou aqui, em No papel).'
+            : 'Nenhuma análise sem entrada.'}
+        </p>
       )}
       {lista.map((e) => {
         const ap = apurar(e);
@@ -355,7 +367,12 @@ export function AbaHistorico({
         return (
           <details key={e.id} className="caixa linha-historico">
             <summary>
-              {sit && <span className={`selo-resultado ${sit}`}>{SELO[sit]}</span>}
+              {sit && (
+                <span className={`selo-resultado ${sit} ${e.aposta ? '' : 'papel'}`}>
+                  {SELO[sit]}
+                  {!e.aposta && sit !== 'pendente' && <small>no papel</small>}
+                </span>
+              )}
               <span className="lh-data">
                 {e.resumo.inicio.slice(0, 10).split('-').reverse().slice(0, 2).join('/')}
               </span>
@@ -376,7 +393,11 @@ export function AbaHistorico({
               <span className="lh-entrada">
                 {ent ? (
                   <>
-                    {ent.descricao} <b>@ {ent.odd}</b>
+                    {ent.descricao}{' '}
+                    <b>
+                      @ {e.aposta?.odd ?? ent.odd}
+                      {e.aposta && ` · ${e.aposta.casa}`}
+                    </b>
                     <span className="miudo">
                       EV {pct(ent.ev)}
                       {ap?.ok && ` · ${ap.lucro >= 0 ? '+' : ''}${dec(ap.lucro)} un.`}
@@ -406,6 +427,39 @@ export function AbaHistorico({
                 <li key={m}>{m}</li>
               ))}
             </ul>
+            {e.aposta ? (
+              <p className="entrou">
+                ✅ Você entrou: @ {e.aposta.odd} na {e.aposta.casa}
+                {e.aposta.valor !== undefined && ` · R$ ${dec(e.aposta.valor)}`} · em{' '}
+                {e.aposta.feitaEm.slice(0, 16).replace('T', ' ')}{' '}
+                <button
+                  className="discreto mini"
+                  onClick={() =>
+                    confirm('Desfazer a entrada? A análise volta para "No papel".') &&
+                    mudar(e.id, { aposta: undefined })
+                  }
+                >
+                  desfazer
+                </button>
+              </p>
+            ) : (
+              ent &&
+              (entrandoEm === e.id ? (
+                <FormAposta
+                  entrada={ent}
+                  decisao={e.resumo.decisao}
+                  onCancelar={() => setEntrandoEm(null)}
+                  onConfirmar={(aposta) => {
+                    mudar(e.id, { aposta });
+                    setEntrandoEm(null);
+                  }}
+                />
+              ) : (
+                <button className="mini" onClick={() => setEntrandoEm(e.id)}>
+                  ✅ Entrei nessa aposta
+                </button>
+              ))
+            )}
             {ap && !ap.ok && <div className="caixa alerta">Apuração: {ap.falta}</div>}
             {ent && !auto?.ok && (
               <div className="marcar-manual">

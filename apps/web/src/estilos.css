@@ -3903,3 +3903,26 @@ button.cl-linha:hover {
     grid-column: 1 / -1;
   }
 }
+.selo-resultado small {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+.selo-resultado.papel {
+  border-style: dashed;
+}
+.entrou {
+  color: var(--ok);
+}
+.grade3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 560px) {
+  .grade3 {
+    grid-template-columns: 1fr;
+  }
+}
