@@ -1,0 +1,123 @@
+### POSICOES
+### MEIO y 447 0.92
+### MEIO y 220 0.74
+### MEIO y 757 0.21
+### MEIO x 537 0.57
+### MEIO x 312 0.08
+### MEIO x 153 0.08
+@294,18 19:30
+@775,10 7 FAVORITO
+@892,10 sis
+@959,11 </>
+@104,30 Athletico Ã
+@295,46 Hoje
+@473,35 C/ Vasco
+@13,106 26 e
+@52,106 19:30
+@299,107 WY Campeonato Brasileiro Série A [3] Arena da Baixada
+@577,106 =] Premiere
+@624,105 5
+@163,186 Formações
+@190,253 Possíveis escalações
+@429,306 Idade
+@551,306 Valor de mercado
+@676,306 Altura
+@768,309 Fantasy
+@959,307 </>
+@317,306 Nacionalidade
+@25,336 imo >
+@479,364 3-4-2-1
+@592,364 4-2-3-1
+@158,384 Athletico II
+@259,388 6.83 O
+@885,388 Vasco [16.78 O
+@18,434 Pts
+@197,536 6
+@312,556 7S. Mendoza
+@674,536 É)
+@864,556 96 P. Henrique
+@211,590 37 L. Esquivel
+@675,589 11 A. Gómez
+@404,602 Q
+@321,634 2
+@404,645 8 J. Cruz
+@769,644 23T. Mendes
+@864,687 55 G. Pereira
+@14,681 4
+@100,701 é
+@480,698 6
+@268,711 e
+@500,754 SK Viveros |
+@582,753 19B. Duarte
+@674,753 22A.Lescano
+@113,757 | i —
+@211,755 33J.F.Aquirre
+@311,819 16 Jádson
+@404,811 É
+@820,820 O som ae
+@404,857 21 Leozinho
+@769,864 58. Sosa
+@210,876 Q
+@211,919 4 A. Dias
+@674,920 9 F. Colidio
+@18,926 27
+@311,951 12 Gilberto
+@864,951 6 L. Piton
+@18,979 el
+@294,18 19:30
+@892,11 "
+@959,11 </>
+@295,46 Hoje
+@504,30 Vasco
+@72,30 Athletico
+@156,30 4
+@252,107 26» 19:30 J Campeonato Brasileiro Série A [21 Arena da Baixada
+@577,107 [3 Premiere
+@624,107 5
+@10,196 J
+@163,186 Formações
+@363,186 Insights da IA
+@565,184 Estatísticas
+@766,186 Classificação
+@936,184 H2H
+@853,253 Compartilhe as escalagoes «
+@237,254 escalagOes
+@89,266 DT
+@163,308 Desempenho w
+@317,306 Nacionalidade
+@511,307 Idade Valor de mercado
+@725,308 Altura Fantasy
+@959,308 </>
+@25,336 imo >
+@479,364 3-4-2-1
+@592,364 4-2-3-1
+@143,386 Athletico
+@247,388 6.83 O
+@885,388 Vasco [16.78 O
+@538,399 E =n
+@312,513 e
+@311,557 7S. Mendoza
+@863,557 96 P. Henrique
+@210,588 37 L Esquivel
+@674,590 11 A. Gomez
+@404,645 81 Cruz
+@769,644 23T. Nendes
+@116,689 (an)
+@311,687 14 L Gustavo
+@864,688 558. Perera
+@491,700 %
+@497,753 K Viveros
+@564,753 198.0
+@674,754 22 A. Lascano
+@252,777 o
+@311,820 16 Jadson
+@865,821 3OR. Renan
+@19,863 v |
+@403,863 21 Leozinho
+@769,864 58. Sosa
+@21,927 27
+@212,920 NA. Dias
+@674,918 9F. Colidio
+@311,953 12 Gilberto
+@864,951 68 L. Piton
+@21,979 21 |

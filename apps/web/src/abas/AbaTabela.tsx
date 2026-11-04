@@ -144,9 +144,10 @@ export function AbaTabela({ r, setR, d }: PropsAba) {
       <h3>Desfalques</h3>
       <UploadPrints
         rotulo="Enviar print dos desfalques"
-        dica='SuperScore → "Jogadores ausentes". Pode ser a tela inteira: o que vem antes do título é ignorado.'
+        dica='SofaScore → "Contusões e suspensões" (esquerda = mandante, direita = visitante) ou SuperScore → "Jogadores ausentes". Não precisa do nome nem do escudo dos times.'
         leituras={r.prints.desfalques ?? []}
         desabilitado={semTimes}
+        modo="lados"
         {...acoesPrints(setR, 'desfalques')}
       />
       {d.avisosDesfalques.map((a) => (

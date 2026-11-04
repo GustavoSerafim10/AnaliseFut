@@ -1,0 +1,59 @@
+### POSICOES
+### MEIO y 647 0.65
+### MEIO y 767 0.33
+### MEIO y 566 0.13
+### MEIO x 487 0.39
+### MEIO x 595 0.10
+### MEIO x 544 0.07
+@490,11 |
+@488,79 Árbitro
+@488,149 O Ramon Abatti Abel
+@990,186 7
+@438,199 Média de cartões [J]
+@548,199 0.29 J]
+@599,198 4.70
+@488,287 Treinadores
+@172,354 Odair Hellmann
+@655,354 Pedro Emanuel
+@62,367 (a
+@143,389 Treinador
+@545,371 O
+@626,389 Treinador
+@488,487 Contusões e suspensões
+@160,569 Carlos Terán
+@669,569 Marino Hinestroza
+@183,609 (O Decisão do clube
+@640,609 (O) Descanso
+@151,689 Claudinho
+@651,687 Carlos Cuesta
+@233,730 == Lesionado Ligamento cruzado
+@665,728 == Lesionado Anca
+@663,808 Mateus Carvalho
+@716,848 == Lesionado Ligamento cruzado
+@488,989 Cabra a nartida
+@487,79 Árbitro
+@487,152 (=) Ramon Abatti Abel
+@438,199 Média de cartões [Jj
+@548,199 029 J]
+@599,198 4.70
+@986,216 Hi
+@488,287 Treinadores
+@172,354 Odair Hellmann
+@655,354 Pedro Emanuel
+@143,389 Treinador
+@626,389 Treinador
+@488,369 |
+@488,487 Contusões e suspensões
+@160,569 Carlos Terán
+@669,569 Marino Hinestroza
+@62,585 O
+@63,625 jy
+@183,609 (O Decisão do clube
+@640,609 (O Descanso
+@151,689 Claudinho
+@651,687 Carlos Cuesta
+@665,728 «= Lesionado Anca
+@233,730 «= Lesionado Ligamento cruzado
+@663,808 Mateus Carvalho
+@716,848 «= Lesionado Ligamento cruzado
+@488,988 Cnahra a nartida

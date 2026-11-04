@@ -264,6 +264,16 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
       else if (qualidade(nome) > qualidade(nomes[igual].nome)) nomes[igual] = { nome, x: xi, y };
     }
   }
+  // campo deitado (SofaScore): as duas formações ("3-4-2-1   4-2-3-1") ficam lado a lado logo
+  // acima do campo; o que estiver acima delas é cabeçalho da página (abas, "Hoje", filtros) e
+  // atrapalharia a escolha da linha do meio
+  const ys = formacoes.map((f) => f.y);
+  const ladoALado = formacoes.length >= 2 && Math.max(...ys) - Math.min(...ys) < 30;
+  if (ladoALado) {
+    const topo = Math.max(...ys) + 15;
+    nomes.splice(0, nomes.length, ...nomes.filter((i) => i.y > topo));
+    for (const c of candidatas) if (c.eixo === 'y' && c.pos <= topo) c.forca = 0;
+  }
   // a linha do meio é a candidata forte que divide os nomes ao meio (a divisória do cabeçalho
   // deixa quase todos de um lado só)
   const coord = (i: { x: number; y: number }, eixo: 'x' | 'y') => (eixo === 'y' ? i.y : i.x);

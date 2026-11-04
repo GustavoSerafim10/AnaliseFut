@@ -28,13 +28,46 @@ export interface Desfalque {
   situacao?: string;
 }
 
-const SITUACOES = /lesionad|suspens|duvid|machucad|contundid|afastad|incert|convocad/;
+const SITUACOES =
+  /lesionad|suspens|duvid|machucad|contundid|afastad|incert|convocad|decisao do clube|descanso|opcao tecnica|nao relacionad/;
 const TITULO_DESFALQUES = /ausentes|desfalques/;
+
+/**
+ * Leitura com posição ("@x,y texto", milésimos da imagem): SofaScore "Contusões e suspensões" em
+ * duas colunas SEM o nome dos times. Esquerda do centro = mandante, direita = visitante. Só vale
+ * o que está entre o título e a próxima seção centralizada (fora árbitro e treinadores). Com
+ * cabeçalho de time no print (SuperScore, uma coluna só), volta à leitura de cima para baixo.
+ */
+function desfalquesPorPosicao(texto: string, jogo: NomesTimes): string {
+  const itens: { x: number; y: number; t: string }[] = [];
+  for (const l of texto.split('\n')) {
+    const p = /^@(\d+),(\d+) (.*)$/.exec(l.trim());
+    if (!p) continue;
+    const [x, y, t] = [Number(p[1]), Number(p[2]), p[3].trim()];
+    // duas leituras da mesma imagem: o mesmo lugar é a mesma linha
+    if (!itens.some((i) => Math.abs(i.x - x) < 45 && Math.abs(i.y - y) < 20))
+      itens.push({ x, y, t });
+  }
+  itens.sort((a, b) => a.y - b.y || a.x - b.x);
+  const comCabecalho = itens.some(
+    (i) => /[>›»]/.test(i.t) && reconhecerTime(i.t.replace(/[>›»]/g, ''), jogo),
+  );
+  const titulo = itens.find((i) => /contus|ausentes|desfalques/.test(semAcento(i.t)));
+  if (comCabecalho || !titulo) return itens.map((i) => i.t).join('\n');
+  const centro = titulo.x;
+  // próxima seção: outro título centralizado abaixo ("Sobre a partida")
+  const fim = itens.find((i) => i.y > titulo.y + 30 && Math.abs(i.x - centro) < 60)?.y ?? 1e9;
+  const corpo = itens.filter((i) => i.y > titulo.y + 10 && i.y < fim);
+  const coluna = (esquerda: boolean) =>
+    corpo.filter((i) => i.x < centro === esquerda).map((i) => i.t);
+  return [`${jogo.casa} >`, ...coluna(true), `${jogo.fora} >`, ...coluna(false)].join('\n');
+}
 
 export function lerDesfalques(
   texto: string,
   jogo: NomesTimes,
 ): { desfalques: Desfalque[]; avisos: string[] } {
+  if (texto.trimStart().startsWith('### POSICOES')) texto = desfalquesPorPosicao(texto, jogo);
   const desfalques: Desfalque[] = [];
   const avisos: string[] = [];
   let atual: Time | null = null;
@@ -61,8 +94,16 @@ export function lerDesfalques(
       continue;
     }
     // "Lesionado" / "Duvidoso": situação do jogador de cima, nunca um jogador
-    if (SITUACOES.test(t) && bruta.split(/\s+/).length <= 3) {
-      if (desfalques.length) desfalques[desfalques.length - 1].situacao = bruta;
+    // conta só palavras de verdade: "(O Decisão do clube", "== Lesionado Ligamento cruzado"
+    if (
+      SITUACOES.test(t) &&
+      bruta.split(/\s+/).filter((p) => /[A-Za-zÀ-ú]{2,}/.test(p)).length <= 4
+    ) {
+      if (desfalques.length)
+        desfalques[desfalques.length - 1].situacao = bruta
+          .split(/\s+/)
+          .filter((p) => /[A-Za-zÀ-ú]{2,}/.test(p))
+          .join(' ');
       continue;
     }
     // nome: começa na primeira palavra "Maiúscula + 2 letras"; antes disso é lixo (ícones, camisa)
