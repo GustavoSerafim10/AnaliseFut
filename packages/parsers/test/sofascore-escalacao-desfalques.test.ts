@@ -12,8 +12,11 @@ describe('SofaScore sem nome de time no print: esquerda = mandante, direita = vi
     const r = lerEscalacao(fx('escalacao-sofascore-athletico'), jogo);
     expect(r.casa.formacao).toBe('3-4-2-1');
     expect(r.fora.formacao).toBe('4-2-3-1');
-    expect(r.casa.titulares).toHaveLength(10); // o goleiro (Mycael) não saiu no OCR
-    expect(r.fora.titulares).toHaveLength(10); // nem o do Vasco (L. Jardim)
+    // os goleiros vêm da leitura extra do canto do gol (o nome fica em cima da linha da área)
+    expect(r.casa.titulares).toHaveLength(11);
+    expect(r.fora.titulares).toHaveLength(11);
+    expect(r.casa.titulares[0]).toBe('Mycael');
+    expect(r.fora.titulares[0]).toBe('L. Jardim');
     expect(r.casa.titulares).toEqual(
       expect.arrayContaining(['L. Esquivel', 'Leozinho', 'J. Cruz']),
     );
@@ -46,12 +49,42 @@ describe('campo do site repete o desenho do print', () => {
     expect(r.fora.formacao).toBe('4-2-3-1');
   });
   it('posições: mandante na metade esquerda, visitante na direita, centroavante perto do meio', () => {
-    const p = (l: 'casa' | 'fora', n: string) => r[l].posicoes!.find((x) => x.nome === n)!;
+    const p = (l: 'casa' | 'fora', n: string) => r[l].posicoes!.find((x) => x.nome.includes(n))!;
     expect(r.casa.posicoes!.every((x) => x.x < 50)).toBe(true);
     expect(r.fora.posicoes!.every((x) => x.x > 50)).toBe(true);
     expect(p('casa', 'Viveros').x).toBeGreaterThan(p('casa', 'Aquirre').x);
     expect(p('fora', 'B. Duarte').x).toBeLessThan(p('fora', 'Renan').x);
     // mesma coluna no print, mesma coluna no site
     expect(p('casa', 'L. Esquivel').x).toBe(p('casa', 'A. Dias').x);
+  });
+});
+
+describe('segundo print do mesmo campo (lido no navegador do usuário)', () => {
+  const r = lerEscalacao(fx('escalacao-sofascore-athletico-2'), jogo);
+  it('"19B.Duarte 22 A. Lescano": camisa grudada e dois jogadores na mesma linha', () => {
+    expect(r.fora.titulares).toEqual(expect.arrayContaining(['B. Duarte', 'A. Lescano']));
+    expect(r.fora.titulares).toHaveLength(11);
+  });
+  it('goleiros no gol, e pedaços do recorte ("Renan", "enrique", "Athl.") não viram goleiro', () => {
+    expect(r.casa.titulares[0]).toBe('Mycael');
+    expect(r.fora.titulares[0]).toBe('L. Jardim');
+    expect(r.casa.posicoes!.find((p) => p.nome === 'Mycael')).toMatchObject({ x: 4, y: 50 });
+    expect(r.fora.posicoes!.find((p) => p.nome === 'L. Jardim')).toMatchObject({ x: 96, y: 50 });
+  });
+  it('"Aquirre Q" (lixo no fim) não vira coluna própria: 3-4-2-1 e Aguirre alinhado à defesa', () => {
+    expect(r.casa.formacao).toBe('3-4-2-1');
+    const x = (n: string) => r.casa.posicoes!.find((p) => p.nome.includes(n))!.x;
+    expect(x('Aquirre')).toBe(x('Esquivel'));
+  });
+});
+
+describe('leitura atual do site (camisa grudada separada pela posição das palavras)', () => {
+  it('os 22, com os goleiros, e B. Duarte separado de A. Lescano', () => {
+    const r = lerEscalacao(fx('escalacao-sofascore-athletico-3'), jogo);
+    expect(r.casa.titulares).toHaveLength(11);
+    expect(r.fora.titulares).toHaveLength(11);
+    expect([r.casa.formacao, r.fora.formacao]).toEqual(['3-4-2-1', '4-2-3-1']);
+    const x = (n: string) => r.fora.posicoes!.find((p) => p.nome.includes(n))!.x;
+    expect(x('Lescano') - x('Duarte')).toBeGreaterThan(5);
   });
 });

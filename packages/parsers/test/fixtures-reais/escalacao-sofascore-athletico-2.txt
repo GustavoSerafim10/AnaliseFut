@@ -1,0 +1,89 @@
+### POSICOES
+### MEIO y 616 0.22
+### MEIO y 415 0.13
+### MEIO y 725 0.13
+### MEIO x 511 0.84
+### MEIO x 843 0.12
+### MEIO x 270 0.11
+@450,21 3-4-2-1
+@571,21 4-2-3-1
+@92,56 Athletico
+@202,57 6.83 O
+@839,57 Vasco NM
+@933,57 6.78 O
+@570,84 | |
+@271,260 =
+@861,313 96 P. Henrique
+@164,297 a
+@658,297 e
+@165,363 37 L. Esquivel
+@658,363 11 A. Gomez
+@370,446 8 J. Cruz
+@759,444 23T. Mendes
+@271,512 14 L. Gustavo
+@861,510 55 G. Pereira
+@57,525 (7
+@463,530 €)
+@459,573 71
+@463,585 [oe
+@464,604 3 K. Viveros
+@612,612 19B.Duarte 22 A. Lescano
+@658,547 @
+@63,626 o
+@207,643 33 J. F. Aquirre Q
+@271,711 16 Jádson
+@861,712 30 R. Renan
+@362,739 os
+@370,751 EL)
+@370,777 21 Leozinho
+@759,779 5S. Sosa
+@164,797 Q
+@164,861 4 A. Dias
+@658,860 9 F. Colidio
+@271,910 12 Gilberto
+@862,912 6L. Piton
+@450,21 3-4-2-1
+@571,21 2-3-1
+@151,57 Athletico [16.83 ©
+@840,57 Vasco [1
+@933,56 6.78 O
+@272,312 7S. Mendoza
+@860,313 96 P. Henrique
+@164,364 37 L. Esquivel
+@658,362 11 A. Gómez
+@369,444 8J.Cruz
+@759,445 23T. Mendes
+@271,514 14 L. Gustavo
+@464,530 q
+@861,511 55 G. Pereira
+@477,612 K. Víveros |
+@536,611 19B.
+@658,613 22 A. Leacano
+@208,646 UR
+@270,712 16 Jadson
+@860,713 30 R. Renan
+@369,779 21 Leozinho
+@759,780 5S. Sosa
+@164,861 4 A. Dias
+@658,863 9F. Colidio
+@271,913 12 Gilberto
+@861,912 6L Piton
+### GOLEIRO esquerda 37
+### GOLEIRO esquerda 1 Mycael
+### GOLEIRO esquerda 334
+### GOLEIRO esquerda 6)
+### GOLEIRO esquerda (=
+### GOLEIRO esquerda [Y
+### GOLEIRO esquerda Mycael
+### GOLEIRO direita E
+### GOLEIRO direita O
+### GOLEIRO direita enrique
+### GOLEIRO direita x
+### GOLEIRO direita a
+### GOLEIRO direita )
+### GOLEIRO direita ase,
+### GOLEIRO direita L.Jardim
+### GOLEIRO direita })
+### GOLEIRO direita Renan
+### GOLEIRO direita 2
+### GOLEIRO direita n

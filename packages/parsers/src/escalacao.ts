@@ -13,6 +13,39 @@ export const MARCA_DIREITA = '### DIREITA';
 /** formato atual do OCR: linhas "@x,y texto" + "### MEIO <x|y> <milésimos>" */
 export const MARCA_POSICOES = '### POSICOES';
 export const MARCA_MEIO = '### MEIO';
+/** "### GOLEIRO esquerda <texto>": leitura extra do canto do gol (recorte ampliado) */
+export const MARCA_GOLEIRO = '### GOLEIRO';
+
+/**
+ * Nome do goleiro no texto do recorte ("Mycael/ 33", "À - L. Jardim"): o melhor nome que não é
+ * de um jogador já lido (o recorte pega pedaços dos defensores ao lado: "Renan", "Pereira").
+ */
+function goleiroDoCanto(textos: string[], jaLidos: string[]): string | undefined {
+  let melhor: string | undefined;
+  for (const t of textos) {
+    const limpo = t
+      .replace(/([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 ')
+      .replace(/[^A-Za-zÀ-ú. ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const nome = nomeDeJogador(limpo);
+    if (
+      nome &&
+      nome.replace(/[^A-Za-zÀ-ú]/g, '').length >= 4 &&
+      // jogador já lido, ou pedaço do nome de um time ("Athl." do cabeçalho)
+      !jaLidos.some(
+        (j) =>
+          mesmoJogador(j, nome) ||
+          semAcento(j)
+            .replace(/[^a-z]/g, '')
+            .startsWith(semAcento(nome).replace(/[^a-z]/g, '')),
+      ) &&
+      (!melhor || qualidade(nome) > qualidade(melhor))
+    )
+      melhor = nome;
+  }
+  return melhor;
+}
 
 export type StatusEscalacao = 'provavel' | 'confirmada';
 
@@ -29,21 +62,35 @@ export interface LadoEscalacao {
 }
 
 /**
- * Formação pelas colunas do campo: jogadores na mesma distância do meio (±25 milésimos) são a
- * mesma fileira; do gol para frente, sem o goleiro. Só vale com os 10 de linha.
+ * Colunas do campo: jogadores a menos de 50 milésimos um do outro na distância do meio são a
+ * mesma fileira (no SofaScore as fileiras ficam ~100 apart; o lixo do OCR no fim do nome, como
+ * "Aquirre Q", desloca o centro da linha em ~40). Devolve, para cada jogador, a distância média
+ * da coluna dele, e a formação (do gol para frente, sem o goleiro; só com os 10 de linha).
  */
-function formacaoPelasColunas(dist: number[], comGoleiro: boolean): string | undefined {
-  const xs = [...dist].sort((p, q) => q - p);
-  if (comGoleiro) xs.shift();
-  if (xs.length !== 10) return undefined;
-  const grupos: number[] = [];
+function colunasDoCampo(
+  dist: number[],
+  comGoleiro: boolean,
+): { alinhada: number[]; formacao?: string } {
+  const ordem = dist.map((d, i) => ({ d, i })).sort((p, q) => q.d - p.d);
+  const grupos: { d: number; i: number }[][] = [];
   let ultimo = Infinity;
-  for (const d of xs) {
-    if (ultimo - d > 25) grupos.push(1);
-    else grupos[grupos.length - 1]++;
-    ultimo = d;
+  for (const o of ordem) {
+    if (ultimo - o.d > 50) grupos.push([]);
+    grupos[grupos.length - 1].push(o);
+    ultimo = o.d;
   }
-  return grupos.length >= 3 && grupos.length <= 5 ? grupos.join('-') : undefined;
+  const alinhada = [...dist];
+  for (const g of grupos) {
+    const media = g.reduce((a, o) => a + o.d, 0) / g.length;
+    for (const o of g) alinhada[o.i] = media;
+  }
+  const linha = grupos.map((g) => g.length);
+  if (comGoleiro && linha[0] === 1) linha.shift();
+  const formacao =
+    linha.reduce((a, n) => a + n, 0) === 10 && linha.length >= 3 && linha.length <= 5
+      ? linha.join('-')
+      : undefined;
+  return { alinhada, formacao };
 }
 
 const formacaoValida = (f?: string) =>
@@ -258,6 +305,11 @@ function qualidade(nome: string): number {
  */
 function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
   const avisos: string[] = [];
+  const doCanto = (lado: string) =>
+    linhas
+      .filter((l) => l.startsWith(`${MARCA_GOLEIRO} ${lado} `))
+      .map((l) => l.slice(MARCA_GOLEIRO.length + lado.length + 2));
+  const goleiros = { esquerda: doCanto('esquerda'), direita: doCanto('direita') };
   const candidatas = linhas
     .filter((l) => l.startsWith(MARCA_MEIO))
     .map((l) => {
@@ -281,8 +333,12 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
     // das palavras; isto cobre prints antigos); o segundo fica um pouco à direita
     const trechos = texto.split(/\s(?=\d{1,2}\s+[A-ZÀ-Ú])/);
     for (const [k, trecho] of trechos.entries()) {
-      // "N.Ferrares" → "N. Ferrares"
-      const nome = nomeDeJogador(trecho.replace(/\b([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 '));
+      // "N.Ferrares" → "N. Ferrares"; "19B.Duarte" (camisa grudada na inicial) → "19 B. Duarte"
+      const nome = nomeDeJogador(
+        trecho
+          .replace(/^(\d{1,2})(?=[A-ZÀ-Ú]\.)/, '$1 ')
+          .replace(/([A-ZÀ-Ú]\.)(?=[A-ZÀ-Ú])/g, '$1 '),
+      );
       if (!nome) continue;
       const xi = x + (k - (trechos.length - 1) / 2) * 60;
       // duas leituras da mesma imagem: o mesmo lugar é o mesmo jogador; fica o nome mais limpo
@@ -349,23 +405,36 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
     const doLado = xs.filter(noCampo).filter((i) => titulares.includes(i.nome));
     const dist = doLado.map((i) => Math.abs(i.a - meio));
     const lida = formacoes.find((f) => coord(f, eixo) < meio === ehAntes)?.f;
-    const pelasColunas = formacaoPelasColunas(dist, titulares.length >= 11);
+    const colunas = colunasDoCampo(dist, titulares.length >= 11);
+    const pelasColunas = colunas.formacao;
+    // 10 de linha e o goleiro achado no recorte do canto do gol (campo deitado): entra primeiro
+    const goleiro =
+      eixo === 'x' && titulares.length === 10
+        ? goleiroDoCanto(goleiros[ehAntes ? 'esquerda' : 'direita'], [
+            ...nomes.map((i) => i.nome),
+            jogo.casa,
+            jogo.fora,
+          ])
+        : undefined;
     return {
-      titulares,
+      titulares: goleiro ? [goleiro, ...titulares] : titulares,
       reservas: [],
       // as colunas do print valem mais que o número lido (o OCR troca 3 por 5)
       formacao: pelasColunas ?? (formacaoValida(lida) ? lida : undefined),
-      posicoes: doLado.map((i) => {
-        const prof = Math.abs(i.a - meio) / fundo;
-        // o goleiro (11 lidos: o mais fundo) fica no gol; os de linha vão até a entrada da área
-        const ehGoleiro = titulares.length >= 11 && Math.abs(i.a - meio) === Math.max(...dist);
-        const x = ehGoleiro ? 4 : 50 - 3 - prof * 33;
-        return {
-          nome: i.nome,
-          x: Math.round((ehAntes ? x : 100 - x) * 10) / 10,
-          y: Math.round((8 + ((i.b - bMin) / Math.max(1, bMax - bMin)) * 84) * 10) / 10,
-        };
-      }),
+      posicoes: doLado
+        .map((i, k) => {
+          // profundidade da coluna (alinhada), não a do centro da linha lida
+          const prof = colunas.alinhada[k] / fundo;
+          // o goleiro (11 lidos: o mais fundo) fica no gol; os de linha vão até a entrada da área
+          const ehGoleiro = titulares.length >= 11 && Math.abs(i.a - meio) === Math.max(...dist);
+          const x = ehGoleiro ? 4 : 50 - 3 - prof * 33;
+          return {
+            nome: i.nome,
+            x: Math.round((ehAntes ? x : 100 - x) * 10) / 10,
+            y: Math.round((8 + ((i.b - bMin) / Math.max(1, bMax - bMin)) * 84) * 10) / 10,
+          };
+        })
+        .concat(goleiro ? [{ nome: goleiro, x: ehAntes ? 4 : 96, y: 50 }] : []),
     };
   };
   return {

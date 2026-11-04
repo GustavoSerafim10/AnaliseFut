@@ -6,6 +6,7 @@
 import {
   lerTabelaOcr,
   linhasDoTesseract,
+  MARCA_GOLEIRO,
   MARCA_MEIO,
   MARCA_POSICOES,
   NUMEROS_TABELA,
@@ -303,7 +304,8 @@ export async function lerImagem(
             const trechos: (typeof l.words)[] = [];
             for (const wd of l.words) {
               const atual = trechos[trechos.length - 1];
-              if (!atual || (/^\d/.test(wd.text) && atual.some((x) => !/^\d/.test(x.text))))
+              // ("19B.Duarte 22 A. Lescano": a camisa grudada no nome também é nome)
+              if (!atual || (/^\d/.test(wd.text) && atual.some((x) => /[A-Za-zÀ-ú]/.test(x.text))))
                 trechos.push([wd]);
               else atual.push(wd);
             }
@@ -322,6 +324,44 @@ export async function lerImagem(
               linhas.push(`@${cx},${cy} ${t}`);
             }
           }
+    }
+    // goleiro: no SofaScore o nome fica em cima da linha da grande área e some na leitura da
+    // página inteira. Recorte do canto do gol ampliado 3x; o nome é branco e as linhas do campo
+    // são cinza: só o quase-branco vira texto (preto em fundo branco), com margem branca (texto
+    // colado na borda do print não é lido). Dois cortes de brilho; o leitor fica com o nome que
+    // não é de nenhum titular já lido.
+    aoProgredir = null;
+    const base = document.createElement('canvas');
+    base.width = original.width;
+    base.height = original.height;
+    base.getContext('2d')!.putImageData(original, 0, 0);
+    const larg = Math.round(original.width * 0.14);
+    const sy = Math.round(original.height * 0.3);
+    const alt = Math.round(original.height * 0.6);
+    const margem = 30;
+    for (const lado of ['esquerda', 'direita'] as const) {
+      const sx = lado === 'esquerda' ? 0 : original.width - larg;
+      for (const corte of [150, 190]) {
+        const recorte = document.createElement('canvas');
+        recorte.width = larg * 3 + 2 * margem;
+        recorte.height = alt * 3 + 2 * margem;
+        const rctx = recorte.getContext('2d', { willReadFrequently: true })!;
+        rctx.fillStyle = '#fff';
+        rctx.fillRect(0, 0, recorte.width, recorte.height);
+        rctx.imageSmoothingQuality = 'high';
+        rctx.drawImage(base, sx, sy, larg, alt, margem, margem, larg * 3, alt * 3);
+        const px = rctx.getImageData(margem, margem, larg * 3, alt * 3);
+        for (let i = 0; i < px.data.length; i += 4) {
+          const v = cinzaDe(px.data, i) >= corte ? 0 : 255;
+          px.data[i] = px.data[i + 1] = px.data[i + 2] = v;
+        }
+        rctx.putImageData(px, margem, margem);
+        const { data } = await w.recognize(recorte, {}, { blocks: true, text: true });
+        for (const b of data.blocks ?? [])
+          for (const p of b.paragraphs)
+            for (const l of p.lines)
+              if (l.text.trim()) linhas.push(`${MARCA_GOLEIRO} ${lado} ${l.text.trim()}`);
+      }
     }
     return linhas.join('\n');
   } finally {
