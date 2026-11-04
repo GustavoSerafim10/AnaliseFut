@@ -20,7 +20,9 @@ export interface MercadoDetectado {
  */
 export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [
-    /vitoria antecipada|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
+    // Futamina/Jogou: "Pagamento antecipado" (paga com 2 gols de vantagem), "Resultado + ambas",
+    // "Resultado + total" e o handicap europeu de 3 vias ("Resultado com handicap")
+    /vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
     'outro',
   ],
   // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -

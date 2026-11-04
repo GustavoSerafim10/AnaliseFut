@@ -88,6 +88,9 @@ export function normalizar1win(texto: string): string {
           return `${lado[0].toUpperCase()}${lado.slice(1).toLowerCase()} De ${v}`;
         },
       )
+      // "+05" / "-05": linha de handicap com o ponto perdido (com sinal e zero à esquerda,
+      // só pode ser ±0.5; odd nunca tem sinal)
+      .replace(/(^|[\s,])([+-])0(\d)(?![\d.,])/gm, '$1$20.$3')
       // "CR Flamengo O 1.03" → "CR Flamengo 0 1.03"
       .replace(/([ \t])[Oo](?=[ \t]+\d)/g, '$10')
       // "Atlético-MG1 1.49" → "Atlético-MG 1 1.49"
@@ -405,6 +408,21 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     }
 
     const tokens = bruta.split(/[\s|]+/).filter(Boolean);
+
+    // tema claro: o rótulo "1" do resultado é cinza-claro e some ("2.17 x 3.36 2 3.26") ou vira
+    // lixo ("] 2.06 X 3.19 2 3.09"); com "X" e "2" no lugar, a primeira odd é a do lado 1
+    if (ORDEM_PADRAO[mercado.mercado]?.join() === '1,X,2') {
+      const semLixo = tokens.filter((t) => /[\dxX]/.test(t));
+      const [o1, x, oX, dois, o2] = semLixo;
+      if (
+        semLixo.length === 5 &&
+        /^x$/i.test(x) &&
+        dois === '2' &&
+        [o1, oX, o2].every((t) => (lerOdd(t)?.odd ?? 0) > 1)
+      ) {
+        tokens.splice(0, tokens.length, '1', o1, 'X', oX, '2', o2);
+      }
+    }
 
     // handicap em colunas por time, só números: "-1.5 1.85 +1.5 2.01" (Bet365, Pinnacle)
     if (
