@@ -237,8 +237,11 @@ async function preprocessar(arquivo: File, modo: ModoOcr = 'bloco'): Promise<Pre
     soma += c;
   }
   const inverter = soma / (px.length / 4) < 128;
+  // tema claro (Futamina, Jogou, 1win clara): rótulos cinza-claro em caixa cinza somem na
+  // binarização do Tesseract; a curva (gama 2) escurece os tons médios e mantém o fundo
+  const gama = !inverter && modo === 'bloco';
   for (let i = 0; i < px.length; i += 4)
-    px[i] = px[i + 1] = px[i + 2] = inverter ? 255 - px[i] : px[i];
+    px[i] = px[i + 1] = px[i + 2] = inverter ? 255 - px[i] : gama ? (px[i] * px[i]) / 255 : px[i];
   ctx.putImageData(dados, 0, 0);
   return { cinza, binario, meio, original, escala };
 }

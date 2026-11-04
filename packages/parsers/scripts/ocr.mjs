@@ -3,7 +3,7 @@
 //      npm run ocr -- --tabela classificacao.png   (leitura em colunas, como a do site)
 // Serve para transformar prints reais em fixtures de teste dos parsers.
 // Mesmo tratamento do site (apps/web/src/ocr.ts, modo "bloco"): amplia com Lanczos-3 (até 4x,
-// ~4000 px, no máximo ~16 Mpx), cinza, inverte tema escuro; Tesseract em modo bloco (psm 6).
+// ~4000 px, no máximo ~16 Mpx), cinza, inverte tema escuro (no claro, curva gama 2); Tesseract em modo bloco (psm 6).
 // O código da ampliação é o mesmo do site: o filtro do sharp dá outro resultado no OCR.
 import { Buffer } from 'node:buffer';
 import sharp from 'sharp';
@@ -89,6 +89,8 @@ async function preprocessar(arq) {
   let soma = 0;
   for (const v of cinza) soma += v;
   if (soma / cinza.length < 128) for (let i = 0; i < cinza.length; i++) cinza[i] = 255 - cinza[i];
+  // tema claro: mesma curva do site (gama 2), só na leitura em bloco
+  else if (!tabela) for (let i = 0; i < cinza.length; i++) cinza[i] = (cinza[i] * cinza[i]) / 255;
   const png = await sharp(Buffer.from(cinza), { raw: { width: W, height: H, channels: 1 } })
     .png()
     .toBuffer();

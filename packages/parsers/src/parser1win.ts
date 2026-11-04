@@ -79,10 +79,11 @@ export function normalizar1win(texto: string): string {
       // "+1.5" / "+ 1.5" (Pinnacle, Bet365): o sinal grudado ou solto antes da linha
       .replace(/([ \t]|^)\+[ \t]+(\d)/gm, '$1+$2')
       // "AcimaDel5" / "AcimaDe25" / "AcimaDe?2.0" → "Acima De 1.5"; linha de total tem 1 casa decimal
+      // "AcimaDed5" / "AcimaDed.5" (tema claro): o "4" saiu como "d"
       .replace(
-        /\b(abaixo|acima)[ \t]*de[ \t]*\??([l\d][\dl]*(?:\.\d+)?)/gi,
+        /\b(abaixo|acima)[ \t]*de[ \t]*\??((?:[ld]|\d)[\dl]*(?:\.\d+)?)(?![A-Za-z])/gi,
         (_, lado: string, n: string) => {
-          let v = n.replace(/l/g, '1');
+          let v = n.replace(/l/g, '1').replace(/^d/, '4');
           if (!v.includes('.') && v.length >= 2) v = `${v.slice(0, -1)}.${v.slice(-1)}`;
           return `${lado[0].toUpperCase()}${lado.slice(1).toLowerCase()} De ${v}`;
         },
