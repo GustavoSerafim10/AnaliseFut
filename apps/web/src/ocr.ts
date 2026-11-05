@@ -4,8 +4,10 @@
  * (calibrado com prints reais do SofaScore, SuperScore e Flashscore).
  */
 import {
+  coresDaCamisa,
   lerTabelaOcr,
   linhasDoTesseract,
+  MARCA_CAMISA,
   MARCA_GOLEIRO,
   MARCA_MEIO,
   MARCA_POSICOES,
@@ -325,6 +327,25 @@ export async function lerImagem(
             }
           }
     }
+    // camisas: no SofaScore ficam logo abaixo das duas formações, lado a lado
+    const formacoes = linhas.flatMap((l) => {
+      const m = /^@(\d+),(\d+) [3-5]-\d-\d(-\d)?$/.exec(l);
+      return m ? [{ x: Number(m[1]), y: Number(m[2]) }] : [];
+    });
+    const esq = formacoes[0];
+    const dir = formacoes.find((f) => esq && f.x > esq.x && Math.abs(f.y - esq.y) < 30);
+    if (esq && dir)
+      for (const [lado, f] of [
+        ['esquerda', esq],
+        ['direita', dir],
+      ] as const) {
+        const c = coresDaCamisa(
+          { data: original.data, largura: original.width, altura: original.height },
+          (f.x / 1000) * original.width,
+          (f.y / 1000) * original.height,
+        );
+        if (c) linhas.push(`${MARCA_CAMISA} ${lado} ${c.cor1}${c.cor2 ? ` ${c.cor2}` : ''}`);
+      }
     // goleiro: no SofaScore o nome fica em cima da linha da grande área e some na leitura da
     // página inteira. Recorte do canto do gol ampliado 3x; o nome é branco e as linhas do campo
     // são cinza: só o quase-branco vira texto (preto em fundo branco), com margem branca (texto

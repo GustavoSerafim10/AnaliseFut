@@ -68,6 +68,8 @@ export interface EscalacaoTime {
   tecnico?: string;
   /** posição de cada titular no print (% do campo deitado), quando o print tinha o campo */
   posicoes?: { nome: string; x: number; y: number }[];
+  /** cores da camisa lidas do print */
+  cores?: { cor1: string; cor2?: string };
   /** formação escolhida à mão: o campo passa a ser montado por ela */
   formacaoEscolhida?: boolean;
   origem: 'print' | 'manual' | 'vazio';

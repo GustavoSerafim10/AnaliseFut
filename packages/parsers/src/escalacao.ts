@@ -15,6 +15,8 @@ export const MARCA_POSICOES = '### POSICOES';
 export const MARCA_MEIO = '### MEIO';
 /** "### GOLEIRO esquerda <texto>": leitura extra do canto do gol (recorte ampliado) */
 export const MARCA_GOLEIRO = '### GOLEIRO';
+/** "### CAMISA esquerda #rrggbb [#rrggbb]": cores da camisa desenhada abaixo da formação */
+export const MARCA_CAMISA = '### CAMISA';
 
 /**
  * Nome do goleiro no texto do recorte ("Mycael/ 33", "À - L. Jardim"): o melhor nome que não é
@@ -59,6 +61,8 @@ export interface LadoEscalacao {
    * 100 = gol do visitante; y: 0 = lateral de cima): o campo do site repete o desenho do print
    */
   posicoes?: { nome: string; x: number; y: number }[];
+  /** cores da camisa no print, quando ele mostra a camisa */
+  cores?: { cor1: string; cor2?: string };
 }
 
 /**
@@ -233,6 +237,7 @@ function juntarLado(a: LadoEscalacao, b: LadoEscalacao): LadoEscalacao {
     formacao: a.formacao ?? b.formacao,
     tecnico: a.tecnico ?? b.tecnico,
     posicoes: a.posicoes ?? b.posicoes,
+    cores: a.cores ?? b.cores,
   };
 }
 
@@ -371,6 +376,10 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
       .filter((l) => l.startsWith(`${MARCA_GOLEIRO} ${lado} `))
       .map((l) => l.slice(MARCA_GOLEIRO.length + lado.length + 2));
   const goleiros = { esquerda: doCanto('esquerda'), direita: doCanto('direita') };
+  const camisaDo = (l: 'esquerda' | 'direita') => {
+    const c = linhas.find((x) => x.startsWith(`${MARCA_CAMISA} ${l} `))?.split(' ');
+    return c ? { cor1: c[3], ...(c[4] ? { cor2: c[4] } : {}) } : undefined;
+  };
   const candidatas = linhas
     .filter((l) => l.startsWith(MARCA_MEIO))
     .map((l) => {
@@ -502,6 +511,7 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
       reservas: [],
       // as colunas do print valem mais que o número lido (o OCR troca 3 por 5)
       formacao: pelasColunas ?? (formacaoValida(lida) ? lida : undefined),
+      cores: camisaDo(ehAntes ? 'esquerda' : 'direita'),
       posicoes: doLado
         .map((i, k) => {
           // profundidade da coluna (alinhada), não a do centro da linha lida

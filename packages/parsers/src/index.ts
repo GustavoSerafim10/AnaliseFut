@@ -19,6 +19,7 @@ export * from './contexto';
 export * from './tabelaOcr';
 export * from './consolidacao';
 export * from './escalacao';
+export * from './camisa';
 export * from './ultimas';
 
 export interface LeituraPrint extends ResultadoParser {

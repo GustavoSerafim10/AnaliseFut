@@ -730,7 +730,9 @@ pre {
   width: 118px;
   height: 138px;
   flex: none;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 18px rgba(255, 210, 63, 0.25));
+  position: relative;
+  display: block;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 16px var(--time));
   animation: flutua 6s ease-in-out infinite;
 }
 .mc-fora .escudo {
@@ -741,6 +743,8 @@ pre {
   font-weight: 700;
   font-size: 30px;
   letter-spacing: 1px;
+  stroke-width: 3px;
+  paint-order: stroke;
 }
 .mc-texto {
   min-width: 0;
@@ -784,15 +788,374 @@ pre {
   color: var(--amarelo);
 }
 .mc-vs {
-  margin-top: 6px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 10px auto 0;
   font-family: var(--fonte-tecnica);
   font-weight: 700;
   font-size: 46px;
   line-height: 1;
   letter-spacing: 0.04em;
-  text-shadow:
-    0 0 18px rgba(127, 212, 255, 0.9),
-    0 2px 10px rgba(0, 0, 0, 0.8);
+}
+.mc-vs-texto {
+  position: relative;
+  background: linear-gradient(90deg, var(--casa), #fff 50%, var(--fora));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9));
+  animation: mc-vs-corre 4s ease-in-out infinite alternate;
+}
+.mc-vs-anel {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--casa),
+    transparent 35%,
+    var(--fora) 50%,
+    transparent 85%,
+    var(--casa)
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation: mc-gira 5s linear infinite;
+}
+@keyframes mc-vs-corre {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+@keyframes mc-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* cores dos times: luz de cada lado, feixes de refletor, faíscas e a fita no rodapé */
+.mc-luz,
+.mc-feixe,
+.mc-faiscas,
+.mc-fita {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+.mc-luz {
+  inset: 0;
+  mix-blend-mode: screen;
+  animation: mc-respira 5s ease-in-out infinite;
+}
+.mc-luz.casa {
+  background: radial-gradient(ellipse 48% 110% at 8% 50%, var(--casa), transparent 72%);
+}
+.mc-luz.fora {
+  background: radial-gradient(ellipse 48% 110% at 92% 50%, var(--fora), transparent 72%);
+  animation-delay: -2.5s;
+}
+@keyframes mc-respira {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+.mc-feixe {
+  top: -40%;
+  width: 16%;
+  height: 190%;
+  mix-blend-mode: screen;
+  opacity: 0.34;
+  transform-origin: 50% 0;
+  -webkit-mask-image: linear-gradient(180deg, #000 10%, transparent 80%);
+  mask-image: linear-gradient(180deg, #000 10%, transparent 80%);
+}
+.mc-feixe.casa {
+  left: 24%;
+  background: linear-gradient(90deg, transparent, var(--casa) 50%, transparent);
+  animation: mc-feixe-casa 8s ease-in-out infinite alternate;
+}
+.mc-feixe.fora {
+  right: 24%;
+  background: linear-gradient(90deg, transparent, var(--fora) 50%, transparent);
+  animation: mc-feixe-fora 8s ease-in-out infinite alternate;
+}
+@keyframes mc-feixe-casa {
+  from {
+    transform: rotate(24deg);
+  }
+  to {
+    transform: rotate(-12deg);
+  }
+}
+@keyframes mc-feixe-fora {
+  from {
+    transform: rotate(-24deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+.mc-faiscas {
+  inset: 0;
+  overflow: hidden;
+}
+.mc-faiscas i {
+  position: absolute;
+  bottom: -8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0;
+  animation: mc-sobe 7s linear infinite;
+}
+.mc-faiscas i.casa {
+  background: var(--casa);
+  box-shadow: 0 0 9px 2px var(--casa);
+}
+.mc-faiscas i.fora {
+  background: var(--fora);
+  box-shadow: 0 0 9px 2px var(--fora);
+}
+.mc-faiscas i:nth-child(14n + 1) {
+  left: 4%;
+  animation-delay: -0.6s;
+}
+.mc-faiscas i:nth-child(14n + 2) {
+  left: 11%;
+  animation-delay: -3.1s;
+}
+.mc-faiscas i:nth-child(14n + 3) {
+  left: 18%;
+  animation-delay: -5.4s;
+}
+.mc-faiscas i:nth-child(14n + 4) {
+  left: 25%;
+  animation-delay: -1.9s;
+}
+.mc-faiscas i:nth-child(14n + 5) {
+  left: 32%;
+  animation-delay: -4.2s;
+}
+.mc-faiscas i:nth-child(14n + 6) {
+  left: 39%;
+  animation-delay: -6.3s;
+}
+.mc-faiscas i:nth-child(14n + 7) {
+  left: 46%;
+  animation-delay: -2.6s;
+}
+.mc-faiscas i:nth-child(14n + 8) {
+  left: 54%;
+  animation-delay: -5s;
+}
+.mc-faiscas i:nth-child(14n + 9) {
+  left: 61%;
+  animation-delay: -1.2s;
+}
+.mc-faiscas i:nth-child(14n + 10) {
+  left: 68%;
+  animation-delay: -3.7s;
+}
+.mc-faiscas i:nth-child(14n + 11) {
+  left: 75%;
+  animation-delay: -6s;
+}
+.mc-faiscas i:nth-child(14n + 12) {
+  left: 82%;
+  animation-delay: -2.2s;
+}
+.mc-faiscas i:nth-child(14n + 13) {
+  left: 89%;
+  animation-delay: -4.6s;
+}
+.mc-faiscas i:nth-child(14n + 14) {
+  left: 96%;
+  animation-delay: -0.2s;
+}
+@keyframes mc-sobe {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  85% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-230px) scale(0.3);
+    opacity: 0;
+  }
+}
+.mc-fita {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 4px;
+  background: linear-gradient(90deg, var(--casa), #fff 50%, var(--fora));
+  background-size: 200% 100%;
+  box-shadow: 0 0 16px var(--casa);
+  animation: mc-vs-corre 5s ease-in-out infinite alternate;
+}
+
+/* escudo com as cores do time: ondas que saem dele e reflexo que atravessa */
+.mc-escudo {
+  position: relative;
+  flex: none;
+  animation: mc-entra-casa 0.8s cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+}
+.mc-fora .mc-escudo {
+  animation-name: mc-entra-fora;
+}
+.mc-onda {
+  position: absolute;
+  inset: 8%;
+  border-radius: 46%;
+  border: 2px solid var(--time);
+  opacity: 0;
+  animation: mc-onda 3.6s ease-out infinite;
+}
+.mc-onda.dois {
+  animation-delay: -1.8s;
+}
+@keyframes mc-onda {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+.escudo-reflexo {
+  opacity: 0.32;
+  transform: skewX(-18deg);
+  animation: mc-reflexo 5s ease-in-out infinite;
+}
+@keyframes mc-reflexo {
+  0%,
+  55% {
+    translate: 0 0;
+  }
+  100% {
+    translate: 250px 0;
+  }
+}
+@keyframes mc-entra-casa {
+  from {
+    opacity: 0;
+    transform: translateX(-70px) scale(0.7) rotate(-10deg);
+  }
+}
+@keyframes mc-entra-fora {
+  from {
+    opacity: 0;
+    transform: translateX(70px) scale(0.7) rotate(10deg);
+  }
+}
+.mc-nome::after {
+  content: '';
+  display: block;
+  width: 72px;
+  height: 4px;
+  margin-top: 9px;
+  border-radius: 2px;
+  background: var(--time);
+  box-shadow: 0 0 12px var(--time);
+  transform-origin: left;
+  animation: mc-risco 0.9s 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.mc-fora .mc-nome::after {
+  margin-left: auto;
+  transform-origin: right;
+}
+@keyframes mc-risco {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* trocar as cores do time */
+.mc-cores {
+  position: relative;
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.mc-cores summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(5, 10, 23, 0.6);
+  color: #d3def5;
+}
+.mc-cores summary::-webkit-details-marker {
+  display: none;
+}
+.mc-cores summary:hover,
+.mc-cores[open] summary {
+  border-color: var(--time);
+  color: #fff;
+}
+.mc-cores.pendente summary {
+  border-color: var(--amarelo);
+  color: var(--amarelo);
+}
+.mc-cores-painel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 7px;
+  width: 190px;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: #0a1224;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+}
+.mc-fora .mc-cores-painel {
+  left: auto;
+  right: 0;
+}
+.mc-cores-painel small {
+  color: #9fb0d0;
+}
+.mc-cores-painel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mc-cores-painel input[type='color'] {
+  width: 38px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--borda);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+.mc-cores-painel button {
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 @media (max-width: 900px) {
@@ -825,7 +1188,12 @@ pre {
     font-size: 11px;
   }
   .mc-vs {
-    font-size: 34px;
+    width: 62px;
+    height: 62px;
+    font-size: 30px;
+  }
+  .mc-feixe {
+    display: none;
   }
 }
 
