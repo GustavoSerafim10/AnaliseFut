@@ -51,7 +51,7 @@ function fileiras(formacao?: string): number[] {
 
 /** iniciais para o círculo: "J. F. Aguirre" → "JA", "Leozinho" → "LE" */
 function iniciais(nome: string): string {
-  const p = nome.replace(/\./g, ' ').split(/\s+/).filter(Boolean);
+  const p = nome.replace(/[.'’]/g, ' ').split(/\s+/).filter(Boolean);
   if (!p.length || nome === '?') return '?';
   return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0].slice(0, 2)).toUpperCase();
 }

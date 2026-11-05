@@ -1,0 +1,102 @@
+### POSICOES
+### MEIO y 177 0.96
+### MEIO y 425 0.13
+### MEIO y 508 0.13
+### MEIO x 494 0.78
+### MEIO x 439 0.11
+### MEIO x 315 0.10
+@435,64 3-4-3
+@552,64 4-2-3-1
+@69,96 Milan
+@162,99 15 7.28 O
+@785,96 Ferencváros ll
+@904,97 7.72 O
+@316,332 30 A. Jashari
+@654,334 —
+@841,334 54 O. Nagy
+@186,347 165,
+@642,347 7.33
+@186,377 13S. Diawara
+@439,380 70 A. Cisse
+@621,377 15D.
+@658,366 E
+@844,435 3
+@745,455 72A.
+@745,476 Madarasz
+@849,473 TY
+@315,516 80 Y. Musah
+@841,516 4M. Gómez
+@69,520 -
+@180,538 +.
+@186,527 +
+@643,533 PA
+@643,579 757,
+@69,611 96 L. Torriani
+@186,608 5K. De Winter
+@439,609 9G. Ramos
+@542,604 11Y.
+@642,608 16K
+@930,608 63D.
+@542,630 Bamidele
+@642,630 Zachariassen
+@931,630 Radnoti
+@324,640 |
+@315,702 20 0. Hutchinson
+@745,695 É
+@841,702 5 N. Zohoré
+@186,749 e
+@186,761 cA o
+@642,752 E
+@745,766 6 A. Nagy
+@642,799 gu
+@644,816 8.25
+@204,831 Gila
+@439,839 11 C. Pulisic
+@641,840 7V.
+@315,857 717
+@642,862 Birmancevic
+@841,887 47C.
+@315,889 33 D. Bartesaghi
+@841,908 0'Dowda
+@555,997 nm
+@552,64 4-2-3-1
+@86,97 Milan [1
+@172,97 728 O
+@552,96 (7)
+@767,96 Ferencváros
+@891,97 772 O
+@435,97 Mm
+@370,318 Z e
+@841,330 54 0. Nagy
+@186,377 13 S. Diawara
+@439,380 70 A. Cisse
+@687,394 15D. Arzani ®
+@745,455 2A
+@47,480 4
+@315,516 80 Y. Musah
+@841,517 4 M. Gómez
+@931,523 Cm
+@541,608 11Y.
+@642,608 16K.
+@929,613 63 D
+@642,630 Zachariassen
+@841,629 É
+@190,631 rey
+@841,702 6 N. Zohoré
+@186,843 34 ML Gila
+@439,839 11 C. Pulsié
+@695,781 e”
+@641,840 7V.
+@315,889 33 D. Bartesaghi
+@839,887 47C
+@841,908 0’'Dowda
+### GOLEIRO esquerda 96 L. Torriani
+### GOLEIRO esquerda cd
+### GOLEIRO esquerda -L. Torriani
+### GOLEIRO direita o
+### GOLEIRO direita ) Radnoti
+### GOLEIRO direita ay
+### GOLEIRO direita “O
+### GOLEIRO direita D
+### GOLEIRO direita Radnoti
+### GOLEIRO direita re

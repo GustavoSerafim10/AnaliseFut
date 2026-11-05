@@ -67,7 +67,7 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
     '1X2',
   ],
   [
-    /total de gols|gols mais ?\/ ?menos|gols \+ ?\/ ?-|over ?\/ ?under|mais ?\/ ?menos|acima ?\/ ?abaixo|^total\b|\btotal\b/,
+    /total de gols|gols mais ?\/ ?menos|gols \+ ?\/ ?-|over ?\/ ?under|mais ?\/ ?menos|acima ?\/ ?abaixo|\btota(l|is)\b/,
     'total',
   ],
 ];
@@ -127,6 +127,16 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
         periodo,
         time,
       };
+    // "<nome que não reconheço> total": é total de um time, nunca do jogo. Virar total do jogo já
+    // deu EV falso duas vezes ("Milão total" 2.5 @ 1.74/2.08 contra 2.61/1.49 do jogo)
+    const antes = /^(.*)\btota(l|is)\b[^a-z]*(a\b)?[^a-z]*$/.exec(t)?.[1] ?? '';
+    const sobra = antes
+      .replace(
+        /escanteios?|cantos?|cart(ao|oes)|amarelos?|resultado|gols?|tempos?|partida|jogo|mais|menos|primeiro|segundo/g,
+        ' ',
+      )
+      .match(/[a-z]{3,}/);
+    if (sobra) return { mercado: 'outro', periodo };
   }
   for (const [re, mercado] of SINONIMOS_MERCADO) {
     if (re.test(t)) return { mercado, periodo };

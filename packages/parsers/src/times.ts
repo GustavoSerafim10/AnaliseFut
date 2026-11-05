@@ -32,11 +32,20 @@ const PALAVRAS_VAZIAS = new Set([
   'total',
 ]);
 
+/** A 1win aportuguesa o nome ("Milão"), e o cadastro do jogo costuma vir como no SofaScore. */
+const NOME_APORTUGUESADO: Record<string, string> = {
+  milao: 'milan',
+  napoles: 'napoli',
+  sevilha: 'sevilla',
+  genova: 'genoa',
+};
+
 export function tokensDoNome(nome: string): string[] {
   return semAcento(nome)
     .replace(/[^a-z0-9 ]/g, ' ')
     .split(' ')
-    .filter((t) => t.length > 1 && !PALAVRAS_VAZIAS.has(t));
+    .filter((t) => t.length > 1 && !PALAVRAS_VAZIAS.has(t))
+    .map((t) => NOME_APORTUGUESADO[t] ?? t);
 }
 
 function tokenBate(a: string, b: string): boolean {

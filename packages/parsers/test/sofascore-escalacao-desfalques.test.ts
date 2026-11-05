@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { lerDesfalques, lerEscalacao } from '../src';
+import { juntarEscalacoes, lerDesfalques, lerEscalacao } from '../src';
 
 // SofaScore, Athletico-PR × Vasco (04/11/2026): texto lido pelo OCR do site em modo "lados"
 const fx = (n: string) =>
@@ -39,6 +39,49 @@ describe('SofaScore sem nome de time no print: esquerda = mandante, direita = vi
     expect(de('casa')[0].situacao).toBe('Decisão do clube');
     expect(de('fora')[1].situacao).toBe('Lesionado Anca');
     expect(r.avisos).toEqual([]);
+  });
+});
+
+// Milan × Ferencváros (05/11/2026): SofaScore, texto real do OCR do site
+describe('Milan × Ferencváros: campo com 11 de cada lado', () => {
+  const jogoM = { casa: 'Milan', fora: 'Ferencváros' };
+  const recorte = fx('escalacao-sofascore-milan-recorte');
+  const pagina = fx('escalacao-sofascore-milan-pagina');
+
+  it('"0\'Dowda" (zero no lugar do O) entra no time', () => {
+    const r = lerEscalacao(recorte, jogoM);
+    expect(r.fora.titulares).toContain("O'Dowda");
+    expect(r.casa.titulares).toHaveLength(11);
+    expect(r.fora.titulares).toHaveLength(11);
+  });
+
+  it('o mesmo jogador lido duas vezes, um pouco deslocado, conta uma vez só', () => {
+    // o que apareceu no site do usuário: "M. Gomez" abaixo de "M. Gómez", "BA Ney" junto de "A. Nagy"
+    const r = lerEscalacao(`${recorte}\n@841,548 4 M. Gomez\n@770,790 BA Ney`, jogoM);
+    expect(r.fora.titulares).toHaveLength(11);
+    expect(r.fora.titulares).toContain('M. Gómez');
+    expect(r.fora.titulares).toContain('A. Nagy');
+    expect(r.fora.titulares).not.toContain('M. Gomez');
+    expect(r.fora.titulares).not.toContain('BA Ney');
+    // os dois Nagy são jogadores diferentes, longe um do outro
+    expect(r.fora.titulares).toContain('O. Nagy');
+  });
+
+  it('página inteira: a coluna lateral não vira jogador e a linha do meio vem das formações', () => {
+    const r = lerEscalacao(pagina, jogoM);
+    const todos = [...r.casa.titulares, ...r.fora.titulares];
+    for (const lixo of ['Comparar', 'Programação', 'Pts', 'Onde', 'Troféus', 'Classificação'])
+      expect(todos).not.toContain(lixo);
+    expect(r.casa.titulares).toEqual(expect.arrayContaining(['A. Jashari', 'G. Ramos']));
+    expect(r.fora.titulares).toEqual(expect.arrayContaining(['D. Arzani', 'N. Zohoré']));
+    expect(r.casa.titulares).not.toContain('N. Zohoré');
+  });
+
+  it('dois prints do mesmo campo não somam jogadores: vale o mais completo', () => {
+    const j = juntarEscalacoes([lerEscalacao(pagina, jogoM), lerEscalacao(recorte, jogoM)])!;
+    expect(j.casa.titulares).toHaveLength(11);
+    expect(j.fora.titulares).toHaveLength(11);
+    expect(j.fora.titulares).toContain("O'Dowda");
   });
 });
 

@@ -123,6 +123,9 @@ function ladoVazio(): LadoEscalacao {
 /** "G. Arrascaeta 7.4" → "G. Arrascaeta"; "10 Hugo Souza" → "Hugo Souza"; lixo → null. */
 export function nomeDeJogador(linha: string): string | null {
   const tokens = linha
+    // "0'Dowda": o OCR troca o O do apóstrofo por zero (e às vezes dobra o apóstrofo)
+    .replace(/(^|\s)0(?=['’]+[A-Z])/g, '$1O')
+    .replace(/['’]{2,}/g, "'")
     .replace(/[|[\]{}()<>«»“”"_=+*#~^]/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
@@ -301,6 +304,60 @@ function qualidade(nome: string): number {
     );
 }
 
+/** Distância de edição (para "Ney" × "Nagy", "Gomez" × "Gómez"). */
+function distanciaEdicao(a: string, b: string): number {
+  let ant = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const atual = [i];
+    for (let j = 1; j <= b.length; j++)
+      atual[j] = Math.min(
+        ant[j] + 1,
+        atual[j - 1] + 1,
+        ant[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    ant = atual;
+  }
+  return ant[b.length];
+}
+
+/** Dois nomes lidos a menos disto (milésimos da imagem) podem ser o mesmo jogador. */
+const PERTO_NO_CAMPO = 80;
+
+/**
+ * As duas leituras da imagem podem deslocar o mesmo nome (o selo da nota entra na caixa da
+ * linha: "M. Gómez" e "M. Gomez", "A. Nagy" e "BA Ney"). Perto no campo e com sobrenome parecido
+ * é a mesma pessoa, fica o nome mais limpo. Se ainda passar de 11, junta o par mais próximo.
+ */
+function fundirLeiturasRepetidas<T extends { nome: string; a: number; b: number }>(xs: T[]): T[] {
+  const r = [...xs];
+  const sobrenome = (n: string) =>
+    semAcento(n)
+      .replace(/[^a-z ]/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .pop() ?? '';
+  const longe = (p: T, q: T) => Math.hypot(p.a - q.a, p.b - q.b);
+  const tirarPior = (i: number, j: number) => {
+    if (qualidade(r[j].nome) > qualidade(r[i].nome)) r[i] = r[j];
+    r.splice(j, 1);
+  };
+  for (let i = 0; i < r.length; i++)
+    for (let j = r.length - 1; j > i; j--) {
+      const [si, sj] = [sobrenome(r[i].nome), sobrenome(r[j].nome)];
+      const parecido = Math.min(si.length, sj.length) >= 3 && distanciaEdicao(si, sj) <= 2;
+      if (parecido && longe(r[i], r[j]) < PERTO_NO_CAMPO) tirarPior(i, j);
+    }
+  while (r.length > 11) {
+    let par: [number, number] | null = null;
+    for (let i = 0; i < r.length; i++)
+      for (let j = i + 1; j < r.length; j++)
+        if (!par || longe(r[i], r[j]) < longe(r[par[0]], r[par[1]])) par = [i, j];
+    if (!par || longe(r[par[0]], r[par[1]]) >= PERTO_NO_CAMPO) break;
+    tirarPior(par[0], par[1]);
+  }
+  return r;
+}
+
 /**
  * Formato com posição ("@x,y texto", milésimos da imagem) e as candidatas a linha do meio de
  * campo achadas na imagem (vale a que divide os nomes ao meio). Campo em pé (meio em y):
@@ -361,6 +418,16 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
     nomes.splice(0, nomes.length, ...nomes.filter((i) => i.y > topo));
     for (const c of candidatas) if (c.eixo === 'y' && c.pos <= topo) c.forca = 0;
   }
+  // as duas formações ficam centradas na linha do meio: isso vale mais que contar nomes, porque
+  // o print da página inteira tem a coluna lateral ("Troféus", "Onde assistir") à esquerda
+  const xsForm = formacoes.map((f) => f.x);
+  const meioForm = ladoALado ? (Math.min(...xsForm) + Math.max(...xsForm)) / 2 : null;
+  const pelaFormacao =
+    meioForm === null
+      ? undefined
+      : candidatas
+          .filter((c) => c.eixo === 'x' && Math.abs(c.pos - meioForm) < 25)
+          .sort((p, q) => Math.abs(p.pos - meioForm) - Math.abs(q.pos - meioForm))[0];
   // a linha do meio é a candidata forte que divide os nomes ao meio (a divisória do cabeçalho
   // deixa quase todos de um lado só)
   const coord = (i: { x: number; y: number }, eixo: 'x' | 'y') => (eixo === 'y' ? i.y : i.x);
@@ -368,10 +435,12 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
     const antes = nomes.filter((i) => coord(i, c.eixo) < c.pos).length;
     return Math.min(antes, nomes.length - antes) * c.forca;
   };
-  const melhor = candidatas.reduce<(typeof candidatas)[number] | undefined>(
-    (a, c) => (!a || nota(c) > nota(a) ? c : a),
-    undefined,
-  );
+  const melhor =
+    pelaFormacao ??
+    candidatas.reduce<(typeof candidatas)[number] | undefined>(
+      (a, c) => (!a || nota(c) > nota(a) ? c : a),
+      undefined,
+    );
   if (!melhor)
     avisos.push('linha do meio de campo não achada na imagem: times separados pelo centro');
   const eixo = melhor?.eixo ?? 'x';
@@ -404,7 +473,8 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
   const fundo = Math.max(1, ...emCampo.map((i) => Math.abs(i.a - meio)));
   const bMin = Math.min(...emCampo.map((i) => i.b));
   const bMax = Math.max(...emCampo.map((i) => i.b));
-  const lado = (xs: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => {
+  const lado = (lidos: typeof itens, doGol: 1 | -1, ehAntes: boolean): LadoEscalacao => {
+    const xs = fundirLeiturasRepetidas(lidos.filter(noCampo));
     const titulares = cortarExcesso([...new Set(ordenar(xs, doGol))]);
     const doLado = xs.filter(noCampo).filter((i) => titulares.includes(i.nome));
     const dist = doLado.map((i) => Math.abs(i.a - meio));
@@ -460,6 +530,15 @@ function lerPorPosicao(linhas: string[], jogo: NomesTimes): LeituraEscalacao {
 /** Vários prints → uma escalação por time. */
 export function juntarEscalacoes(leituras: LeituraEscalacao[]): LeituraEscalacao | null {
   if (!leituras.length) return null;
+  // print de campo já traz o time inteiro: somar dois só cria jogadores repetidos; vale o mais
+  // perto de 11 × 11 (empate: o primeiro)
+  const deCampo = leituras.filter((l) => l.casa.posicoes?.length && l.fora.posicoes?.length);
+  if (deCampo.length >= 2) {
+    const erro = (l: LeituraEscalacao) =>
+      Math.abs(l.casa.titulares.length - 11) + Math.abs(l.fora.titulares.length - 11);
+    const melhor = deCampo.reduce((a, b) => (erro(b) < erro(a) ? b : a));
+    leituras = [melhor, ...leituras.filter((l) => !deCampo.includes(l))];
+  }
   return leituras.slice(1).reduce(
     (a, b) => ({
       casa: juntarLado(a.casa, b.casa),
