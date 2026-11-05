@@ -435,3 +435,20 @@ export function bolasDoCampo(
     fora: bola({ ...fora, padrao: 'liso' }, reserva, fora.cor1),
   };
 }
+
+/** Para o backup: tudo o que está salvo por time. */
+export const identidadesSalvas = () => ({ cores: lerEscolhas(), escudos: lerEscudos() });
+
+/** Restaura de um backup sem tocar no que já existe neste aparelho. */
+export function juntarIdentidades(x: {
+  cores?: Record<string, { cor1: string; cor2: string }>;
+  escudos?: Record<string, EscudoSalvo>;
+}): void {
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify({ ...x.cores, ...lerEscolhas() }));
+    localStorage.setItem(CHAVE_ESCUDOS, JSON.stringify({ ...x.escudos, ...lerEscudos() }));
+  } catch {
+    return;
+  }
+  avisarMudanca();
+}

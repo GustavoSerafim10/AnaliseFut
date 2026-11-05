@@ -165,7 +165,6 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                 <th>
                   EV × gate <Dica termo="gate" />
                 </th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -185,7 +184,13 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                     <td title={a.descricao}>
                       <div className="mercado-linha">
                         <IconeMercado a={a} />
-                        <div className="mercado-nome">{rotuloCurto(a.linha)}</div>
+                        <div className="mercado-nome">
+                          {rotuloCurto(a.linha)}
+                          <span className={`chip chip-${status.c}`}>
+                            {status.i && <Icone nome={status.i} tamanho={14} />}
+                            {status.t}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -206,12 +211,6 @@ export function ComparativoOdds({ d }: { d: Derivado }) {
                       {a.ev > 0 ? '+' : ''}
                       {p1(a.ev)}
                       <MedidorEv ev={a.ev} gate={a.evMinimo} />
-                    </td>
-                    <td>
-                      <span className={`chip chip-${status.c}`}>
-                        {status.i && <Icone nome={status.i} tamanho={14} />}
-                        {status.t}
-                      </span>
                     </td>
                   </tr>
                 );

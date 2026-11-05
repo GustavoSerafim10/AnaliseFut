@@ -9,6 +9,10 @@ interface Props {
   desabilitado?: boolean;
   /** 'lados': nomes com posição no campo (escalação); 'tabela': classificação em colunas */
   modo?: ModoOcr;
+  /** o que este print trouxe ("Escanteios 6 · Gols 4") */
+  descrever?: (texto: string) => string;
+  /** aviso quando o print parece ser de outro jogo ou da área errada */
+  conferir?: (texto: string) => string | null;
   onLido: (l: Leitura) => void;
   onRemover: (indice: number) => void;
 }
@@ -39,6 +43,8 @@ export function UploadPrints({
   leituras,
   desabilitado,
   modo,
+  descrever,
+  conferir,
   onLido,
   onRemover,
 }: Props) {
@@ -162,10 +168,16 @@ export function UploadPrints({
         <ul className="lista-prints">
           {leituras.map((l, i) => (
             <li key={`${l.arquivo}-${i}`}>
-              <details>
-                <summary>{l.arquivo}</summary>
-                <pre>{l.texto}</pre>
-              </details>
+              <div className="print-lido">
+                <details>
+                  <summary>
+                    {descrever ? <strong>{descrever(l.texto)}</strong> : l.arquivo}
+                    {descrever && <small> {l.arquivo}</small>}
+                  </summary>
+                  <pre>{l.texto}</pre>
+                </details>
+                {conferir?.(l.texto) && <p className="print-aviso">⚠️ {conferir(l.texto)}</p>}
+              </div>
               <button
                 className="perigo mini"
                 onClick={() => onRemover(i)}

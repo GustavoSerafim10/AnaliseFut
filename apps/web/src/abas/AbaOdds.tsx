@@ -1,5 +1,5 @@
 import { chaveSelecao, type LinhaOdd, type TipoMercado } from '@pe/engine';
-import { checarSanidade, juntarLinhas, lerOddsCasa } from '@pe/parsers';
+import { checarSanidade, conferirPrintOdds, juntarLinhas, lerOddsCasa } from '@pe/parsers';
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
@@ -24,6 +24,23 @@ const ORDEM_MERCADO: TipoMercado[] = [
   'cartoes_1x2',
 ];
 
+/** Nome curto de cada família de mercado, na lista de prints. */
+function familia(m: TipoMercado): string {
+  if (m.startsWith('escanteios') || m === 'primeiro_escanteio') return 'Escanteios';
+  if (m.startsWith('cartoes')) return 'Cartões';
+  const nomes: Partial<Record<TipoMercado, string>> = {
+    '1X2': '1X2',
+    DC: 'Dupla chance',
+    DNB: 'Empate anula',
+    AH: 'Handicap',
+    total: 'Gols',
+    total_time: 'Gols por time',
+    ambas: 'Ambas marcam',
+    primeiro_gol: '1º gol',
+  };
+  return nomes[m] ?? 'Outros';
+}
+
 export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const [json, setJson] = useState('');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'alerta'; texto: string } | null>(null);
@@ -44,6 +61,23 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
       },
     );
   const leitura = lerTodos(r.prints[grupo] ?? []);
+  const lerUm = (texto: string) =>
+    lerOddsCasa([texto], { jogo: nomes, data: r.jogo.data, fuso: FUSO, casa }).linhas;
+  const descrever = (texto: string) => {
+    const conta = new Map<string, number>();
+    for (const l of lerUm(texto))
+      conta.set(familia(l.mercado), (conta.get(familia(l.mercado)) ?? 0) + 1);
+    return conta.size
+      ? [...conta].map(([f, n]) => `${f} ${n}`).join(' · ')
+      : 'Sem odds com modelo neste print';
+  };
+  const conferir = (texto: string) =>
+    conferirPrintOdds(texto, {
+      jogo: nomes,
+      data: r.jogo.data,
+      hora: r.jogo.hora,
+      oddsLidas: lerUm(texto).length,
+    });
 
   /**
    * Acrescenta só odds novas: não sobrescreve as já existentes (nem as que você corrigiu),
@@ -113,6 +147,8 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         dica="Mande todos os mercados, quantos prints forem; repetidos são juntados. O horário de coleta é lido da barra de status."
         leituras={r.prints[grupo] ?? []}
         desabilitado={semTimes}
+        descrever={descrever}
+        conferir={conferir}
         onLido={(lido) => {
           setR((x) => ({
             ...x,
@@ -130,6 +166,9 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
 
       {leitura.avisos
         .filter((a) => !a.startsWith('horário'))
+        // com odds de outros prints, "nenhuma odd" é só um print sem mercado com modelo: a lista
+        // de prints já mostra qual
+        .filter((a) => !(a.startsWith('nenhuma odd') && leitura.linhas.length))
         .map((a) => (
           <div key={a} className="caixa alerta">
             {a}

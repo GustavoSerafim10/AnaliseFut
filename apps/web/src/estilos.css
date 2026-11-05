@@ -165,7 +165,8 @@ h4 {
   display: flex;
   align-self: stretch;
   align-items: stretch;
-  justify-content: center;
+  /* "safe": sem espaço, encosta no começo; só "center" cortava o primeiro item ("Partida" → "la") */
+  justify-content: safe center;
   gap: 4px;
   flex: 1;
   min-width: 0;
@@ -4542,4 +4543,79 @@ button.cl-linha:hover {
 .escudos-lidos img {
   height: 34px;
   width: auto;
+}
+
+/* topo: o menu tem prioridade sobre o selo e a pílula */
+@media (max-width: 1720px) {
+  .selo-marca {
+    display: none;
+  }
+}
+@media (max-width: 1400px) and (min-width: 901px) {
+  .pilula-versao {
+    display: none;
+  }
+  .nome-site {
+    font-size: 22px;
+  }
+  .topo {
+    gap: 10px;
+  }
+  .nav-principal button {
+    padding: 0 12px;
+    font-size: 15px;
+  }
+}
+@media (max-width: 1080px) and (min-width: 901px) {
+  .nome-site {
+    display: none;
+  }
+}
+
+/* comparativo: o status fica embaixo do mercado, sem coluna cortada */
+.mercado-nome .chip {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.mercado-nome {
+  display: grid;
+  justify-items: start;
+}
+
+/* descartados agrupados */
+.grupo-descartes {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+}
+.grupo-descartes.atencao {
+  border-color: var(--amarelo);
+}
+.grupo-descartes summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.grupo-descartes .dica {
+  display: block;
+  font-size: 11px;
+}
+
+/* lista de prints */
+.print-lido {
+  flex: 1;
+  min-width: 0;
+}
+.print-lido small {
+  margin-left: 6px;
+  color: var(--suave);
+  font-size: 11px;
+}
+.print-aviso {
+  margin: 4px 0 0;
+  color: var(--amarelo);
+  font-size: 12px;
 }

@@ -404,7 +404,11 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       continue;
     }
     lidasPorMercado.push({ linha: assinatura(bruta), mercado });
-    if (mercado.mercado === 'outro') {
+    if (
+      mercado.mercado === 'outro' ||
+      mercado.mercado === 'placar_exato' ||
+      mercado.mercado === 'intervalo_final'
+    ) {
       ignoradas++;
       continue;
     }

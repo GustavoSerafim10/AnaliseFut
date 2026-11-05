@@ -26,7 +26,8 @@ function textoHandicap(time: string, adversario: string, L: number): string {
 }
 
 function textoTotal(lado: string, L: number, alvo: string, unidade = 'gols'): string {
-  const base = `${alvo} ${lado === 'over' ? 'mais' : 'menos'} de ${num(L)} ${unidade}`;
+  const un = L === 1 && unidade === 'gols' ? 'gol' : unidade;
+  const base = `${alvo} ${lado === 'over' ? 'mais' : 'menos'} de ${num(L)} ${un}`;
   if (ehLinhaDeQuarto(L))
     return `${base} (linha de quarto: metade em ${num(L - 0.25)}, metade em ${num(L + 0.25)})`;
   if (Number.isInteger(L)) return `${base}; exatamente ${L} devolve a aposta`;
@@ -116,6 +117,18 @@ export function descreverAposta(l: LinhaOdd, nomes: NomesTimes): string {
       break;
     case 'ambas':
       texto = lado === 'sim' ? 'os dois times marcarem' : 'pelo menos um time NÃO marcar';
+      break;
+    case 'primeiro_gol':
+    case 'ultimo_gol': {
+      const qual = l.mercado === 'primeiro_gol' ? 'primeiro' : 'último';
+      texto =
+        lado === 'nenhum'
+          ? 'não sair gol no jogo'
+          : `${nomeTime(lado === 'fora' ? 'fora' : 'casa')} marcar o ${qual} gol`;
+      break;
+    }
+    case 'par_impar':
+      texto = `o total de gols ser ${lado === 'par' ? 'par' : 'ímpar'}`;
       break;
     case 'vencer_sem_sofrer':
       texto = `${nomeTime(l.time ?? 'casa')} vencer sem sofrer gol${lado === 'nao' ? ': NÃO' : ''}`;

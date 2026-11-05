@@ -1,5 +1,6 @@
 import { CAMPOS_STATS, type FonteStats } from '@pe/parsers';
 import { RaioX } from '../componentes/RaioX';
+import { conferirPrintEstatisticas } from '@pe/parsers';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { acoesPrints, type PropsAba } from './tipos';
 
@@ -33,6 +34,7 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         dica={info.dica}
         leituras={r.prints[fonte] ?? []}
         desabilitado={semTimes}
+        conferir={conferirPrintEstatisticas}
         {...acoesPrints(setR, fonte)}
       />
 

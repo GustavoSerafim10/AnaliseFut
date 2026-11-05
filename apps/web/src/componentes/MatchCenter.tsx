@@ -212,10 +212,8 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
         {lado('casa', casa, coresCasa, brilhoCasa)}
         <div className="mc-centro">
           <div className="mc-meta">
-            <Icone nome="trofeu" tamanho={18} />
-            <span>{r.jogo.competicao || 'Competição'}</span>
-            {data && <span>• {data}</span>}
-            {r.jogo.hora && <span>• {r.jogo.hora}</span>}
+            {r.jogo.competicao && <Icone nome="trofeu" tamanho={18} />}
+            <span>{[r.jogo.competicao, data, r.jogo.hora].filter(Boolean).join(' • ')}</span>
           </div>
           <div className="mc-vs">
             <span className="mc-vs-anel" aria-hidden="true" />

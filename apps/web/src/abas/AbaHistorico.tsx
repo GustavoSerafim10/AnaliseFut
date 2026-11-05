@@ -1,6 +1,7 @@
 import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
 import { useState } from 'react';
+import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { FormAposta } from '../componentes/FormAposta';
 import { UploadPrints } from '../componentes/UploadPrints';
@@ -12,7 +13,10 @@ import {
   calibracao,
   clvDe,
   exportarJson,
+  gravarUltimoBackup,
   importarJson,
+  lerExtrasBackup,
+  lerUltimoBackup,
   filtrar,
   marco,
   minhasEntradas,
@@ -65,6 +69,9 @@ interface Props {
   bancaInicial: number | null;
   setBancaInicial: (v: number | null) => void;
   travas: TravasBanca | null;
+  rascunhoAtual: Rascunho;
+  /** false = já há uma análise aberta: ela fica */
+  restaurarRascunho: (r: Rascunho) => boolean;
 }
 
 function LinhaBalanco({ titulo, b, dica }: { titulo: string; b: Balanco; dica?: string }) {
@@ -260,6 +267,8 @@ export function AbaHistorico({
   bancaInicial,
   setBancaInicial,
   travas,
+  rascunhoAtual,
+  restaurarRascunho,
 }: Props) {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'alerta'; texto: string } | null>(null);
   const [json, setJson] = useState('');
@@ -278,20 +287,49 @@ export function AbaHistorico({
   const mudar = (id: string, m: Partial<EntradaHistorico>) =>
     setHistorico(historico.map((e) => (e.id === id ? { ...e, ...m } : e)));
 
+  const [ultimoBackup, setUltimoBackup] = useState(lerUltimoBackup);
+  const diasSemBackup = ultimoBackup
+    ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
+    : null;
+
   function baixar() {
-    const blob = new Blob([exportarJson(historico)], { type: 'application/json' });
+    const blob = new Blob(
+      [
+        exportarJson(historico, {
+          banca: bancaInicial,
+          rascunho: rascunhoAtual,
+          ...identidadesSalvas(),
+        }),
+      ],
+      { type: 'application/json' },
+    );
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `historico-analises-${isoLocal(new Date()).slice(0, 10)}.json`;
+    a.download = `backup-pricing-engine-${isoLocal(new Date()).slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    const agora = isoLocal(new Date());
+    gravarUltimoBackup(agora);
+    setUltimoBackup(agora);
   }
 
   function importar(texto: string) {
     const r = importarJson(texto, historico);
     if ('erro' in r) return setMsg({ tipo: 'alerta', texto: r.erro });
     setHistorico(r.lista);
-    setMsg({ tipo: 'ok', texto: `${r.novas} análise(s) nova(s) importada(s).` });
+    // o que já existe neste aparelho não é substituído
+    const x = lerExtrasBackup(texto);
+    const veio: string[] = [`${r.novas} análise(s) nova(s)`];
+    if (x.banca && !bancaInicial) {
+      setBancaInicial(x.banca);
+      veio.push('banca');
+    }
+    if (x.cores || x.escudos) {
+      juntarIdentidades(x);
+      veio.push('cores e escudos');
+    }
+    if (x.rascunho && restaurarRascunho(x.rascunho)) veio.push('análise aberta');
+    setMsg({ tipo: 'ok', texto: `Importado: ${veio.join(', ')}.` });
     setJson('');
   }
 
@@ -299,9 +337,10 @@ export function AbaHistorico({
     <section className="passo">
       <h2>Histórico</h2>
       <p className="dica">
-        Salve cada análise na aba Análise. Depois do jogo, registre o placar e o fechamento da
-        referência: o <strong>CLV</strong> diz se há vantagem muito antes do lucro. Nunca julgue por
-        green/red. O histórico fica neste aparelho: exporte para backup ou para o celular.
+        Cada análise com odds é salva sozinha até o início do jogo. Depois do jogo, registre o
+        placar e o fechamento da referência: o <strong>CLV</strong> diz se há vantagem muito antes
+        do lucro. Nunca julgue por green/red. O histórico fica neste aparelho: exporte para backup
+        ou para o celular.
       </p>
 
       <div className="abas-mini">
@@ -570,10 +609,21 @@ export function AbaHistorico({
       })}
 
       <h3>Backup</h3>
+      <p className="dica">
+        Tudo fica só neste navegador. O arquivo leva o histórico, a banca, a análise aberta, as
+        cores e os escudos; as fotos de figurinhas e da galeria ficam de fora. Ao importar, o que já
+        existe aqui não é substituído.
+      </p>
+      {historico.length > 0 && (diasSemBackup === null || diasSemBackup >= 7) && (
+        <div className="caixa alerta miudo">
+          {diasSemBackup === null
+            ? 'Você ainda não fez backup neste navegador.'
+            : `Último backup há ${diasSemBackup} dias.`}{' '}
+          Se limpar o navegador, sem backup se perde tudo.
+        </div>
+      )}
       <div className="linha-acoes">
-        <button onClick={baixar} disabled={!historico.length}>
-          ⬇️ Exportar JSON
-        </button>
+        <button onClick={baixar}>⬇️ Exportar backup</button>
         <label className="botao">
           ⬆️ Importar arquivo
           <input

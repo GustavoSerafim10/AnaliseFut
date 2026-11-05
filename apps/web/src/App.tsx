@@ -27,6 +27,8 @@ import {
   carregarHistorico,
   gravarBancaInicial,
   gravarHistorico,
+  mesmoRascunho,
+  podeSalvarSozinho,
   salvarNoHistorico,
   type ApostaFeita,
   travasDoHistorico,
@@ -100,9 +102,24 @@ export function App() {
     setR((x) => ({ ...x, idHistorico: id }));
   }
 
+  // salva sozinho, com uma folga para não gravar a cada tecla
+  useEffect(() => {
+    if (demo || !podeSalvarSozinho(r, d)) return;
+    const atual = historico.find((e) => e.id === r.idHistorico);
+    if (atual && mesmoRascunho(atual.rascunho, r)) return;
+    const espera = setTimeout(() => {
+      const { lista, id } = salvarNoHistorico(historico, r, d);
+      setHistorico(lista);
+      setR((x) => ({ ...x, idHistorico: id }));
+    }, 1500);
+    return () => clearTimeout(espera);
+  }, [r, d, historico, demo]);
+
   function abrirDoHistorico(salvo: Rascunho) {
     if (
-      !confirm('Abrir esta análise? O rascunho atual será substituído (salve-o antes se quiser).')
+      !confirm(
+        'Abrir esta análise? A que está aberta sai da tela; se já tinha odds, fica salva no Histórico.',
+      )
     )
       return;
     setR({ ...rascunhoNovo(), ...salvo, config: { ...rascunhoNovo().config, ...salvo.config } });
@@ -188,7 +205,11 @@ export function App() {
   }
 
   function novaAnalise() {
-    if (confirm('Começar uma nova análise? O rascunho atual será apagado.')) {
+    if (
+      confirm(
+        'Começar uma nova análise? A atual sai da tela; se já tinha odds, fica salva no Histórico.',
+      )
+    ) {
       setR(rascunhoNovo());
       setAba({ id: 'jogo' });
     }
@@ -356,6 +377,12 @@ export function App() {
             bancaInicial={bancaInicial}
             setBancaInicial={setBancaInicial}
             travas={travas ?? null}
+            rascunhoAtual={r}
+            restaurarRascunho={(x) => {
+              if (r.jogo.casa || r.jogo.fora) return false;
+              setR({ ...rascunhoNovo(), ...x, config: { ...rascunhoNovo().config, ...x.config } });
+              return true;
+            }}
           />
         )}
         {aba.id === 'promocoes' && <AbaPromocoes {...props} />}

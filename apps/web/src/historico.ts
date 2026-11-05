@@ -214,12 +214,38 @@ export function resumir(r: Rascunho, d: Derivado): ResumoAnalise {
   };
 }
 
+const jogoComecou = (r: Rascunho, agora: number) => {
+  const inicio = Date.parse(inicioIso(r));
+  return Number.isFinite(inicio) && agora >= inicio;
+};
+
+/**
+ * Salva sozinho até o início do jogo, assim que a análise tem times, hora e odds válidas: ninguém
+ * perde o jogo por esquecer o botão. Depois do início, o motor exclui o jogo (só pré-live).
+ */
+export function podeSalvarSozinho(r: Rascunho, d: Derivado, agora = Date.now()): boolean {
+  return (
+    !!r.jogo.casa &&
+    !!r.jogo.fora &&
+    !!r.jogo.hora &&
+    !!d.v4 &&
+    d.oddsValidas.length > 0 &&
+    !jogoComecou(r, agora)
+  );
+}
+
+/** Mesmo conteúdo (o id entra no rascunho só depois da primeira gravação). */
+export const mesmoRascunho = (a: Rascunho, b: Rascunho) =>
+  JSON.stringify({ ...a, idHistorico: undefined }) ===
+  JSON.stringify({ ...b, idHistorico: undefined });
+
 /** Salva (ou atualiza, se o rascunho já veio do histórico). Devolve a lista e o id. */
 export function salvarNoHistorico(
   lista: EntradaHistorico[],
   r: Rascunho,
   d: Derivado,
   aposta?: ApostaFeita,
+  agora = Date.now(),
 ): { lista: EntradaHistorico[]; id: string } {
   const id =
     r.idHistorico ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -228,7 +254,8 @@ export function salvarNoHistorico(
     id,
     salvoEm: isoLocal(new Date()),
     rascunho: { ...r, idHistorico: id },
-    resumo: resumir(r, d),
+    // depois do início o motor responde "excluído": a decisão que valeu é a de antes do jogo
+    resumo: anterior && jogoComecou(r, agora) ? anterior.resumo : resumir(r, d),
     resultado: anterior?.resultado,
     aposta: aposta ?? anterior?.aposta,
     manual: anterior?.manual,
@@ -479,12 +506,52 @@ export function calibracao(lista: EntradaHistorico[]): Calibracao {
   return { jogos: Math.max(r1.length, rOU.length), brier1x2: media(r1), brierOU: media(rOU) };
 }
 
-export function exportarJson(lista: EntradaHistorico[]): string {
+/** O que vai no backup além do histórico. As fotos de figurinhas e galeria ficam de fora: pesam. */
+export interface ExtrasBackup {
+  banca?: number | null;
+  rascunho?: Rascunho;
+  cores?: Record<string, { cor1: string; cor2: string }>;
+  escudos?: Record<string, { imagem: string; cor1?: string; cor2?: string }>;
+}
+
+export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {}): string {
   return JSON.stringify(
-    { versao: 1, exportadoEm: isoLocal(new Date()), historico: lista },
+    { versao: 2, exportadoEm: isoLocal(new Date()), historico: lista, ...extras },
     null,
     1,
   );
+}
+
+export function lerExtrasBackup(texto: string): ExtrasBackup {
+  try {
+    const { banca, rascunho, cores, escudos } = JSON.parse(texto) as ExtrasBackup;
+    return {
+      ...(banca !== undefined ? { banca } : {}),
+      ...(rascunho ? { rascunho } : {}),
+      ...(cores ? { cores } : {}),
+      ...(escudos ? { escudos } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
+const CHAVE_ULTIMO_BACKUP = 'pe-ultimo-backup';
+
+export function lerUltimoBackup(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_ULTIMO_BACKUP);
+  } catch {
+    return null;
+  }
+}
+
+export function gravarUltimoBackup(quando: string): void {
+  try {
+    localStorage.setItem(CHAVE_ULTIMO_BACKUP, quando);
+  } catch {
+    /* sem storage: fica sem o lembrete */
+  }
 }
 
 /** Junta um backup ao histórico atual (mesmo id: fica a versão salva por último). */

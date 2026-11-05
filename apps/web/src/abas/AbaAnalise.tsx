@@ -121,10 +121,9 @@ export function AbaAnalise({
   const rt = r.redTeam;
   const setRt = (m: Partial<Rascunho['redTeam']>) =>
     setR((x) => ({ ...x, redTeam: { ...x.redTeam, ...m } }));
+  // só a decisão final pede o red team: a opinião do modelo sozinho não
   const pedeRedTeam =
-    res?.gatilho === 'completar o red team' ||
-    d.v4?.gatilho === 'completar o red team' ||
-    rt.argumentos.some((a) => a.trim());
+    d.v4?.gatilho === 'completar o red team' || rt.argumentos.some((a) => a.trim());
 
   const campos = CAMPOS_STATS.filter((c) => d.tabela[c.campo] || ESSENCIAIS.includes(c.campo));
 
@@ -210,7 +209,6 @@ export function AbaAnalise({
         <>
           <div className="linha-acoes">
             <button
-              className="primario"
               onClick={() => {
                 onSalvar();
                 setCopiado(null);
@@ -247,10 +245,10 @@ export function AbaAnalise({
               }}
             />
           )}
-          {salvo && (
+          {(salvo || salvoNoHistorico) && (
             <p className="dica">
-              Salvo ✓ Depois do jogo, registre o placar e o fechamento da referência na aba
-              Histórico.
+              Salva no Histórico ✓ Com odds lidas, ela se atualiza sozinha até o início do jogo.
+              Depois do jogo, registre o placar e o fechamento da referência por lá.
             </p>
           )}
           <label>
@@ -266,11 +264,14 @@ export function AbaAnalise({
 
       {res && rel && (
         <>
-          <h3>Motor de apoio (V3.3)</h3>
-          <details className="caixa">
+          <details className="caixa opiniao-modelo">
             <summary>
-              Decisão do modelo sozinho: {res.rotulo} · DQ {res.dq.efetiva}
+              Opinião do modelo sozinho, fora da decisão: {res.rotulo} · DQ {res.dq.efetiva}
             </summary>
+            <p className="dica">
+              Isto é o motor de apoio (V3.3) sem a referência de mercado. Quem decide é o quadro
+              Decisão Final, lá em cima.
+            </p>
             <div className={`decisao ${CLASSE[res.decisao]}`}>
               <div className="rotulo">{res.rotulo}</div>
               <p>{rel.resumo}</p>
@@ -312,6 +313,18 @@ export function AbaAnalise({
                 </dl>
               </div>
             )}
+            <div className="relatorio">
+              {rel.secoes.map((s) => (
+                <div key={s.titulo} className="caixa">
+                  <h3>{s.titulo}</h3>
+                  <ul>
+                    {s.linhas.map((l, i) => (
+                      <li key={i}>{l}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </details>
 
           {pedeRedTeam && (
@@ -356,19 +369,6 @@ export function AbaAnalise({
               </label>
             </div>
           )}
-
-          <div className="relatorio">
-            {rel.secoes.map((s) => (
-              <div key={s.titulo} className="caixa">
-                <h3>{s.titulo}</h3>
-                <ul>
-                  {s.linhas.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
 
           <div className="linha-acoes">
             <button onClick={() => copiar(textoAnalise(d, rel, res), setCopiado)}>

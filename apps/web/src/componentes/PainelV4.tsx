@@ -1,3 +1,4 @@
+import { agruparDescartes } from '../descartes';
 import { pct } from '../estado';
 import type { PropsAba } from '../abas/tipos';
 import { Icone } from './ui';
@@ -61,13 +62,26 @@ export function PainelV4({ r, setR, d }: PropsAba) {
           ))}
         </ul>
         <h4>Descartados</h4>
-        <ul className="miudo">
-          {v.descartados.map((x, i) => (
-            <li key={`${x.chave}-${i}`}>
-              {sem(x.descricao)}: {x.motivo}
-            </li>
-          ))}
-        </ul>
+        {agruparDescartes(v.descartados).map((g) => (
+          <details
+            key={g.titulo}
+            className={`grupo-descartes${g.atencao ? ' atencao' : ''}`}
+            open={g.atencao}
+          >
+            <summary>
+              {g.atencao && '⚠️ '}
+              {g.titulo} <span className="marca">{g.itens.length}</span>
+            </summary>
+            <ul className="miudo">
+              {g.itens.map((x, i) => (
+                <li key={`${x.chave}-${i}`}>
+                  {sem(x.descricao)}
+                  {g.titulo !== x.motivo && <span className="dica"> {x.motivo}</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
         {d.movimentos.length > 0 && (
           <>
             <h4>Movimentos entre prints</h4>
