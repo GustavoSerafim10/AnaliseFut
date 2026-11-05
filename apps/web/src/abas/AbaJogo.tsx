@@ -1,4 +1,8 @@
+import { useEffect, useState } from 'react';
 import fundoEstadio from '../assets/estadio-dados.webp';
+import { UploadPrints } from '../componentes/UploadPrints';
+import { escudoDoTime, salvarEscudo, useCoresEscolhidas } from '../coresTimes';
+import type { PrintDoJogo } from '../ocr';
 import { EditorFigurinhas } from '../componentes/Figurinhas';
 import { Icone, type NomeIcone } from '../componentes/ui';
 import type { Rascunho } from '../estado';
@@ -60,6 +64,46 @@ export function AbaJogo({
   const config = <K extends keyof Rascunho['config']>(campo: K, v: Rascunho['config'][K]) =>
     setR((x) => ({ ...x, config: { ...x.config, [campo]: v } }));
   const vazio = !r.jogo.casa && !r.jogo.fora;
+  useCoresEscolhidas();
+  const [avisoPrint, setAvisoPrint] = useState<string | null>(null);
+  /** escudos do print aguardando o nome do time: salvam assim que ele estiver preenchido */
+  const [escudosNovos, setEscudosNovos] = useState<PrintDoJogo['escudos'] | null>(null);
+  useEffect(() => {
+    if (!escudosNovos || !r.jogo.casa || !r.jogo.fora) return;
+    const ok =
+      salvarEscudo(r.jogo.casa, escudosNovos.casa) && salvarEscudo(r.jogo.fora, escudosNovos.fora);
+    setEscudosNovos(null);
+    if (!ok) setAvisoPrint('Sem espaço no navegador para salvar os escudos.');
+  }, [escudosNovos, r.jogo.casa, r.jogo.fora]);
+  /** Print do jogo: escudos por time; nomes, hora e competição só no que ainda está vazio. */
+  const aoLerPrintDoJogo = (texto: string) => {
+    const p = JSON.parse(texto) as PrintDoJogo;
+    setR((x) => ({
+      ...x,
+      jogo: {
+        ...x.jogo,
+        casa: x.jogo.casa || p.casa || '',
+        fora: x.jogo.fora || p.fora || '',
+        hora: x.jogo.hora || p.hora || '',
+        competicao: x.jogo.competicao || p.competicao || '',
+      },
+    }));
+    if (!p.escudos) {
+      setAvisoPrint('Não achei os dois escudos neste print: use o topo da página do jogo.');
+      return;
+    }
+    setEscudosNovos(p.escudos);
+    const faltam = [
+      !(r.jogo.casa || p.casa) && 'mandante',
+      !(r.jogo.fora || p.fora) && 'visitante',
+      !(r.jogo.hora || p.hora) && 'hora',
+    ].filter(Boolean);
+    setAvisoPrint(
+      faltam.length
+        ? `Não consegui ler: ${faltam.join(', ')}. Preencha abaixo; os escudos entram quando os dois times tiverem nome.`
+        : null,
+    );
+  };
 
   // checklist: cada item lê o estado real do rascunho e do que o motor já derivou
   const partidaOk = !!(r.jogo.casa && r.jogo.fora && r.jogo.hora);
@@ -165,6 +209,27 @@ export function AbaJogo({
               </span>
             </div>
           </div>
+          <UploadPrints
+            rotulo="Enviar print do jogo (times e escudos)"
+            dica="O topo da página do jogo no SofaScore, com os dois escudos. Preenche o que estiver vazio, e o escudo e as cores ficam salvos para os próximos jogos do time."
+            leituras={[]}
+            modo="cabecalho"
+            onLido={(l) => aoLerPrintDoJogo(l.texto)}
+            onRemover={() => undefined}
+          />
+          {avisoPrint && <div className="caixa alerta miudo">{avisoPrint}</div>}
+          {[r.jogo.casa, r.jogo.fora].some((n) => n && escudoDoTime(n)) && (
+            <div className="escudos-lidos">
+              {[r.jogo.casa, r.jogo.fora].map((n, i) => {
+                const e = n ? escudoDoTime(n) : undefined;
+                return e ? (
+                  <span key={i}>
+                    <img src={e.imagem} alt="" /> {n}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
           <div className="times-cadastro">
             <label>
               <span className="rotulo-campo">

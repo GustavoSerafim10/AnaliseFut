@@ -4,7 +4,13 @@
  * (calibrado com prints reais do SofaScore, SuperScore e Flashscore).
  */
 import {
+  acharEscudos,
+  areasDoCabecalho,
   coresDaCamisa,
+  coresDoEscudo,
+  lerCompeticao,
+  lerHora,
+  limparNome,
   lerTabelaOcr,
   linhasDoTesseract,
   MARCA_CAMISA,
@@ -12,15 +18,47 @@ import {
   MARCA_MEIO,
   MARCA_POSICOES,
   NUMEROS_TABELA,
+  recortarEscudo,
+  type Caixa,
   type ReconhecerOcr,
+  type Recorte,
 } from '@pe/parsers';
 import { createWorker, PSM, type Worker } from 'tesseract.js';
 
 /**
  * bloco: texto corrido (estatísticas, odds). lados: nomes com posição no campo (escalação).
  * tabela: classificação lida coluna por coluna, com as cores dos últimos jogos e das zonas.
+ * cabecalho: print do jogo; devolve JSON (ver PrintDoJogo) com os escudos e o texto lido.
  */
-export type ModoOcr = 'bloco' | 'lados' | 'tabela';
+export type ModoOcr = 'bloco' | 'lados' | 'tabela' | 'cabecalho';
+
+export interface PrintDoJogo {
+  casa?: string;
+  fora?: string;
+  hora?: string;
+  competicao?: string;
+  escudos?: {
+    casa: { imagem: string; cor1?: string; cor2?: string };
+    fora: { imagem: string; cor1?: string; cor2?: string };
+  };
+}
+
+/** O escudo vem pequeno do print: amplia 3x suavizado, senão fica pixelado no topo da análise. */
+function recorteParaPng(r: Recorte): string {
+  const base = document.createElement('canvas');
+  base.width = r.largura;
+  base.height = r.altura;
+  base
+    .getContext('2d')!
+    .putImageData(new ImageData(new Uint8ClampedArray(r.data), r.largura, r.altura), 0, 0);
+  const grande = document.createElement('canvas');
+  grande.width = r.largura * 3;
+  grande.height = r.altura * 3;
+  const ctx = grande.getContext('2d')!;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(base, 0, 0, grande.width, grande.height);
+  return grande.toDataURL('image/png');
+}
 
 let worker: Promise<Worker> | null = null;
 let aoProgredir: ((p: number) => void) | null = null;
@@ -261,6 +299,53 @@ export async function lerImagem(
       aoProgredir = progresso ?? null;
       return (await w.recognize(cinza)).data.text;
     }
+    if (modo === 'cabecalho') {
+      const img = { data: original.data, largura: original.width, altura: original.height };
+      const caixas = acharEscudos(img);
+      const saida: PrintDoJogo = {};
+      if (caixas) {
+        // letra pequena some na leitura da imagem inteira: relê só cada área
+        const reler = async (c: Caixa, psm: PSM) => {
+          await w.setParameters({ tessedit_pageseg_mode: psm });
+          const { data } = await w.recognize(cinza, {
+            rectangle: {
+              left: c.x0 * escala,
+              top: c.y0 * escala,
+              width: (c.x1 - c.x0 + 1) * escala,
+              height: (c.y1 - c.y0 + 1) * escala,
+            },
+          });
+          return data.text;
+        };
+        const areas = areasDoCabecalho(caixas, original.width, original.height);
+        const nomeEm = async (lista: Caixa[]) => {
+          for (const a of lista) {
+            if (a.x1 - a.x0 < 12 || a.y1 - a.y0 < 6) continue;
+            // nome colado na borda do print não sai como linha, só como palavra
+            for (const psm of [PSM.SINGLE_LINE, PSM.SINGLE_WORD]) {
+              const nome = limparNome(await reler(a, psm));
+              if (nome) return nome;
+            }
+          }
+          return undefined;
+        };
+        const passos = 4;
+        progresso?.(0.05);
+        saida.casa = await nomeEm(areas.casa);
+        progresso?.(1 / passos);
+        saida.fora = await nomeEm(areas.fora);
+        progresso?.(2 / passos);
+        saida.hora = lerHora(await reler(areas.hora, PSM.SPARSE_TEXT));
+        progresso?.(3 / passos);
+        if (areas.topo) saida.competicao = lerCompeticao(await reler(areas.topo, PSM.SPARSE_TEXT));
+        const escudo = (t: 'casa' | 'fora') => {
+          const r = recortarEscudo(img, caixas[t]);
+          return { imagem: recorteParaPng(r), ...coresDoEscudo(r) };
+        };
+        saida.escudos = { casa: escudo('casa'), fora: escudo('fora') };
+      }
+      return JSON.stringify(saida);
+    }
     if (modo === 'tabela') {
       // a página inteira vale 60% da barra; cada coluna relida, o resto
       aoProgredir = (p) => progresso?.(p * 0.6);
@@ -387,7 +472,8 @@ export async function lerImagem(
     return linhas.join('\n');
   } finally {
     aoProgredir = null;
-    if (modo === 'lados') await w.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+    if (modo === 'lados' || modo === 'cabecalho')
+      await w.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
     if (modo === 'tabela') await w.setParameters({ tessedit_char_whitelist: '' });
   }
 }

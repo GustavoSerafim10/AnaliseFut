@@ -738,6 +738,10 @@ pre {
 .mc-fora .escudo {
   animation-delay: -3s;
 }
+/* escudo recortado do print: é pequeno, então amplia suave e sem cortar */
+.escudo-real {
+  object-fit: contain;
+}
 .escudo-texto {
   font-family: var(--fonte-tecnica);
   font-weight: 700;
@@ -4520,4 +4524,22 @@ button.cl-linha:hover {
     font-size: 9px;
     padding: 0 3px;
   }
+}
+
+.escudos-lidos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.escudos-lidos span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.escudos-lidos img {
+  height: 34px;
+  width: auto;
 }

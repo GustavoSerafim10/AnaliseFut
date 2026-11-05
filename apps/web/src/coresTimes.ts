@@ -1,12 +1,14 @@
 /**
- * Cores de cada time no topo da análise. Ordem: a sua escolha (salva por time) → tabela de clubes
- * → camisa lida no print da escalação → cor neutra com aviso para escolher.
+ * Cores de cada time no topo da análise. Ordem: a sua escolha (salva por time) → escudo colado →
+ * tabela de clubes → camisa lida no print da escalação → cor neutra com aviso para escolher.
+ * A tabela só vale contra o escudo se combinar com ele (nome parecido não é o mesmo clube:
+ * Botafogo × Botafogo-SP), e aí fica ela, que tem as listras e a 2ª cor certas.
  */
 import { useSyncExternalStore } from 'react';
 import { semAcento, tokensDoNome } from '@pe/parsers';
 
 export type Padrao = 'liso' | 'listras' | 'faixa';
-export type OrigemCor = 'manual' | 'tabela' | 'print' | 'neutra';
+export type OrigemCor = 'manual' | 'escudo' | 'tabela' | 'print' | 'neutra';
 
 export interface CoresTime {
   cor1: string;
@@ -65,6 +67,26 @@ const CLUBES: Record<string, Entrada> = {
   'vila nova': ['#d0101c', B],
   nautico: ['#d0101c', B, 'listras'],
   'santa cruz': ['#d0101c', P, 'listras'],
+  'botafogo sp': ['#d0101c', P, 'listras'],
+  'botafogo pb': [P, B, 'listras'],
+  londrina: ['#2595d1', B],
+  operario: [P, B, 'listras'],
+  crb: ['#d0101c', B, 'listras'],
+  csa: ['#0a3a92', B],
+  abc: [P, B],
+  'america rn': ['#d0101c', B],
+  athletic: [P, B],
+  'volta redonda': ['#f7d417', P],
+  ferroviaria: ['#7b1e2b', B],
+  amazonas: ['#f7d417', P],
+  ituano: ['#d0101c', P, 'listras'],
+  tombense: ['#d0101c', B],
+  'sampaio correa': ['#f7d417', '#d0101c'],
+  brusque: ['#f7d417', '#00783e'],
+  ypiranga: ['#f7d417', P],
+  confianca: ['#0060ae', B],
+  'sao bernardo': ['#f7d417', P],
+  caxias: ['#7b1e2b', B],
   // Inglaterra
   arsenal: ['#ef0107', B],
   'aston villa': ['#670e36', '#95bfe5'],
@@ -218,6 +240,11 @@ export function coresDaTabela(nome: string): Entrada | null {
 
 const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
 
+const parecidas = (a: string, b: string) => {
+  const [x, y] = [rgb(a), rgb(b)];
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) < 90;
+};
+
 /** Luminância relativa, 0 a 1. */
 export function luminancia(c: string): number {
   const [r, g, b] = rgb(c).map((v) => {
@@ -276,8 +303,14 @@ export function salvarCores(nome: string, cores: { cor1: string; cor2: string } 
   if (cores) e[chaveDoTime(nome)] = cores;
   else delete e[chaveDoTime(nome)];
   localStorage.setItem(CHAVE, JSON.stringify(e));
-  window.dispatchEvent(new Event(CHAVE));
+  avisarMudanca();
 }
+
+let versao = 0;
+const avisarMudanca = () => {
+  versao++;
+  window.dispatchEvent(new Event(CHAVE));
+};
 
 /** Redesenha quem usa as cores quando uma escolha muda (topo e campo ficam iguais). */
 export function useCoresEscolhidas(): void {
@@ -286,18 +319,60 @@ export function useCoresEscolhidas(): void {
       window.addEventListener(CHAVE, avisar);
       return () => window.removeEventListener(CHAVE, avisar);
     },
-    () => localStorage.getItem(CHAVE),
+    () => versao,
   );
 }
+
+const CHAVE_ESCUDOS = 'pe-escudos-times';
+
+export interface EscudoSalvo {
+  imagem: string;
+  cor1?: string;
+  cor2?: string;
+}
+
+function lerEscudos(): Record<string, EscudoSalvo> {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_ESCUDOS) ?? '{}') as Record<string, EscudoSalvo>;
+  } catch {
+    return {};
+  }
+}
+
+/** Fica salvo por time neste navegador: volta sozinho no próximo jogo dele. */
+export function salvarEscudo(nome: string, escudo: EscudoSalvo | null): boolean {
+  const e = lerEscudos();
+  if (escudo) e[chaveDoTime(nome)] = escudo;
+  else delete e[chaveDoTime(nome)];
+  try {
+    localStorage.setItem(CHAVE_ESCUDOS, JSON.stringify(e));
+  } catch {
+    return false;
+  }
+  avisarMudanca();
+  return true;
+}
+
+export const escudoDoTime = (nome: string): EscudoSalvo | undefined =>
+  lerEscudos()[chaveDoTime(nome)];
 
 /** Monta as cores sem navegador: `escolha` é o que está salvo para o time. */
 export function resolverCores(
   nome: string,
   escolha?: { cor1: string; cor2: string },
   camisa?: { cor1: string; cor2?: string },
+  escudo?: { cor1?: string; cor2?: string },
 ): CoresTime {
   const padraoTabela = coresDaTabela(nome);
   if (escolha) return { ...escolha, padrao: padraoTabela?.[2] ?? 'liso', origem: 'manual' };
+  const doEscudo = escudo?.cor1;
+  const tabelaCombina =
+    !!padraoTabela &&
+    (!doEscudo || parecidas(doEscudo, padraoTabela[0]) || parecidas(doEscudo, padraoTabela[1]));
+  if (doEscudo && !tabelaCombina) {
+    const cor2 = escudo.cor2 ?? (luminancia(doEscudo) > 0.5 ? '#0b0b0d' : '#f8fafc');
+    return { cor1: doEscudo, cor2, padrao: 'liso', origem: 'escudo' };
+  }
   if (padraoTabela) {
     const [cor1, cor2, padrao = 'liso'] = padraoTabela;
     return { cor1, cor2, padrao, origem: 'tabela' };
@@ -310,13 +385,8 @@ export function resolverCores(
 }
 
 export function coresDoTime(nome: string, camisa?: { cor1: string; cor2?: string }): CoresTime {
-  return resolverCores(nome, lerEscolhas()[chaveDoTime(nome)], camisa);
+  return resolverCores(nome, lerEscolhas()[chaveDoTime(nome)], camisa, escudoDoTime(nome));
 }
-
-const parecidas = (a: string, b: string) => {
-  const [x, y] = [rgb(a), rgb(b)];
-  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) < 90;
-};
 
 export interface BolaNoCampo {
   fundo: string;

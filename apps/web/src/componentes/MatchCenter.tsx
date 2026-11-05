@@ -10,8 +10,10 @@ import {
   corDeBrilho,
   corDoTexto,
   coresDoTime,
+  escudoDoTime,
   misturar,
   salvarCores,
+  salvarEscudo,
   useCoresEscolhidas,
   type CoresTime,
 } from '../coresTimes';
@@ -100,7 +102,8 @@ const ORIGEM: Record<CoresTime['origem'], string> = {
   manual: 'escolhidas por você',
   tabela: 'da tabela de clubes',
   print: 'lidas da camisa no print',
-  neutra: 'time não reconhecido: escolha as cores',
+  escudo: 'lidas do escudo no print',
+  neutra: 'time não reconhecido: cole o print do jogo ou escolha as cores',
 };
 
 /** Trocar as cores do time; a escolha fica salva e vale nos próximos jogos dele. */
@@ -123,6 +126,11 @@ function EscolherCores({ nome, cores }: { nome: string; cores: CoresTime }) {
           Secundária
           <input type="color" value={cores.cor2} onChange={(e) => mudar('cor2', e.target.value)} />
         </label>
+        {escudoDoTime(nome) && (
+          <button type="button" onClick={() => salvarEscudo(nome, null)}>
+            Remover escudo
+          </button>
+        )}
         {cores.origem === 'manual' && (
           <button type="button" onClick={() => salvarCores(nome, null)}>
             Voltar ao automático
@@ -164,7 +172,11 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
       <div className="mc-escudo">
         <span className="mc-onda" aria-hidden="true" />
         <span className="mc-onda dois" aria-hidden="true" />
-        <Escudo nome={nome} cores={cores} />
+        {escudoDoTime(nome) ? (
+          <img className="escudo escudo-real" src={escudoDoTime(nome)!.imagem} alt="" />
+        ) : (
+          <Escudo nome={nome} cores={cores} />
+        )}
       </div>
       <div className="mc-texto">
         <div className="mc-nome">{nome}</div>

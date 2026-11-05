@@ -78,3 +78,33 @@ describe('bolinhas do campo', () => {
     expect(branco.fora.fundo).toBe('#f8fafc');
   });
 });
+
+describe('escudo colado', () => {
+  it('nome parecido com outro clube: vale a cor do escudo', () => {
+    expect(
+      resolverCores('Botafogo', undefined, undefined, { cor1: '#e52e2e', cor2: '#faf7f7' }),
+    ).toMatchObject({
+      origem: 'escudo',
+      cor1: '#e52e2e',
+    });
+  });
+  it('combina com a tabela: fica a tabela, que tem as listras', () => {
+    expect(resolverCores('Milan', undefined, undefined, { cor1: '#d5061a' })).toMatchObject({
+      origem: 'tabela',
+      padrao: 'listras',
+    });
+  });
+  it('time fora da tabela usa o escudo antes da camisa; sua escolha manda em tudo', () => {
+    const camisa = { cor1: '#123456' };
+    const escudo = { cor1: '#2595d1', cor2: '#fbfdfd' };
+    expect(resolverCores('Clube Inventado', undefined, camisa, escudo).origem).toBe('escudo');
+    expect(
+      resolverCores('Clube Inventado', { cor1: '#000000', cor2: '#ffffff' }, camisa, escudo).origem,
+    ).toBe('manual');
+  });
+  it('Botafogo-SP e Londrina na tabela', () => {
+    expect(coresDaTabela('Botafogo-SP')?.[0]).toBe('#d0101c');
+    expect(coresDaTabela('Botafogo')?.[0]).toBe('#0b0b0d');
+    expect(coresDaTabela('Londrina')).not.toBeNull();
+  });
+});
