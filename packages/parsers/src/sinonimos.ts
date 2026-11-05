@@ -22,7 +22,9 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [
     // Futamina/Jogou: "Pagamento antecipado" (paga com 2 gols de vantagem), "Resultado + ambas",
     // "Resultado + total" e o handicap europeu de 3 vias ("Resultado com handicap")
-    /vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
+    // 99Play: "Handicap 1×2" (3 vias, "Começa 0:2"), "Botafogo SP devolve aposta" (é dupla chance
+    // com devolução, não o empate anula), "Qual equipe vai marcar", "Botafogo SP para marcar"
+    /handicap 1 ?[x×] ?2|(?<!empate )devolve aposta|qual equipe|para marcar|^\S* ?marcador\b|vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
     'outro',
   ],
   // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -
@@ -78,6 +80,8 @@ export function ehBarraDeAbas(linha: string): boolean {
   // título da 1win separa as partes com ". " ("Handicap asiático. Chutes"): não é a barra, e
   // sem isso o bloco de chutes herdava o "Handicap de escanteios" de cima
   if (/[a-z]\.\s+[a-z]/.test(t)) return false;
+  // 99Play: mercado "Totais chutes" (são duas palavras de aba, mas é título)
+  if (/\btotais chutes\b/.test(t)) return false;
   const abas = [
     'todos',
     'principal',
@@ -102,6 +106,11 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
   const t = semAcento(linha).trim();
   if (ehBarraDeAbas(t)) return null;
   const periodo = detectarPeriodo(t);
+
+  // estatística sem modelo, mesmo com nome de time e "total": "Londrina PR total de impedimentos"
+  // virava gols do Londrina
+  if (/chutes|finalizac|impediment|laterais|tiros de meta|\bfaltas\b/.test(t))
+    return { mercado: 'outro', periodo };
 
   // "Aston Villa total", "Escanteios. CR Flamengo total", "Cartões amarelos. CR Flamengo total"
   // (par/ímpar dos gols de um time não é o total dele)

@@ -66,8 +66,11 @@ const ORDEM_PADRAO: Partial<Record<TipoMercado, string[]>> = {
   ultimo_gol: ['casa', 'fora', 'nenhum'],
 };
 
-/** título de mercado da 1win: termina na setinha de recolher, lida como "A", "a", "~" ou "^" */
-const TITULO_COM_SETA = /[A-Za-zÀ-ú]{3,}.*\s[Aa~^»]$/;
+/**
+ * título de mercado: termina no botão de recolher, lido como "A", "a", "~" ou "^" (1win) ou como
+ * "-", "—" ou "=" (99Play)
+ */
+const TITULO_COM_SETA = /[A-Za-zÀ-ú]{3,}.*\s[Aa~^»=—–-]$/;
 
 const CONFIANCA_OCR = 0.6;
 const CONFIANCA_CORRIGIDA = 0.45;
@@ -80,8 +83,9 @@ export function normalizar1win(texto: string): string {
       .replace(/([ \t]|^)\+[ \t]+(\d)/gm, '$1+$2')
       // "AcimaDel5" / "AcimaDe25" / "AcimaDe?2.0" → "Acima De 1.5"; linha de total tem 1 casa decimal
       // "AcimaDed5" / "AcimaDed.5" (tema claro): o "4" saiu como "d"
+      // "Menosde45" / "Menos de1,5" (99Play): "Mais/Menos de"
       .replace(
-        /\b(abaixo|acima)[ \t]*de[ \t]*\??((?:[ld]|\d)[\dl]*(?:\.\d+)?)(?![A-Za-z])/gi,
+        /\b(abaixo|acima|mais|menos)[ \t]*de[ \t]*\??((?:[ld]|\d)[\dl]*(?:\.\d+)?)(?![A-Za-z])/gi,
         (_, lado: string, n: string) => {
           let v = n.replace(/l/g, '1').replace(/^d/, '4');
           if (!v.includes('.') && v.length >= 2) v = `${v.slice(0, -1)}.${v.slice(-1)}`;
@@ -417,6 +421,58 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     }
 
     const tokens = bruta.split(/[\s|]+/).filter(Boolean);
+
+    // o controle deslizante da 99Play repete a linha sozinha embaixo do mercado ("2.5", "-0.75")
+    if (tokens.length === 1 && COM_LINHA.has(mercado.mercado) && lerNumero(tokens[0]) !== null)
+      continue;
+
+    // Jogou: "2.5 Mais 1.77 Menos 1.97" (a linha vem antes, uma vez só)
+    const totalPrefixo =
+      /^(\d+(?:\.\d+)?)\s+(mais|acima|over|menos|abaixo|under)\s+(\S+)\s+(mais|acima|over|menos|abaixo|under)\s+(\S+)$/i.exec(
+        bruta,
+      );
+    if (totalPrefixo && COM_LINHA.has(mercado.mercado) && !HANDICAPS.has(mercado.mercado)) {
+      const L = Number(totalPrefixo[1]);
+      for (const [rot, tok] of [
+        [totalPrefixo[2], totalPrefixo[3]],
+        [totalPrefixo[4], totalPrefixo[5]],
+      ]) {
+        const lado = ladoTotal(rot);
+        const o = lerOdd(tok);
+        if (lado && o && o.odd > 1) emitir({ lado, time: mercado.time }, o, L);
+      }
+      continue;
+    }
+
+    // Jogou: "1 -0.25 1.86 2 +0.25 1.87" (1 = mandante, 2 = visitante)
+    const ahNumerado =
+      /^([12])\s+([+-]?\d+(?:\.\d+)?)\s+(\S+)\s+([12])\s+([+-]?\d+(?:\.\d+)?)\s+(\S+)$/.exec(bruta);
+    if (ahNumerado && HANDICAPS.has(mercado.mercado)) {
+      for (const [n, l, tok] of [ahNumerado.slice(1, 4), ahNumerado.slice(4, 7)]) {
+        const o = lerOdd(tok);
+        if (o && o.odd > 1) emitir({ lado: n === '1' ? 'casa' : 'fora' }, o, Number(l));
+      }
+      continue;
+    }
+
+    // dupla chance com os rótulos cortados pela largura do botão ("Botafogo SP ou er 1.15
+    // BotafogoSPoul 1.23 Empateoulond 2.08"): a ordem é sempre 1X, 12, X2, confirmada pelo último
+    // rótulo, que começa em "Empate"
+    if (mercado.mercado === 'DC') {
+      const nums = tokens.filter((t) => lerNumero(t) !== null);
+      const rotulos = bruta.split(/\s+[\d.]+(?=\s|$)/).map((x) => semAcento(x).trim());
+      if (
+        nums.length === 3 &&
+        rotulos[2]?.startsWith('empate') &&
+        !rotulos[0].startsWith('empate')
+      ) {
+        nums.forEach((t, i) => {
+          const o = lerOdd(t);
+          if (o && o.odd > 1) emitir({ lado: ['1X', '12', 'X2'][i] }, o);
+        });
+        continue;
+      }
+    }
 
     // tema claro: o rótulo "1" do resultado é cinza-claro e some ("2.17 x 3.36 2 3.26") ou vira
     // lixo ("] 2.06 X 3.19 2 3.09"); com "X" e "2" no lugar, a primeira odd é a do lado 1
