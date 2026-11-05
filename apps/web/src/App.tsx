@@ -24,10 +24,12 @@ import { abaDoExemplo, ehExemplo, rascunhoExemplo } from './exemplo';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
 import {
   carregarBancaInicial,
+  avisoDoBanco,
   carregarHistorico,
   gravarBancaInicial,
   gravarHistorico,
   mesmoRascunho,
+  ouvirFalhaDeGravacao,
   podeSalvarSozinho,
   salvarNoHistorico,
   type ApostaFeita,
@@ -85,7 +87,8 @@ export function App() {
     [historico, bancaInicial, r.idHistorico],
   );
   const d = useMemo(() => derivar(r, travas), [r, travas]);
-  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(null);
+  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(avisoDoBanco);
+  useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);
     // a análise aberta foi apagada: ela segue na tela, mas não volta sozinha para o histórico

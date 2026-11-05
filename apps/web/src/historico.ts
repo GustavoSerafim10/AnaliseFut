@@ -3,6 +3,7 @@
  * reabrir) e um RESUMO congelado na hora de salvar: depois do início o motor exclui o jogo
  * (só pré-live), então a decisão registrada é a que valeu. O placar entra depois do jogo e a
  * apuração usa os mesmos liquidadores do motor. Exportar/importar JSON leva para outro aparelho.
+ * Fica no banco do navegador (armazem.ts); o localStorage é só o plano B, se ele não abrir.
  * V4.0: a decisão registrada é a da V4; o CLV contra o fechamento JUSTO da referência é o
  * termômetro principal, por estratégia (S1–S4), e as apostas alimentam as travas da banca.
  */
@@ -21,6 +22,7 @@ import {
   type TravasBanca,
 } from '@pe/engine';
 import type { OddLine } from '@pe/schemas';
+import { abrirDeposito, migrarHistorico, type Deposito } from './armazem';
 import type { Derivado } from './dados';
 import { inicioIso, isoLocal, type Rascunho } from './estado';
 
@@ -99,7 +101,7 @@ export const entrou = (e: EntradaHistorico) => !!e.aposta && !!e.resumo.entrada;
 /** odd que vale para apurar: a que o usuário pegou, senão a da análise */
 export const oddDe = (e: EntradaHistorico) => e.aposta?.odd ?? e.resumo.entrada?.odd ?? 0;
 
-export function carregarHistorico(): EntradaHistorico[] {
+function lerDoLocalStorage(): EntradaHistorico[] {
   try {
     const s = localStorage.getItem(CHAVE);
     const lista = s ? (JSON.parse(s) as EntradaHistorico[]) : [];
@@ -109,8 +111,64 @@ export function carregarHistorico(): EntradaHistorico[] {
   }
 }
 
+/** Com o banco aberto, a lista fica em memória e cada mudança vai para o banco em fila. */
+let banco: { deposito: Deposito<EntradaHistorico>; lista: EntradaHistorico[] } | null = null;
+let fila: Promise<void> = Promise.resolve();
+let aoFalharGravacao: ((erro: string) => void) | null = null;
+let falhaAoAbrir: string | null = null;
+
+/** Aviso para o usuário quando o banco não abriu e o site está na cópia antiga. */
+export const avisoDoBanco = () => falhaAoAbrir;
+
+export function ouvirFalhaDeGravacao(f: (erro: string) => void): void {
+  aoFalharGravacao = f;
+}
+
+const ESPERA_DO_BANCO_MS = 5000;
+
+/** Roda uma vez, antes de desenhar o site: abre o banco e traz o histórico antigo para ele. */
+export async function iniciarHistorico(): Promise<void> {
+  try {
+    const abrindo = (async () => {
+      const deposito = await abrirDeposito<EntradaHistorico>('historico');
+      const lista = await migrarHistorico(deposito, {
+        ler: () => localStorage.getItem(CHAVE),
+        apagar: () => localStorage.removeItem(CHAVE),
+      });
+      return { deposito, lista };
+    })();
+    banco = await Promise.race([
+      abrindo,
+      new Promise<never>((_, falha) =>
+        setTimeout(() => falha(new Error('o banco demorou demais')), ESPERA_DO_BANCO_MS),
+      ),
+    ]);
+    // pede ao navegador para não limpar sozinho quando faltar espaço no aparelho
+    void navigator.storage?.persist?.().catch(() => undefined);
+  } catch (e) {
+    banco = null;
+    falhaAoAbrir = `O banco do navegador não abriu (${(e as Error).message}): o Histórico pode estar incompleto nesta sessão, mas nada foi apagado. Recarregue a página; se continuar, restaure o backup.`;
+  }
+}
+
+export function carregarHistorico(): EntradaHistorico[] {
+  return banco ? banco.lista : lerDoLocalStorage();
+}
+
 /** false = o aparelho não deixou gravar (aba privada, armazenamento cheio). */
 export function gravarHistorico(lista: EntradaHistorico[]): boolean {
+  if (banco) {
+    const b = banco;
+    b.lista = lista;
+    fila = fila
+      .then(() => b.deposito.gravar(lista))
+      .catch((e: Error) =>
+        aoFalharGravacao?.(
+          `Não consegui gravar o histórico (${e.message}): exporte o backup antes de fechar a página.`,
+        ),
+      );
+    return true;
+  }
   try {
     localStorage.setItem(CHAVE, JSON.stringify(lista));
     return true;
@@ -595,25 +653,52 @@ export function importarJson(
   return { lista, novas };
 }
 
-/** O Chrome guarda cerca de 5 milhões de caracteres por site. */
-const LIMITE_ARMAZENAMENTO = 5_000_000;
+/** O localStorage (análise aberta, escudos, fotos) guarda cerca de 5 milhões de caracteres. */
+const LIMITE_LOCAL = 5_000_000;
 
-/** Fração do armazenamento em uso e quantas análises ainda cabem, pelo tamanho médio. */
-export function usoArmazenamento(lista: EntradaHistorico[]): {
+export interface EspacoDoHistorico {
+  /** a parte mais cheia: o banco ou o localStorage */
   fracao: number;
   cabem: number | null;
-} {
+  /** tamanho do histórico, em MB */
+  mb: number;
+  noBanco: boolean;
+  /** o navegador prometeu não limpar sozinho */
+  protegido: boolean;
+}
+
+export async function espacoDoHistorico(lista: EntradaHistorico[]): Promise<EspacoDoHistorico> {
+  // amostra: medir centenas de análises a cada mudança pesaria à toa
+  const amostra = lista.slice(0, 20);
+  const media = amostra.length ? JSON.stringify(amostra).length / amostra.length : 0;
+  let usadoLocal = 0;
   try {
-    const usado = Object.keys(localStorage).reduce(
+    usadoLocal = Object.keys(localStorage).reduce(
       (s, k) => s + k.length + (localStorage.getItem(k)?.length ?? 0),
       0,
     );
-    const media = lista.length ? JSON.stringify(lista).length / lista.length : 0;
-    return {
-      fracao: usado / LIMITE_ARMAZENAMENTO,
-      cabem: media ? Math.max(0, Math.floor((LIMITE_ARMAZENAMENTO - usado) / media)) : null,
-    };
   } catch {
-    return { fracao: 0, cabem: null };
+    /* sem storage: conta como vazio */
   }
+  const mb = (media * lista.length) / 1e6;
+  const local = usadoLocal / LIMITE_LOCAL;
+  if (!banco)
+    return {
+      fracao: local,
+      cabem: media ? Math.max(0, Math.floor((LIMITE_LOCAL - usadoLocal) / media)) : null,
+      mb,
+      noBanco: false,
+      protegido: false,
+    };
+  const est = await navigator.storage?.estimate?.().catch(() => undefined);
+  const quota = est?.quota ?? 0;
+  const usado = est?.usage ?? 0;
+  const protegido = (await navigator.storage?.persisted?.().catch(() => false)) ?? false;
+  return {
+    fracao: Math.max(local, quota ? usado / quota : 0),
+    cabem: media && quota ? Math.max(0, Math.floor((quota - usado) / media)) : null,
+    mb,
+    noBanco: true,
+    protegido,
+  };
 }

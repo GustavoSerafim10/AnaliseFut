@@ -1,6 +1,6 @@
 import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { FormAposta } from '../componentes/FormAposta';
@@ -23,7 +23,8 @@ import {
   painel,
   situacao,
   temPlacar,
-  usoArmazenamento,
+  espacoDoHistorico,
+  type EspacoDoHistorico,
   type Balanco,
   type EntradaHistorico,
   type FiltroPainel,
@@ -288,7 +289,14 @@ export function AbaHistorico({
   const mudar = (id: string, m: Partial<EntradaHistorico>) =>
     setHistorico(historico.map((e) => (e.id === id ? { ...e, ...m } : e)));
 
-  const espaco = usoArmazenamento(historico);
+  const [espaco, setEspaco] = useState<EspacoDoHistorico | null>(null);
+  useEffect(() => {
+    let vale = true;
+    void espacoDoHistorico(historico).then((e) => vale && setEspaco(e));
+    return () => {
+      vale = false;
+    };
+  }, [historico]);
   const [ultimoBackup, setUltimoBackup] = useState(lerUltimoBackup);
   const diasSemBackup = ultimoBackup
     ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
@@ -617,12 +625,21 @@ export function AbaHistorico({
         cores e os escudos; as fotos de figurinhas e da galeria ficam de fora. Ao importar, o que já
         existe aqui não é substituído.
       </p>
-      <p className={`miudo${espaco.fracao >= 0.7 ? ' alerta-txt' : ''}`}>
-        Espaço usado neste navegador: {pct(espaco.fracao, 0)}
-        {espaco.cabem !== null && ` · cabem cerca de mais ${espaco.cabem} análises`}.
-        {espaco.fracao >= 0.7 &&
-          ' Está enchendo: exporte um backup; quando encher, as análises novas deixam de ser gravadas.'}
-      </p>
+      {espaco && (
+        <p className={`miudo${espaco.fracao >= 0.7 ? ' alerta-txt' : ''}`}>
+          Histórico: {dec(espaco.mb, 1).replace('.', ',')} MB,{' '}
+          {espaco.noBanco ? 'no banco do navegador' : 'no armazenamento simples do navegador'}
+          {espaco.cabem !== null &&
+            ` · ${espaco.cabem > 9999 ? 'cabem mais de 10 mil análises' : `cabem cerca de mais ${espaco.cabem} análises`}`}
+          {espaco.noBanco &&
+            (espaco.protegido
+              ? ' · protegido contra limpeza automática'
+              : ' · o navegador pode limpar se faltar espaço no aparelho, então mantenha o backup em dia')}
+          .
+          {espaco.fracao >= 0.7 &&
+            ' Está enchendo: exporte um backup; quando encher, as análises novas deixam de ser gravadas.'}
+        </p>
+      )}
       {historico.length > 0 && (diasSemBackup === null || diasSemBackup >= 7) && (
         <div className="caixa alerta miudo">
           {diasSemBackup === null
