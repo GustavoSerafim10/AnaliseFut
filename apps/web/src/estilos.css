@@ -4316,13 +4316,13 @@ button.cl-linha:hover {
   text-transform: uppercase;
 }
 .campo-formacao.casa span {
-  color: var(--amarelo);
+  color: var(--rotulo-casa, var(--amarelo));
 }
 .campo-formacao.fora {
   text-align: right;
 }
 .campo-formacao.fora span {
-  color: var(--ciano);
+  color: var(--rotulo-fora, var(--ciano));
 }
 .campo {
   position: relative;
@@ -4399,18 +4399,22 @@ button.cl-linha:hover {
   font-family: var(--fonte-tecnica);
   font-weight: 700;
   font-size: 15px;
-  color: var(--sobre-primaria);
-  background: var(--amarelo);
+  color: var(--bola-texto-casa, var(--sobre-primaria));
+  -webkit-text-stroke: var(--bola-contorno-casa, 0) #0b0b0d;
+  paint-order: stroke fill;
+  background: var(--bola-casa, var(--amarelo));
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
 .jogador-campo.fora .jogador-bola {
-  background: var(--ciano);
-  color: #03202a;
+  background: var(--bola-fora, var(--ciano));
+  color: var(--bola-texto-fora, #03202a);
+  -webkit-text-stroke: var(--bola-contorno-fora, 0) #0b0b0d;
 }
 .jogador-campo.vazio .jogador-bola {
   background: rgba(255, 255, 255, 0.08);
   color: var(--texto);
+  -webkit-text-stroke: 0;
   border-style: dashed;
 }
 .jogador-nome {

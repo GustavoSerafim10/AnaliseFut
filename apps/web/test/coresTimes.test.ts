@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bolasDoCampo,
   coresDaTabela,
   corDeBrilho,
   corDoTexto,
@@ -54,5 +55,26 @@ describe('legibilidade no fundo escuro', () => {
   it('letras do escudo contrastam com o fundo', () => {
     expect(corDoTexto({ cor1: '#0b0b0d', cor2: '#f8fafc' })).toBe('#f8fafc');
     expect(corDoTexto({ cor1: '#fde100', cor2: '#fff176' })).toBe('#0b0b0d');
+  });
+});
+
+describe('bolinhas do campo', () => {
+  const r = (n: string) => resolverCores(n);
+  it('cada time com a sua camisa', () => {
+    const b = bolasDoCampo(r('Palmeiras'), r('Chelsea'));
+    expect(b.casa.fundo).toBe('#006437');
+    expect(b.fora.fundo).toBe('#034694');
+  });
+  it('listras viram listras', () => {
+    expect(bolasDoCampo(r('Milan'), r('Chelsea')).casa.fundo).toContain(
+      'repeating-linear-gradient',
+    );
+  });
+  it('cores parecidas: o visitante vai de reserva lisa e os dois se distinguem', () => {
+    const b = bolasDoCampo(r('Flamengo'), r('Athletico'));
+    expect(b.casa.fundo).toContain('#d0101c');
+    expect(b.fora.fundo).toBe('#0b0b0d');
+    const branco = bolasDoCampo(r('Liverpool'), r('Arsenal'));
+    expect(branco.fora.fundo).toBe('#f8fafc');
   });
 });

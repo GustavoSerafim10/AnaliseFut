@@ -4,7 +4,7 @@
  * Os escudos são desenhados com as cores e as iniciais do time, não são oficiais. Os indicadores
  * de cada time só aparecem quando o dado existe — nada é inventado.
  */
-import { useId, useState, type CSSProperties } from 'react';
+import { useId, type CSSProperties } from 'react';
 import fundoEstadio from '../assets/estadio-dados.webp';
 import {
   corDeBrilho,
@@ -12,6 +12,7 @@ import {
   coresDoTime,
   misturar,
   salvarCores,
+  useCoresEscolhidas,
   type CoresTime,
 } from '../coresTimes';
 import type { Derivado } from '../dados';
@@ -103,18 +104,9 @@ const ORIGEM: Record<CoresTime['origem'], string> = {
 };
 
 /** Trocar as cores do time; a escolha fica salva e vale nos próximos jogos dele. */
-function EscolherCores({
-  nome,
-  cores,
-  aoMudar,
-}: {
-  nome: string;
-  cores: CoresTime;
-  aoMudar: () => void;
-}) {
+function EscolherCores({ nome, cores }: { nome: string; cores: CoresTime }) {
   const mudar = (campo: 'cor1' | 'cor2', valor: string) => {
     salvarCores(nome, { cor1: cores.cor1, cor2: cores.cor2, [campo]: valor });
-    aoMudar();
   };
   return (
     <details className={`mc-cores${cores.origem === 'neutra' ? ' pendente' : ''}`}>
@@ -132,13 +124,7 @@ function EscolherCores({
           <input type="color" value={cores.cor2} onChange={(e) => mudar('cor2', e.target.value)} />
         </label>
         {cores.origem === 'manual' && (
-          <button
-            type="button"
-            onClick={() => {
-              salvarCores(nome, null);
-              aoMudar();
-            }}
-          >
+          <button type="button" onClick={() => salvarCores(nome, null)}>
             Voltar ao automático
           </button>
         )}
@@ -150,7 +136,7 @@ function EscolherCores({
 const FAISCAS = Array.from({ length: 7 }, (_, i) => i);
 
 export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
-  const [, atualizar] = useState(0);
+  useCoresEscolhidas();
   const casa = r.jogo.casa || 'Mandante';
   const fora = r.jogo.fora || 'Visitante';
   const coresCasa = coresDoTime(casa, d.escalacao.casa.cores);
@@ -183,7 +169,7 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
       <div className="mc-texto">
         <div className="mc-nome">{nome}</div>
         <div className="mc-indicadores">{indicadores(d, t).join(' | ')}</div>
-        <EscolherCores nome={nome} cores={cores} aoMudar={() => atualizar((n) => n + 1)} />
+        <EscolherCores nome={nome} cores={cores} />
       </div>
     </div>
   );

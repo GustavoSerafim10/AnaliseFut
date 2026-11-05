@@ -2,6 +2,7 @@
  * Cores de cada time no topo da análise. Ordem: a sua escolha (salva por time) → tabela de clubes
  * → camisa lida no print da escalação → cor neutra com aviso para escolher.
  */
+import { useSyncExternalStore } from 'react';
 import { semAcento, tokensDoNome } from '@pe/parsers';
 
 export type Padrao = 'liso' | 'listras' | 'faixa';
@@ -275,6 +276,18 @@ export function salvarCores(nome: string, cores: { cor1: string; cor2: string } 
   if (cores) e[chaveDoTime(nome)] = cores;
   else delete e[chaveDoTime(nome)];
   localStorage.setItem(CHAVE, JSON.stringify(e));
+  window.dispatchEvent(new Event(CHAVE));
+}
+
+/** Redesenha quem usa as cores quando uma escolha muda (topo e campo ficam iguais). */
+export function useCoresEscolhidas(): void {
+  useSyncExternalStore(
+    (avisar) => {
+      window.addEventListener(CHAVE, avisar);
+      return () => window.removeEventListener(CHAVE, avisar);
+    },
+    () => localStorage.getItem(CHAVE),
+  );
 }
 
 /** Monta as cores sem navegador: `escolha` é o que está salvo para o time. */
@@ -298,4 +311,57 @@ export function resolverCores(
 
 export function coresDoTime(nome: string, camisa?: { cor1: string; cor2?: string }): CoresTime {
   return resolverCores(nome, lerEscolhas()[chaveDoTime(nome)], camisa);
+}
+
+const parecidas = (a: string, b: string) => {
+  const [x, y] = [rgb(a), rgb(b)];
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) < 90;
+};
+
+export interface BolaNoCampo {
+  fundo: string;
+  texto: string;
+  contorno: string;
+  rotulo: string;
+}
+
+function bola(c: CoresTime, cor1: string, cor2: string): BolaNoCampo {
+  const rotulo = corDeBrilho({ cor1, cor2 });
+  if (c.padrao === 'listras')
+    return {
+      fundo: `repeating-linear-gradient(90deg, ${cor1} 0 25%, ${cor2} 25% 50%)`,
+      texto: '#f8fafc',
+      contorno: '3px',
+      rotulo,
+    };
+  if (c.padrao === 'faixa')
+    return {
+      fundo: `linear-gradient(135deg, ${cor1} 36%, ${cor2} 36% 64%, ${cor1} 64%)`,
+      texto: '#f8fafc',
+      contorno: '3px',
+      rotulo,
+    };
+  return { fundo: cor1, texto: corDoTexto({ cor1, cor2 }), contorno: '0', rotulo };
+}
+
+/**
+ * Bolinhas do campo com a camisa de cada time. Cores parecidas (Flamengo × Athletico): o visitante
+ * joga de "camisa reserva", lisa na 2ª cor, ou branca se ela também for parecida.
+ */
+export function bolasDoCampo(
+  casa: CoresTime,
+  fora: CoresTime,
+): { casa: BolaNoCampo; fora: BolaNoCampo } {
+  const bolaCasa = bola(casa, casa.cor1, casa.cor2);
+  if (!parecidas(casa.cor1, fora.cor1))
+    return { casa: bolaCasa, fora: bola(fora, fora.cor1, fora.cor2) };
+  const reserva = !parecidas(casa.cor1, fora.cor2)
+    ? fora.cor2
+    : parecidas(casa.cor1, '#f8fafc')
+      ? '#0b0b0d'
+      : '#f8fafc';
+  return {
+    casa: bolaCasa,
+    fora: bola({ ...fora, padrao: 'liso' }, reserva, fora.cor1),
+  };
 }

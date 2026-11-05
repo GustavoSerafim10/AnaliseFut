@@ -1,9 +1,10 @@
 /**
- * Campo com as duas escalações, montado pela formação: mandante à esquerda (amarelo), visitante
- * à direita (ciano). O primeiro da lista é o goleiro; depois, da defesa para o ataque, na ordem
+ * Campo com as duas escalações, montado pela formação: mandante à esquerda, visitante à direita,
+ * cada um com as cores do time (ver coresTimes.ts). O primeiro da lista é o goleiro; depois, da defesa para o ataque, na ordem
  * em que o leitor entrega (e em que o usuário corrige). Os jogadores entram fileira por fileira.
  */
 import type { CSSProperties } from 'react';
+import { bolasDoCampo, coresDoTime, useCoresEscolhidas } from '../coresTimes';
 
 export const FORMACOES = [
   '4-4-2',
@@ -29,6 +30,8 @@ export interface TimeNoCampo {
   posicoes?: { nome: string; x: number; y: number }[];
   /** formação escolhida à mão: monta pela formação mesmo havendo posições */
   formacaoEscolhida?: boolean;
+  /** cores da camisa lidas do print */
+  cores?: { cor1: string; cor2?: string };
 }
 
 const igual = (a: string, b: string) =>
@@ -125,10 +128,23 @@ export function CampoEscalacao({
       </select>
     </label>
   );
+  useCoresEscolhidas();
+  const bolas = bolasDoCampo(
+    coresDoTime(casa.nome, casa.cores),
+    coresDoTime(fora.nome, fora.cores),
+  );
+  const coresCss = Object.fromEntries(
+    (['casa', 'fora'] as const).flatMap((t) => [
+      [`--bola-${t}`, bolas[t].fundo],
+      [`--bola-texto-${t}`, bolas[t].texto],
+      [`--bola-contorno-${t}`, bolas[t].contorno],
+      [`--rotulo-${t}`, bolas[t].rotulo],
+    ]),
+  ) as CSSProperties;
   // a chave muda com a escalação: a animação de entrada roda de novo quando ela muda
   const chave = [casa, fora].map((t) => `${t.formacao}|${t.titulares.join(',')}`).join('#');
   return (
-    <div className="campo-escalacao caixa">
+    <div className="campo-escalacao caixa" style={coresCss}>
       <div className="campo-topo">
         {seletor('casa', casa)}
         {seletor('fora', fora)}

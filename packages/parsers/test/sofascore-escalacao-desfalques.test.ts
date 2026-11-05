@@ -77,6 +77,14 @@ describe('Milan × Ferencváros: campo com 11 de cada lado', () => {
     expect(r.casa.titulares).not.toContain('N. Zohoré');
   });
 
+  it('nome do time no print diferente do digitado não vira jogador', () => {
+    const r = lerEscalacao(recorte, { casa: 'Flamengo', fora: 'Athletico' });
+    expect(r.casa.titulares).not.toContain('Milan');
+    expect(r.fora.titulares).not.toContain('Ferencváros');
+    expect(r.casa.titulares).toHaveLength(11);
+    expect(r.fora.titulares).toHaveLength(11);
+  });
+
   it('dois prints do mesmo campo não somam jogadores: vale o mais completo', () => {
     const j = juntarEscalacoes([lerEscalacao(pagina, jogoM), lerEscalacao(recorte, jogoM)])!;
     expect(j.casa.titulares).toHaveLength(11);
