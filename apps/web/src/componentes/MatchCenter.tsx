@@ -191,22 +191,24 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
       aria-label={`${casa} contra ${fora}`}
       style={{ '--casa': brilhoCasa, '--fora': brilhoFora } as CSSProperties}
     >
-      <div
-        className="mc-foto"
-        style={{ backgroundImage: `url(${fundoEstadio})` }}
-        aria-hidden="true"
-      />
-      <div className="mc-luz casa" aria-hidden="true" />
-      <div className="mc-luz fora" aria-hidden="true" />
-      <div className="mc-feixe casa" aria-hidden="true" />
-      <div className="mc-feixe fora" aria-hidden="true" />
-      <div className="mc-faiscas" aria-hidden="true">
-        {FAISCAS.map((i) => (
-          <i key={`c${i}`} className="casa" />
-        ))}
-        {FAISCAS.map((i) => (
-          <i key={`f${i}`} className="fora" />
-        ))}
+      <div className="mc-fundo" aria-hidden="true">
+        <div
+          className="mc-foto"
+          style={{ backgroundImage: `url(${fundoEstadio})` }}
+          aria-hidden="true"
+        />
+        <div className="mc-luz casa" aria-hidden="true" />
+        <div className="mc-luz fora" aria-hidden="true" />
+        <div className="mc-feixe casa" aria-hidden="true" />
+        <div className="mc-feixe fora" aria-hidden="true" />
+        <div className="mc-faiscas" aria-hidden="true">
+          {FAISCAS.map((i) => (
+            <i key={`c${i}`} className="casa" />
+          ))}
+          {FAISCAS.map((i) => (
+            <i key={`f${i}`} className="fora" />
+          ))}
+        </div>
       </div>
       <div className="mc-conteudo">
         {lado('casa', casa, coresCasa, brilhoCasa)}

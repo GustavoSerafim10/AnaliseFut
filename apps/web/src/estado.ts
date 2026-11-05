@@ -79,6 +79,8 @@ export interface Rascunho {
   noticia: boolean;
   /** id da entrada do histórico de onde veio (salvar de novo atualiza a mesma entrada) */
   idHistorico?: string;
+  /** você apagou esta análise do histórico: ela não volta sozinha (salvar à mão desfaz) */
+  naoSalvarSozinho?: boolean;
 }
 
 export function rascunhoNovo(): Rascunho {
@@ -87,7 +89,8 @@ export function rascunhoNovo(): Rascunho {
       casa: '',
       fora: '',
       competicao: '',
-      data: new Date().toISOString().slice(0, 10),
+      // data local: em UTC, depois das 21h de Brasília já seria amanhã
+      data: isoLocal(new Date()).slice(0, 10),
       hora: '',
     },
     config: {
@@ -132,11 +135,13 @@ export function carregarRascunho(): Rascunho {
   return rascunhoNovo();
 }
 
-export function salvarRascunho(r: Rascunho): void {
+/** false = o navegador não deixou gravar (armazenamento cheio, aba privada). */
+export function salvarRascunho(r: Rascunho): boolean {
   try {
     localStorage.setItem(CHAVE, JSON.stringify(r));
+    return true;
   } catch {
-    /* ignora: é só conveniência */
+    return false;
   }
 }
 

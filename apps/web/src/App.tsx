@@ -59,8 +59,9 @@ export function App() {
   const [aba, setAba] = useState<Aba>(() =>
     demo ? ({ id: abaDoExemplo() } as Aba) : { id: 'jogo' },
   );
+  const [rascunhoCheio, setRascunhoCheio] = useState(false);
   useEffect(() => {
-    if (!demo) salvarRascunho(r);
+    if (!demo) setRascunhoCheio(!salvarRascunho(r));
   }, [r, demo]);
   const irPara = (hash: string) => {
     location.hash = hash;
@@ -87,6 +88,9 @@ export function App() {
   const [avisoHistorico, setAvisoHistorico] = useState<string | null>(null);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);
+    // a análise aberta foi apagada: ela segue na tela, mas não volta sozinha para o histórico
+    if (r.idHistorico && !h.some((e) => e.id === r.idHistorico))
+      setR((x) => ({ ...x, idHistorico: undefined, naoSalvarSozinho: true }));
     setAvisoHistorico(
       gravarHistorico(h) ? null : 'Não consegui gravar o histórico neste aparelho: exporte o JSON.',
     );
@@ -98,8 +102,13 @@ export function App() {
       return;
     }
     const { lista, id } = salvarNoHistorico(historico, r, d, aposta);
-    setHistorico(lista);
-    setR((x) => ({ ...x, idHistorico: id }));
+    setHistoricoState(lista);
+    setAvisoHistorico(
+      gravarHistorico(lista)
+        ? null
+        : 'Não consegui gravar o histórico neste aparelho: exporte o backup.',
+    );
+    setR((x) => ({ ...x, idHistorico: id, naoSalvarSozinho: undefined }));
   }
 
   // salva sozinho, com uma folga para não gravar a cada tecla
@@ -387,6 +396,12 @@ export function App() {
         )}
         {aba.id === 'promocoes' && <AbaPromocoes {...props} />}
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
+        {rascunhoCheio && (
+          <div className="caixa alerta">
+            O navegador não deixou guardar esta análise: se fechar a página, ela se perde. Exporte
+            um backup no Histórico.
+          </div>
+        )}
       </main>
       <footer className="rodape">
         Pricing Engine V4.0 · referência afiada × casa mole · NO BET é o padrão

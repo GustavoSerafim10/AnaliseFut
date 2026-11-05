@@ -2,7 +2,8 @@
  * Peças de interface reutilizadas: ícones (SVG em linha, sem biblioteca), tooltip explicativo
  * e número com contagem animada. Nenhuma delas calcula nada: só exibem valores do motor.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 const CAMINHOS = {
   bola: (
@@ -130,11 +131,50 @@ export const GLOSSARIO = {
 } as const;
 
 /** "?" com explicação: abre no hover, no foco do teclado e no toque. */
+/** Em cima do ícone, ou embaixo se faltar espaço; sempre dentro da largura da tela. */
+function posicaoDoBalao(el: HTMLElement): CSSProperties {
+  const r = el.getBoundingClientRect();
+  const meia = Math.min(130, (window.innerWidth - 24) / 2);
+  const x = Math.max(meia + 12, Math.min(window.innerWidth - meia - 12, (r.left + r.right) / 2));
+  const emCima = r.top > 170;
+  return {
+    left: x,
+    top: emCima ? r.top - 8 : r.bottom + 8,
+    transform: `translate(-50%, ${emCima ? '-100%' : '0'})`,
+  };
+}
+
+/**
+ * O balão vai direto no body: dentro de um elemento animado ou de uma tabela com rolagem ele era
+ * cortado ou ia parar fora da tela. Rolar a página fecha.
+ */
 export function Dica({ termo }: { termo: keyof typeof GLOSSARIO }) {
+  const [estilo, setEstilo] = useState<CSSProperties | null>(null);
+  useEffect(() => {
+    if (!estilo) return;
+    const fechar = () => setEstilo(null);
+    window.addEventListener('scroll', fechar, { capture: true, passive: true, once: true });
+    return () => window.removeEventListener('scroll', fechar, { capture: true });
+  }, [estilo]);
   return (
-    <span className="dica-termo" tabIndex={0} role="note" aria-label={GLOSSARIO[termo]}>
+    <span
+      className="dica-termo"
+      tabIndex={0}
+      role="note"
+      aria-label={GLOSSARIO[termo]}
+      onMouseEnter={(e) => setEstilo(posicaoDoBalao(e.currentTarget))}
+      onFocus={(e) => setEstilo(posicaoDoBalao(e.currentTarget))}
+      onMouseLeave={() => setEstilo(null)}
+      onBlur={() => setEstilo(null)}
+    >
       <Icone nome="info" tamanho={13} />
-      <span className="balao">{GLOSSARIO[termo]}</span>
+      {estilo &&
+        createPortal(
+          <span className="balao-flutuante" style={estilo}>
+            {GLOSSARIO[termo]}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

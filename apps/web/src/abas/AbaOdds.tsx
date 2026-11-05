@@ -4,7 +4,8 @@ import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
 import { UploadPrints } from '../componentes/UploadPrints';
-import { FUSO, type Leitura } from '../estado';
+import { FUSO, type Leitura, type Rascunho } from '../estado';
+import { aplicarLeitura, oddsDefasadas } from '../oddsDaCasa';
 import type { PropsAba } from './tipos';
 
 const ORDEM_MERCADO: TipoMercado[] = [
@@ -61,6 +62,26 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
       },
     );
   const leitura = lerTodos(r.prints[grupo] ?? []);
+  const defasadas = oddsDefasadas(r.odds, casa, leitura.linhas);
+  /** Grava os prints e refaz as odds da casa a partir deles (lê do estado mais novo). */
+  const comPrints = (x: Rascunho, prints: Leitura[]): Rascunho => ({
+    ...x,
+    prints: { ...x.prints, [grupo]: prints },
+    odds: aplicarLeitura(
+      x.odds,
+      casa,
+      lerOddsCasa(
+        prints.map((p) => p.texto),
+        {
+          jogo: { casa: x.jogo.casa || 'Mandante', fora: x.jogo.fora || 'Visitante' },
+          data: x.jogo.data,
+          fuso: FUSO,
+          casa,
+          horariosPadrao: prints.map((p) => p.capturadoEm),
+        },
+      ).linhas,
+    ),
+  });
   const lerUm = (texto: string) =>
     lerOddsCasa([texto], { jogo: nomes, data: r.jogo.data, fuso: FUSO, casa }).linhas;
   const descrever = (texto: string) => {
@@ -99,7 +120,11 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
       return { ...x, odds: [...mantidas, ...extras] };
     });
   const mudar = (i: number, m: Partial<OddLine>) =>
-    setR((x) => ({ ...x, odds: x.odds.map((l, j) => (j === i ? { ...l, ...m } : l)) }));
+    // corrigida à mão: a releitura dos prints não mexe mais nela
+    setR((x) => ({
+      ...x,
+      odds: x.odds.map((l, j) => (j === i ? { ...l, ...m, fonte: 'manual' } : l)),
+    }));
   const remover = (i: number) => setR((x) => ({ ...x, odds: x.odds.filter((_, j) => j !== i) }));
 
   function importar() {
@@ -144,26 +169,35 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
       )}
       <UploadPrints
         rotulo={`Enviar prints da ${casa} (todos os mercados)`}
-        dica="Mande todos os mercados, quantos prints forem; repetidos são juntados. O horário de coleta é lido da barra de status."
+        dica="Mande todos os mercados, quantos prints forem; repetidos são juntados. O horário de coleta é lido da barra de status. Apagar um print tira as odds dele."
         leituras={r.prints[grupo] ?? []}
         desabilitado={semTimes}
         descrever={descrever}
         conferir={conferir}
-        onLido={(lido) => {
-          setR((x) => ({
-            ...x,
-            prints: { ...x.prints, [grupo]: [...(x.prints[grupo] ?? []), lido] },
-          }));
-          adicionarLinhas(lerTodos([...(r.prints[grupo] ?? []), lido]).linhas);
-        }}
+        onLido={(lido) => setR((x) => comPrints(x, [...(x.prints[grupo] ?? []), lido]))}
         onRemover={(i) =>
-          setR((x) => ({
-            ...x,
-            prints: { ...x.prints, [grupo]: (x.prints[grupo] ?? []).filter((_, j) => j !== i) },
-          }))
+          setR((x) =>
+            comPrints(
+              x,
+              (x.prints[grupo] ?? []).filter((_, j) => j !== i),
+            ),
+          )
         }
       />
 
+      {defasadas > 0 && (
+        <div className="caixa alerta">
+          <strong>{defasadas} odd(s) não saem mais dos prints desta casa</strong>: vieram de um
+          print já apagado ou de uma versão antiga do leitor, e continuam entrando na análise.{' '}
+          <button
+            className="primario mini"
+            onClick={() => setR((x) => comPrints(x, x.prints[grupo] ?? []))}
+          >
+            Reler os prints
+          </button>
+          <p className="miudo">O que você corrigiu à mão não muda.</p>
+        </div>
+      )}
       {leitura.avisos
         .filter((a) => !a.startsWith('horário'))
         // com odds de outros prints, "nenhuma odd" é só um print sem mercado com modelo: a lista

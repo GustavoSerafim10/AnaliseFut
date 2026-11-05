@@ -659,7 +659,8 @@ pre {
   max-width: 1600px;
   margin: 0 auto;
   min-height: 250px;
-  overflow: hidden;
+  /* acima do conteúdo: o painel de cores abre por cima dele */
+  z-index: 3;
   border-bottom: 1px solid var(--borda);
   animation: entrada-mc 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -671,7 +672,12 @@ pre {
   background-position: center 55%;
   animation: zoom-mc 18s ease-in-out infinite alternate;
 }
-.match-center::before {
+.mc-fundo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.mc-fundo::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -700,7 +706,7 @@ pre {
     transform: scale(1.06);
   }
 }
-.match-center::after {
+.mc-fundo::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -709,7 +715,7 @@ pre {
 }
 .mc-conteudo {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   display: grid;
   grid-template-columns: 1fr minmax(260px, 0.9fr) 1fr;
   align-items: center;
@@ -1725,12 +1731,10 @@ pre {
 .dica-termo:focus {
   color: var(--ciano);
 }
-.dica-termo .balao {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  z-index: 10;
-  width: 260px;
+.balao-flutuante {
+  position: fixed;
+  z-index: 60;
+  width: min(260px, calc(100vw - 24px));
   padding: 10px 12px;
   border-radius: 10px;
   font-family: 'Inter', sans-serif;
@@ -1741,17 +1745,7 @@ pre {
   background: rgba(9, 18, 38, 0.97);
   border: 1px solid var(--borda-forte);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-  opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 4px);
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
-}
-.dica-termo:hover .balao,
-.dica-termo:focus .balao {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 
 /* ---------- upload ---------- */
@@ -3280,9 +3274,6 @@ main,
 }
 
 /* balões das dicas nunca alargam a página no celular */
-.dica-termo .balao {
-  width: min(260px, calc(100vw - 32px));
-}
 /* no #root e não no body: o Chrome mobile ignora o overflow do body ao medir a página */
 #root {
   overflow-x: clip;

@@ -23,6 +23,7 @@ import {
   painel,
   situacao,
   temPlacar,
+  usoArmazenamento,
   type Balanco,
   type EntradaHistorico,
   type FiltroPainel,
@@ -287,6 +288,7 @@ export function AbaHistorico({
   const mudar = (id: string, m: Partial<EntradaHistorico>) =>
     setHistorico(historico.map((e) => (e.id === id ? { ...e, ...m } : e)));
 
+  const espaco = usoArmazenamento(historico);
   const [ultimoBackup, setUltimoBackup] = useState(lerUltimoBackup);
   const diasSemBackup = ultimoBackup
     ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
@@ -359,6 +361,7 @@ export function AbaHistorico({
         <label>
           Banca inicial (R$), definida uma vez
           <input
+            key={bancaInicial ?? 'sem-banca'}
             inputMode="decimal"
             defaultValue={bancaInicial ?? ''}
             onBlur={(x) => setBancaInicial(num(x.target.value) ?? null)}
@@ -613,6 +616,12 @@ export function AbaHistorico({
         Tudo fica só neste navegador. O arquivo leva o histórico, a banca, a análise aberta, as
         cores e os escudos; as fotos de figurinhas e da galeria ficam de fora. Ao importar, o que já
         existe aqui não é substituído.
+      </p>
+      <p className={`miudo${espaco.fracao >= 0.7 ? ' alerta-txt' : ''}`}>
+        Espaço usado neste navegador: {pct(espaco.fracao, 0)}
+        {espaco.cabem !== null && ` · cabem cerca de mais ${espaco.cabem} análises`}.
+        {espaco.fracao >= 0.7 &&
+          ' Está enchendo: exporte um backup; quando encher, as análises novas deixam de ser gravadas.'}
       </p>
       {historico.length > 0 && (diasSemBackup === null || diasSemBackup >= 7) && (
         <div className="caixa alerta miudo">

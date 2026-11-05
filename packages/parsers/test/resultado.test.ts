@@ -17,6 +17,15 @@ describe('resultado do SofaScore (prints reais)', () => {
     expect(r.amarelos).toEqual({ casa: 0, fora: 2 });
     expect(r.faltando).toEqual(['escanteios']);
   });
+  it('Athletico 1×3 Vasco (04/11)', () => {
+    const r = jogo('athletico');
+    expect(r.placar).toEqual({ casa: 1, fora: 3 });
+    expect(r.intervalo).toEqual({ casa: 1, fora: 0 });
+    expect(r.escanteios).toEqual({ casa: 7, fora: 0 });
+    expect(r.amarelos).toEqual({ casa: 3, fora: 1 });
+    expect(r.vermelhos).toEqual({ casa: 1, fora: 0 });
+    expect(r.faltando).toEqual([]);
+  });
   it('Atlético-MG 0×1 Cruzeiro', () => {
     const r = jogo('atletico');
     expect(r.placar).toEqual({ casa: 0, fora: 1 });

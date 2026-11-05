@@ -225,6 +225,7 @@ const jogoComecou = (r: Rascunho, agora: number) => {
  */
 export function podeSalvarSozinho(r: Rascunho, d: Derivado, agora = Date.now()): boolean {
   return (
+    !r.naoSalvarSozinho &&
     !!r.jogo.casa &&
     !!r.jogo.fora &&
     !!r.jogo.hora &&
@@ -592,4 +593,27 @@ export function importarJson(
   }
   const lista = [...mapa.values()].sort((a, b) => b.resumo.inicio.localeCompare(a.resumo.inicio));
   return { lista, novas };
+}
+
+/** O Chrome guarda cerca de 5 milhões de caracteres por site. */
+const LIMITE_ARMAZENAMENTO = 5_000_000;
+
+/** Fração do armazenamento em uso e quantas análises ainda cabem, pelo tamanho médio. */
+export function usoArmazenamento(lista: EntradaHistorico[]): {
+  fracao: number;
+  cabem: number | null;
+} {
+  try {
+    const usado = Object.keys(localStorage).reduce(
+      (s, k) => s + k.length + (localStorage.getItem(k)?.length ?? 0),
+      0,
+    );
+    const media = lista.length ? JSON.stringify(lista).length / lista.length : 0;
+    return {
+      fracao: usado / LIMITE_ARMAZENAMENTO,
+      cabem: media ? Math.max(0, Math.floor((LIMITE_ARMAZENAMENTO - usado) / media)) : null,
+    };
+  } catch {
+    return { fracao: 0, cabem: null };
+  }
 }

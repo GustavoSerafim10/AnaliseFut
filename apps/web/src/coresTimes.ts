@@ -302,7 +302,11 @@ export function salvarCores(nome: string, cores: { cor1: string; cor2: string } 
   const e = lerEscolhas();
   if (cores) e[chaveDoTime(nome)] = cores;
   else delete e[chaveDoTime(nome)];
-  localStorage.setItem(CHAVE, JSON.stringify(e));
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify(e));
+  } catch {
+    return; // armazenamento cheio: fica a cor que já estava
+  }
   avisarMudanca();
 }
 
