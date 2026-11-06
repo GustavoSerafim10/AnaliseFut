@@ -7,8 +7,16 @@ import { PlacarDeAcerto } from '../src/componentes/PainelHistorico';
 import { derivar, type Derivado } from '../src/dados';
 import { rascunhoNovo, type Rascunho } from '../src/estado';
 import {
+  apostasDoJogo,
   apurar,
+  balanco,
+  calibracao,
+  chaveDaAposta,
+  minhasEntradas,
+  painel,
   placarAcerto,
+  registrarAposta,
+  registrarResultado,
   resumir,
   salvarNoHistorico,
   type EntradaHistorico,
@@ -83,6 +91,84 @@ describe('entrada escolhida na lista', () => {
   });
 });
 
+describe('mais de uma aposta no mesmo jogo', () => {
+  const d = derivar(r);
+  const aposta = (i: number, odd: number) => ({
+    odd,
+    casa: '1win',
+    valor: 10,
+    feitaEm: '2099-10-26T10:00:00-03:00',
+    entrada: { ...entrada, linha: r.odds[i], odd, descricao: `aposta ${i}` },
+  });
+  const duas = () => {
+    const primeira = registrarAposta([], { ...r, idHistorico: 'x' }, d, aposta(0, 1.4));
+    return registrarAposta(primeira.lista, { ...r, idHistorico: primeira.id }, d, aposta(3, 1.9));
+  };
+
+  it('cada aposta conta sozinha no painel', () => {
+    const { lista, id } = duas();
+    expect(lista).toHaveLength(2);
+    expect(id).toBe('x');
+    expect(apostasDoJogo(lista, 'x')).toHaveLength(2);
+    expect(minhasEntradas(lista)).toHaveLength(2);
+    expect(new Set(lista.map(chaveDaAposta)).size).toBe(2);
+  });
+
+  it('salvar a análise de novo não mexe nas apostas', () => {
+    const { lista } = duas();
+    const denovo = salvarNoHistorico(lista, { ...r, idHistorico: 'x' }, d).lista;
+    expect(denovo).toHaveLength(2);
+    expect(denovo.map((e) => e.resumo.entrada?.descricao).sort()).toEqual(['aposta 0', 'aposta 3']);
+  });
+
+  it('o placar registrado em uma vale para o jogo todo, e cada uma é apurada pelo seu mercado', () => {
+    const { lista } = duas();
+    const irma = lista.find((e) => e.irmaDe)!;
+    const fim = registrarResultado(lista, irma.id, {
+      casa: 2,
+      fora: 0,
+      oddFechamento: 2,
+      registradoEm: 'x',
+    });
+    const [a, b] = [fim.find((e) => e.id === 'x')!, fim.find((e) => e.irmaDe)!];
+    expect(a.resultado?.casa).toBe(2);
+    expect(apurar(a)).toMatchObject({ ok: true, resultado: 1 }); // mais de 1,5
+    expect(apurar(b)).toMatchObject({ ok: true, resultado: 1 }); // menos de 2,5
+    expect(b.resultado?.oddFechamento).toBe(2);
+    expect(a.resultado?.oddFechamento).toBeUndefined();
+    expect(painel(minhasEntradas(fim)).green).toBe(2);
+    expect(balanco(minhasEntradas(fim)).apuradas).toBe(2);
+    const sem = registrarResultado(fim, 'x', undefined);
+    expect(sem.find((e) => e.id === 'x')!.resultado).toBeUndefined();
+    expect(sem.find((e) => e.irmaDe)!.resultado?.oddFechamento).toBe(2);
+    expect(apurar(sem.find((e) => e.irmaDe)!)).toBeNull();
+  });
+
+  it('o mesmo jogo não conta duas vezes no placar de acerto nem no Brier', () => {
+    const base = salva('x', 0.72);
+    base.aposta = aposta(0, 1.4);
+    base.resumo.previsao = {
+      modelo1x2: [0.5, 0.3, 0.2],
+      mercado1x2: [0.5, 0.3, 0.2],
+      over25Modelo: 0.5,
+    };
+    const { lista } = registrarAposta([base], { ...r, idHistorico: 'x' }, d, aposta(3, 1.9));
+    const fim = registrarResultado(lista, 'x', { casa: 2, fora: 0, registradoEm: 'x' });
+    expect(placarAcerto(fim).apuradas).toBe(1);
+    expect(calibracao(fim).jogos).toBe(1);
+  });
+
+  it('aposta nova herda o placar que o jogo já tem, sem o fechamento de outra aposta', () => {
+    const base = salva('x', 0.72);
+    base.aposta = aposta(0, 1.4);
+    base.resultado = { casa: 1, fora: 0, oddFechamento: 1.5, registradoEm: 'x' };
+    const { lista } = registrarAposta([base], { ...r, idHistorico: 'x' }, d, aposta(3, 1.9));
+    const irma = lista.find((e) => e.irmaDe)!;
+    expect(irma.resultado?.casa).toBe(1);
+    expect(irma.resultado?.oddFechamento).toBeUndefined();
+  });
+});
+
 describe('placar de acerto', () => {
   it('separa por faixa, conta 1 por jogo e deixa os sem placar pendentes', () => {
     const p = placarAcerto([
@@ -114,7 +200,7 @@ describe('tela', () => {
     renderToString(
       createElement(MelhoresEntradas, {
         d: d as Derivado,
-        podeEntrar: true,
+        registradas: new Set<string>(),
         onEntrar: () => undefined,
       }),
     );
@@ -124,6 +210,18 @@ describe('tela', () => {
     expect(tela({ opcoes: [], entradas: { ...base, status: 'sem_estatisticas' } })).toContain(
       'Faltam as estatísticas',
     );
+  });
+  it('aposta já registrada sai do seletor', () => {
+    const k = lidas[0].chave;
+    const html = renderToString(
+      createElement(MelhoresEntradas, {
+        d: { opcoes: lidas, entradas: { ...base, status: 'ok' } } as unknown as Derivado,
+        registradas: new Set([k]),
+        onEntrar: () => undefined,
+      }),
+    );
+    expect(html).not.toContain(`value="${k}"`);
+    expect(html).toContain(`value="${lidas[1].chave}"`);
   });
   it('dia sem entrada é uma resposta, não um erro', () => {
     expect(tela({ opcoes: [], entradas: { ...base, status: 'ok' } })).toContain('não tem entrada');

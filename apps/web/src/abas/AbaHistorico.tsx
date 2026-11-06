@@ -22,6 +22,7 @@ import {
   minhasEntradas,
   painel,
   placarAcerto,
+  registrarResultado,
   situacao,
   temPlacar,
   espacoDoHistorico,
@@ -560,8 +561,11 @@ export function AbaHistorico({
                 <button
                   className="discreto mini"
                   onClick={() =>
-                    confirm('Desfazer a entrada? A análise volta para "No papel".') &&
-                    mudar(e.id, { aposta: undefined })
+                    e.irmaDe
+                      ? confirm('Desfazer esta aposta? Ela sai do histórico.') &&
+                        setHistorico(historico.filter((x) => x.id !== e.id))
+                      : confirm('Desfazer a entrada? A análise volta para "No papel".') &&
+                        mudar(e.id, { aposta: undefined })
                   }
                 >
                   desfazer
@@ -601,7 +605,10 @@ export function AbaHistorico({
               </div>
             )}
             <h4>Resultado e fechamento</h4>
-            <ResultadoComPrint e={e} onSalvar={(resultado) => mudar(e.id, { resultado })} />
+            <ResultadoComPrint
+              e={e}
+              onSalvar={(resultado) => setHistorico(registrarResultado(historico, e.id, resultado))}
+            />
             <div className="linha-acoes">
               <button onClick={() => abrir(e.rascunho)}>Abrir a análise</button>
               <button

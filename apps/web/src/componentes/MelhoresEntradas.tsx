@@ -36,12 +36,12 @@ export type EscolhaEntrada = Pick<
 function Cartao({
   e,
   n,
-  podeEntrar,
+  registrada,
   onEntrar,
 }: {
   e: EntradaSugerida;
   n: number;
-  podeEntrar: boolean;
+  registrada: boolean;
   onEntrar: () => void;
 }) {
   return (
@@ -72,7 +72,9 @@ function Cartao({
           {e.stakeValor !== undefined && ` = R$ ${dec(e.stakeValor)}`}
         </p>
       </div>
-      {podeEntrar && (
+      {registrada ? (
+        <span className="entrada-registrada">✓ Registrada</span>
+      ) : (
         <button className="entrada-botao" onClick={onEntrar}>
           Entrei nessa
         </button>
@@ -83,11 +85,12 @@ function Cartao({
 
 export function MelhoresEntradas({
   d,
-  podeEntrar,
+  registradas,
   onEntrar,
 }: {
   d: Derivado;
-  podeEntrar: boolean;
+  /** apostas já registradas neste jogo: o mesmo mercado não entra duas vezes */
+  registradas: Set<string>;
   onEntrar: (e: EscolhaEntrada, aviso?: string) => void;
 }) {
   const [verRecusadas, setVerRecusadas] = useState(false);
@@ -96,7 +99,8 @@ export function MelhoresEntradas({
   const avisoBanca = r?.bloqueio
     ? `${r.bloqueio}: a trava da banca pede para não apostar agora. Registre só se você já apostou, para a banca ficar certa.`
     : undefined;
-  const opcao = d.opcoes.find((o) => o.chave === escolhida);
+  const livres = d.opcoes.filter((o) => !registradas.has(o.chave));
+  const opcao = livres.find((o) => o.chave === escolhida);
   const avisoDaOpcao = (o: OpcaoAposta) => {
     const motivo = r?.recusadas.find((x) => x.chave === o.selecao)?.motivo;
     const fora = motivo
@@ -136,7 +140,7 @@ export function MelhoresEntradas({
                 key={e.chave}
                 e={e}
                 n={i + 1}
-                podeEntrar={podeEntrar}
+                registrada={registradas.has(`${e.casa.trim().toLowerCase()}#${e.chave}`)}
                 onEntrar={() => onEntrar(e, avisoBanca)}
               />
             ))}
@@ -167,13 +171,13 @@ export function MelhoresEntradas({
           )}
         </>
       )}
-      {podeEntrar && d.opcoes.length > 0 && (
+      {livres.length > 0 && (
         <div className="entrada-escolher">
           <label>
             Entrou em outra aposta? Escolha qualquer mercado lido, mesmo com NO BET
             <select value={escolhida} onChange={(x) => setEscolhida(x.target.value)}>
               <option value="">Selecione a aposta</option>
-              {d.opcoes.map((o) => (
+              {livres.map((o) => (
                 <option key={o.chave} value={o.chave}>
                   {sem(o.descricao)} @ {dec(o.odd)} · {o.casa}
                   {o.temEstimativa && ` · chance ${Math.round(o.chance * 100)}%`}
@@ -191,6 +195,7 @@ export function MelhoresEntradas({
               );
               if (naLista) onEntrar(naLista, avisoBanca);
               else onEntrar(opcao, avisoDaOpcao(opcao));
+              setEscolhida('');
             }}
           >
             Entrei nessa

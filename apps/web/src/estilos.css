@@ -4734,3 +4734,9 @@ button.cl-linha:hover {
 .entrada-escolher select {
   width: 100%;
 }
+
+.entrada-registrada {
+  flex: none;
+  color: var(--ok);
+  font-weight: 600;
+}

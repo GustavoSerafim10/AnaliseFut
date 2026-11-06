@@ -20,7 +20,13 @@ import { MelhoresEntradas, type EscolhaEntrada } from '../componentes/MelhoresEn
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { Derivado } from '../dados';
-import { resumir, type ApostaFeita, type ResumoAnalise } from '../historico';
+import {
+  chaveDaAposta,
+  resumir,
+  type ApostaFeita,
+  type EntradaHistorico,
+  type ResumoAnalise,
+} from '../historico';
 import type { PropsAba } from './tipos';
 
 const CLASSE: Record<ResultadoAnalise['decisao'], string> = {
@@ -103,12 +109,13 @@ export function AbaAnalise({
   onSalvar,
   onEntrar,
   salvoNoHistorico,
-  apostaFeita,
+  apostas = [],
 }: PropsAba & {
   onSalvar: () => void;
   onEntrar: (a: ApostaFeita) => void;
   salvoNoHistorico: boolean;
-  apostaFeita?: ApostaFeita;
+  /** as apostas já registradas neste jogo */
+  apostas?: EntradaHistorico[];
 }) {
   const [copiado, setCopiado] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
@@ -181,13 +188,16 @@ export function AbaAnalise({
     <section className="passo">
       <MelhoresEntradas
         d={d}
-        podeEntrar={!apostaFeita}
+        registradas={new Set(apostas.map(chaveDaAposta))}
         onEntrar={(e, aviso) => {
           setEntrando(false);
-          setDaLista({ e, aviso });
+          const outras = apostas.length
+            ? `Você já tem ${apostas.length} aposta${apostas.length > 1 ? 's' : ''} neste jogo: apostas do mesmo jogo costumam ganhar ou perder juntas, então o risco aumenta.`
+            : undefined;
+          setDaLista({ e, aviso: [aviso, outras].filter(Boolean).join(' ') || undefined });
         }}
       />
-      {daLista && !apostaFeita && (
+      {daLista && (
         <FormAposta
           key={daLista.e.chave}
           entrada={entradaDaLista(daLista.e)}
@@ -264,7 +274,7 @@ export function AbaAnalise({
             >
               💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
             </button>
-            {resumo?.entrada && resumo.decisao === 'BET' && !apostaFeita && (
+            {resumo?.entrada && resumo.decisao === 'BET' && !apostas.length && (
               <button
                 className={resumo.decisao === 'BET' ? 'primario' : ''}
                 onClick={() => {
@@ -276,14 +286,22 @@ export function AbaAnalise({
               </button>
             )}
           </div>
-          {apostaFeita && (
-            <p className="dica">
-              Você entrou: @ {apostaFeita.odd} na {apostaFeita.casa}
-              {apostaFeita.valor !== undefined && ` (R$ ${dec(apostaFeita.valor)})`}. O resultado se
-              registra na aba Histórico.
-            </p>
+          {apostas.length > 0 && (
+            <div className="dica">
+              Suas apostas neste jogo:
+              <ul>
+                {apostas.map((a) => (
+                  <li key={a.id}>
+                    {a.resumo.entrada?.descricao} @ {String(a.aposta!.odd).replace('.', ',')} na{' '}
+                    {a.aposta!.casa}
+                    {a.aposta!.valor !== undefined && ` (R$ ${dec(a.aposta!.valor)})`}
+                  </li>
+                ))}
+              </ul>
+              O resultado se registra na aba Histórico.
+            </div>
           )}
-          {entrando && resumo?.entrada && !apostaFeita && (
+          {entrando && resumo?.entrada && !apostas.length && (
             <FormAposta
               entrada={resumo.entrada}
               decisao={resumo.decisao}

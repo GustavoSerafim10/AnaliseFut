@@ -11,6 +11,7 @@ import {
   apurarAposta,
   brier,
   calcularTravas,
+  chaveSelecao,
   clvJusto,
   type ApostaBanca,
   type Apuracao,
@@ -93,6 +94,8 @@ export interface EntradaHistorico {
   aposta?: ApostaFeita;
   /** green/red marcado à mão: vale quando o site não apura sozinho (1º escanteio, mercado do 1º tempo...) */
   manual?: Manual;
+  /** aposta extra no mesmo jogo: id da análise original. Não conta de novo no placar de acerto */
+  irmaDe?: string;
 }
 
 export type Manual = 'green' | 'red' | 'devolvida';
@@ -319,6 +322,8 @@ export const mesmoRascunho = (a: Rascunho, b: Rascunho) =>
   JSON.stringify({ ...a, idHistorico: undefined }) ===
   JSON.stringify({ ...b, idHistorico: undefined });
 
+const novoId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
 /** Salva (ou atualiza, se o rascunho já veio do histórico). Devolve a lista e o id. */
 export function salvarNoHistorico(
   lista: EntradaHistorico[],
@@ -327,8 +332,7 @@ export function salvarNoHistorico(
   aposta?: ApostaFeita,
   agora = Date.now(),
 ): { lista: EntradaHistorico[]; id: string } {
-  const id =
-    r.idHistorico ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const id = r.idHistorico ?? novoId();
   const anterior = lista.find((e) => e.id === id);
   const apostaFinal = aposta ?? anterior?.aposta;
   // depois do início o motor responde "excluído": a decisão que valeu é a de antes do jogo
@@ -347,6 +351,81 @@ export function salvarNoHistorico(
     lista: anterior ? lista.map((e) => (e.id === id ? entrada : e)) : [entrada, ...lista],
     id,
   };
+}
+
+/** O placar é do jogo; o fechamento é de cada aposta, porque cada uma tem o seu mercado. */
+function comPlacarDe(r: ResultadoJogo, propria?: ResultadoJogo): ResultadoJogo {
+  return {
+    ...r,
+    oddFechamento: propria?.oddFechamento,
+    fechamentoOutros: propria?.fechamentoOutros,
+  };
+}
+
+/**
+ * Registra uma aposta do jogo aberto. A primeira fica na própria análise; as seguintes viram
+ * entradas ligadas a ela, e assim painel, banca e apuração contam cada aposta sozinha.
+ */
+export function registrarAposta(
+  lista: EntradaHistorico[],
+  r: Rascunho,
+  d: Derivado,
+  aposta: ApostaFeita,
+  agora = Date.now(),
+): { lista: EntradaHistorico[]; id: string } {
+  const raiz = lista.find((e) => e.id === r.idHistorico);
+  if (!raiz?.aposta || !aposta.entrada) return salvarNoHistorico(lista, r, d, aposta, agora);
+  const irma: EntradaHistorico = {
+    id: novoId(),
+    irmaDe: raiz.id,
+    salvoEm: isoLocal(new Date()),
+    rascunho: { ...r, idHistorico: raiz.id },
+    resumo: { ...raiz.resumo, entrada: aposta.entrada, confianca: undefined, previsao: undefined },
+    resultado: raiz.resultado ? comPlacarDe(raiz.resultado) : undefined,
+    aposta,
+  };
+  return { lista: [irma, ...lista], id: raiz.id };
+}
+
+/** As apostas feitas no jogo de uma análise. */
+export const apostasDoJogo = (lista: EntradaHistorico[], id?: string) =>
+  id ? lista.filter((e) => e.aposta && (e.id === id || e.irmaDe === id)) : [];
+
+/** Identifica a aposta na casa: o mesmo mercado não é registrado duas vezes por engano. */
+export const chaveDaAposta = (e: EntradaHistorico) =>
+  e.resumo.entrada
+    ? `${e.resumo.entrada.casa.trim().toLowerCase()}#${chaveSelecao(e.resumo.entrada.linha as LinhaOdd)}`
+    : '';
+
+/** Salva o resultado de uma aposta e leva o placar para as outras apostas do mesmo jogo. */
+export function registrarResultado(
+  lista: EntradaHistorico[],
+  id: string,
+  resultado: ResultadoJogo | undefined,
+): EntradaHistorico[] {
+  const alvo = lista.find((e) => e.id === id);
+  if (!alvo) return lista;
+  const grupo = alvo.irmaDe ?? alvo.id;
+  const temGols = !!resultado && Number.isFinite(resultado.casa) && Number.isFinite(resultado.fora);
+  return lista.map((e) => {
+    if (e.id === id) return { ...e, resultado };
+    if ((e.irmaDe ?? e.id) !== grupo) return e;
+    if (temGols) return { ...e, resultado: comPlacarDe(resultado!, e.resultado) };
+    if (resultado) return e;
+    // resultado apagado: sai o placar do jogo, fica o fechamento próprio de cada aposta
+    return {
+      ...e,
+      resultado: e.resultado?.oddFechamento
+        ? {
+            casa: Number.NaN,
+            fora: Number.NaN,
+            oddFechamento: e.resultado.oddFechamento,
+            fechamentoOutros: e.resultado.fechamentoOutros,
+            registradoEm: e.resultado.registradoEm,
+          }
+        : undefined,
+    };
+  });
 }
 
 /** placar registrado (pode haver só o fechamento, sem placar ainda) */

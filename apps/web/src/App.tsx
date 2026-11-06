@@ -31,6 +31,8 @@ import {
   mesmoRascunho,
   ouvirFalhaDeGravacao,
   podeSalvarSozinho,
+  apostasDoJogo,
+  registrarAposta,
   salvarNoHistorico,
   type ApostaFeita,
   travasDoHistorico,
@@ -104,7 +106,9 @@ export function App() {
       alert('Isto é só o jogo de exemplo: nada é salvo no histórico.');
       return;
     }
-    const { lista, id } = salvarNoHistorico(historico, r, d, aposta);
+    const { lista, id } = aposta
+      ? registrarAposta(historico, r, d, aposta)
+      : salvarNoHistorico(historico, r, d);
     setHistoricoState(lista);
     setAvisoHistorico(
       gravarHistorico(lista)
@@ -378,7 +382,7 @@ export function App() {
             onSalvar={() => salvarAnalise()}
             onEntrar={salvarAnalise}
             salvoNoHistorico={!!historico.find((e) => e.id === r.idHistorico)}
-            apostaFeita={historico.find((e) => e.id === r.idHistorico)?.aposta}
+            apostas={apostasDoJogo(historico, r.idHistorico)}
           />
         )}
         {aba.id === 'historico' && (
