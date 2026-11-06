@@ -56,6 +56,16 @@ export interface ResumoAnalise {
     nivel?: NivelReferencia;
     estrategia?: Estrategia;
   };
+  /** a lista "Melhores entradas" na hora da análise; a 1ª é a que conta no placar de acerto */
+  confianca?: {
+    linha: OddLine;
+    descricao: string;
+    odd: number;
+    casa: string;
+    chance: number;
+    minimo: number;
+    forca: 'forte' | 'media';
+  }[];
   /** previsões para o Brier do modelo × mercado (seção 26) */
   previsao?: {
     modelo1x2: [number, number, number];
@@ -94,6 +104,8 @@ export interface ApostaFeita {
   /** valor em R$ (opcional: sem ele a entrada conta em unidades, mas não entra nas travas) */
   valor?: number;
   feitaEm: string;
+  /** a entrada escolhida na lista "Melhores entradas": é ela que vale na apuração */
+  entrada?: NonNullable<ResumoAnalise['entrada']>;
 }
 
 export const entrou = (e: EntradaHistorico) => !!e.aposta && !!e.resumo.entrada;
@@ -205,6 +217,15 @@ export function resumir(r: Rascunho, d: Derivado): ResumoAnalise {
     competicao: r.jogo.competicao,
     inicio: inicioIso(r),
     dq: res?.dq.efetiva ?? d.dq.dq,
+    confianca: d.entradas?.entradas.map((x) => ({
+      linha: x.linha as OddLine,
+      descricao: x.descricao.replace('Ganha se: ', ''),
+      odd: x.odd,
+      casa: x.casa,
+      chance: x.chance,
+      minimo: x.minimo,
+      forca: x.forca,
+    })),
     previsao: prev
       ? {
           modelo1x2: [prev.p1x2.modelo.casa, prev.p1x2.modelo.empate, prev.p1x2.modelo.fora] as [
@@ -309,14 +330,17 @@ export function salvarNoHistorico(
   const id =
     r.idHistorico ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   const anterior = lista.find((e) => e.id === id);
+  const apostaFinal = aposta ?? anterior?.aposta;
+  // depois do início o motor responde "excluído": a decisão que valeu é a de antes do jogo
+  const resumo = anterior && jogoComecou(r, agora) ? anterior.resumo : resumir(r, d);
   const entrada: EntradaHistorico = {
     id,
     salvoEm: isoLocal(new Date()),
     rascunho: { ...r, idHistorico: id },
-    // depois do início o motor responde "excluído": a decisão que valeu é a de antes do jogo
-    resumo: anterior && jogoComecou(r, agora) ? anterior.resumo : resumir(r, d),
+    // quem entrou por uma aposta da lista é apurado por ela, não pela melhor da análise técnica
+    resumo: apostaFinal?.entrada ? { ...resumo, entrada: apostaFinal.entrada } : resumo,
     resultado: anterior?.resultado,
-    aposta: aposta ?? anterior?.aposta,
+    aposta: apostaFinal,
     manual: anterior?.manual,
   };
   return {
@@ -529,6 +553,87 @@ export function painel(lista: EntradaHistorico[]): Painel {
     p.oddMedia = somaOdd / lista.length;
   }
   return p;
+}
+
+/** Antes disso, o acerto de uma faixa ainda pode ser só sorte. */
+export const JOGOS_PARA_CONFIAR = 50;
+
+export interface FaixaAcerto {
+  nome: string;
+  apuradas: number;
+  green: number;
+  red: number;
+  devolvidas: number;
+  /** green ÷ (green + red) */
+  acerto: number | null;
+  chanceMedia: number | null;
+  minimoMedio: number | null;
+  unidades: number;
+}
+
+export interface PlacarAcerto {
+  /** jogos em que a lista trouxe alguma entrada */
+  comEntrada: number;
+  pendentes: number;
+  apuradas: number;
+  faixas: FaixaAcerto[];
+  total: FaixaAcerto;
+}
+
+const FAIXAS_ACERTO: [string, number, number][] = [
+  ['Abaixo de 60%', 0, 0.6],
+  ['De 60% a 70%', 0.6, 0.7],
+  ['70% ou mais', 0.7, Infinity],
+];
+
+/**
+ * O placar real da lista: conta só a 1ª entrada de cada jogo, porque as outras do mesmo jogo são
+ * correlacionadas e inflariam a amostra. Vale como se 1 unidade fosse apostada na odd sugerida.
+ */
+export function placarAcerto(lista: EntradaHistorico[]): PlacarAcerto {
+  const vazia = (nome: string) => ({ nome, somaC: 0, somaM: 0, unidades: 0, g: 0, r: 0, d: 0 });
+  const grupos = FAIXAS_ACERTO.map(([nome]) => vazia(nome));
+  const geral = vazia('Todas');
+  let comEntrada = 0;
+  let pendentes = 0;
+  for (const e of lista) {
+    const c = e.resumo.confianca?.[0];
+    if (!c) continue;
+    comEntrada++;
+    const a =
+      e.resultado && temPlacar(e)
+        ? apurarAposta({ ...c.linha, odd: c.odd } as LinhaOdd, e.resultado)
+        : null;
+    if (!a?.ok) {
+      pendentes++;
+      continue;
+    }
+    const i = FAIXAS_ACERTO.findIndex(([, de, ate]) => c.chance >= de && c.chance < ate);
+    for (const g of [grupos[i], geral]) {
+      g.somaC += c.chance;
+      g.somaM += c.minimo;
+      g.unidades += a.lucro;
+      if (a.resultado > 0) g.g++;
+      else if (a.resultado < 0) g.r++;
+      else g.d++;
+    }
+  }
+  const fechar = (g: ReturnType<typeof vazia>): FaixaAcerto => {
+    const n = g.g + g.r + g.d;
+    return {
+      nome: g.nome,
+      apuradas: n,
+      green: g.g,
+      red: g.r,
+      devolvidas: g.d,
+      acerto: g.g + g.r ? g.g / (g.g + g.r) : null,
+      chanceMedia: n ? g.somaC / n : null,
+      minimoMedio: n ? g.somaM / n : null,
+      unidades: g.unidades,
+    };
+  };
+  const total = fechar(geral);
+  return { comEntrada, pendentes, apuradas: total.apuradas, faixas: grupos.map(fechar), total };
 }
 
 export interface Calibracao {

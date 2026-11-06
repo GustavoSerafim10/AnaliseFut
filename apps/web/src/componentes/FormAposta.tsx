@@ -9,11 +9,14 @@ import type { ApostaFeita, ResumoAnalise } from '../historico';
 export function FormAposta({
   entrada,
   decisao,
+  daLista,
   onConfirmar,
   onCancelar,
 }: {
   entrada: NonNullable<ResumoAnalise['entrada']>;
   decisao: ResumoAnalise['decisao'];
+  /** veio da lista "Melhores entradas", que tem critério próprio */
+  daLista?: boolean;
   onConfirmar: (a: ApostaFeita) => void;
   onCancelar: () => void;
 }) {
@@ -30,7 +33,7 @@ export function FormAposta({
       <p>
         <strong>{entrada.descricao}</strong>
       </p>
-      {decisao !== 'BET' && (
+      {decisao !== 'BET' && !daLista && (
         <div className="caixa alerta">
           O motor <strong>não aprovou</strong> esta entrada ({decisao ?? 'sem decisão'}). Ela vai
           contar no seu painel mesmo assim.
@@ -57,7 +60,7 @@ export function FormAposta({
       </div>
       {o !== undefined && o < entrada.odd && (
         <p className="miudo">
-          Odd menor que a da análise ({entrada.odd}): o EV real ficou abaixo do calculado.
+          Odd menor que a da análise ({entrada.odd}): a vantagem real ficou abaixo da calculada.
         </p>
       )}
       <div className="linha-acoes">

@@ -2,10 +2,12 @@ import {
   NOME_ESTATISTICA,
   NOMES_TESE,
   relatorioEmTexto,
+  type EntradaSugerida,
   type Relatorio,
   type ResultadoAnalise,
 } from '@pe/engine';
 import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
+import type { OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
 import { Auditoria } from '../componentes/Auditoria';
@@ -15,10 +17,11 @@ import { Distribuicao } from '../componentes/Distribuicao';
 import { FormAposta } from '../componentes/FormAposta';
 import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
+import { MelhoresEntradas } from '../componentes/MelhoresEntradas';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { Derivado } from '../dados';
-import { resumir, type ApostaFeita } from '../historico';
+import { resumir, type ApostaFeita, type ResumoAnalise } from '../historico';
 import type { PropsAba } from './tipos';
 
 const CLASSE: Record<ResultadoAnalise['decisao'], string> = {
@@ -74,6 +77,17 @@ function textoAnalise(d: Derivado, rel: Relatorio, res: ResultadoAnalise): strin
   ].join('\n');
 }
 
+const entradaDaLista = (e: EntradaSugerida): NonNullable<ResumoAnalise['entrada']> => ({
+  linha: e.linha as OddLine,
+  descricao: e.descricao.replace('Ganha se: ', ''),
+  odd: e.odd,
+  casa: e.casa,
+  ev: e.ev,
+  pFinal: e.chance,
+  stake: e.stake,
+  stakeValor: e.stakeValor,
+});
+
 async function copiar(texto: string, aviso: (m: string) => void) {
   try {
     await navigator.clipboard.writeText(texto);
@@ -99,6 +113,7 @@ export function AbaAnalise({
 }) {
   const [copiado, setCopiado] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
+  const [daLista, setDaLista] = useState<EntradaSugerida | null>(null);
   const resumo = d.v4 || d.resultado ? resumir(r, d) : null;
   const [salvo, setSalvo] = useState(false);
   const res = d.resultado;
@@ -165,18 +180,51 @@ export function AbaAnalise({
 
   return (
     <section className="passo">
-      <Indicadores d={d} />
-      <div className="grade-analise">
-        <div className="coluna">
-          <CentroDecisao d={d} />
-          <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
+      <MelhoresEntradas
+        d={d}
+        podeEntrar={!apostaFeita}
+        onEntrar={(e) => {
+          setEntrando(false);
+          setDaLista(e);
+        }}
+      />
+      {daLista && !apostaFeita && (
+        <FormAposta
+          key={daLista.chave}
+          entrada={entradaDaLista(daLista)}
+          decisao={resumo?.decisao ?? null}
+          daLista
+          onCancelar={() => setDaLista(null)}
+          onConfirmar={(ap) => {
+            onEntrar({ ...ap, entrada: entradaDaLista(daLista) });
+            setDaLista(null);
+            setSalvo(true);
+          }}
+        />
+      )}
+      <details className="caixa analise-tecnica">
+        <summary>
+          Análise técnica: preço contra a referência
+          {d.v4 && <span className="marca">{d.v4.rotulo}</span>}
+        </summary>
+        <p className="dica">
+          É o critério mais rígido do site: só aprova com Pinnacle/Betfair ou 4+ casas. Serve para
+          conferir o preço. Pode dizer NO BET mesmo com entrada na lista acima.
+        </p>
+        <Indicadores d={d} />
+        <div className="grade-analise">
+          <div className="coluna">
+            <CentroDecisao d={d} />
+            <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
+          </div>
+          <div className="coluna">
+            <ComparativoOdds d={d} />
+            <Auditoria r={r} d={d} />
+          </div>
         </div>
-        <div className="coluna">
-          <ComparativoOdds d={d} />
-          <Auditoria r={r} d={d} />
-        </div>
-      </div>
-      <GrafoDecisao d={d} />
+        <GrafoDecisao d={d} />
+        <PainelV4 r={r} setR={setR} d={d} />
+      </details>
 
       <h3>Situação dos dados</h3>
       <p className="dica">
@@ -204,7 +252,6 @@ export function AbaAnalise({
         </div>
       )}
 
-      <PainelV4 r={r} setR={setR} d={d} />
       {(d.v4 || res) && (
         <>
           <div className="linha-acoes">
@@ -220,9 +267,12 @@ export function AbaAnalise({
             {resumo?.entrada && !apostaFeita && (
               <button
                 className={resumo.decisao === 'BET' ? 'primario' : ''}
-                onClick={() => setEntrando(true)}
+                onClick={() => {
+                  setDaLista(null);
+                  setEntrando(true);
+                }}
               >
-                ✅ Entrei nessa aposta
+                ✅ Entrei na melhor da análise técnica
               </button>
             )}
           </div>

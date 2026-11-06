@@ -4610,3 +4610,110 @@ button.cl-linha:hover {
   color: var(--amarelo);
   font-size: 12px;
 }
+
+/* Melhores entradas: a resposta principal da análise */
+.melhores-entradas {
+  margin-bottom: 16px;
+}
+.entradas-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+}
+.entradas-cabecalho h3 {
+  margin: 0;
+}
+.entradas-vazio {
+  margin: 8px 0;
+}
+.entradas-lista {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.entrada-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--cartao-2);
+  border: 1px solid var(--borda);
+  border-left: 4px solid var(--alerta);
+  border-radius: var(--raio);
+}
+.entrada-item.forte {
+  border-left-color: var(--ok);
+}
+.entrada-chance {
+  flex: 0 0 76px;
+  text-align: center;
+}
+.entrada-chance strong {
+  display: block;
+  font-family: var(--fonte-tecnica);
+  font-size: 32px;
+  line-height: 1;
+}
+.entrada-chance span {
+  color: var(--suave);
+  font-size: 11px;
+}
+.entrada-corpo {
+  flex: 1;
+  min-width: 0;
+}
+.entrada-corpo h4 {
+  margin: 4px 0;
+}
+.entrada-corpo p {
+  margin: 2px 0;
+}
+.entrada-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.entrada-n {
+  color: var(--suave);
+  font-size: 12px;
+}
+.entrada-selo {
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--alerta);
+  background: var(--alerta-fundo);
+  font-size: 12px;
+}
+.entrada-selo.forte {
+  color: var(--ok);
+  background: var(--ok-fundo);
+}
+.entrada-botao {
+  flex: none;
+}
+.entradas-recusadas {
+  margin-top: 8px;
+}
+.analise-tecnica > summary .marca {
+  margin-left: 8px;
+}
+.placar-acerto .linha-total td {
+  border-top: 1px solid var(--borda-forte);
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .entrada-item {
+    flex-wrap: wrap;
+  }
+  .entrada-corpo {
+    flex-basis: 60%;
+  }
+  .entrada-botao {
+    width: 100%;
+  }
+}

@@ -5,7 +5,7 @@ import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { FormAposta } from '../componentes/FormAposta';
 import { UploadPrints } from '../componentes/UploadPrints';
-import { CartoesPainel, CurvaUnidades } from '../componentes/PainelHistorico';
+import { CartoesPainel, CurvaUnidades, PlacarDeAcerto } from '../componentes/PainelHistorico';
 import {
   apurar,
   apurarAuto,
@@ -21,6 +21,7 @@ import {
   marco,
   minhasEntradas,
   painel,
+  placarAcerto,
   situacao,
   temPlacar,
   espacoDoHistorico,
@@ -349,9 +350,11 @@ export function AbaHistorico({
       <p className="dica">
         Cada análise com odds é salva sozinha até o início do jogo. Depois do jogo, registre o
         placar e o fechamento da referência: o <strong>CLV</strong> diz se há vantagem muito antes
-        do lucro. Nunca julgue por green/red. O histórico fica neste aparelho: exporte para backup
+        do lucro. Não julgue por poucos jogos. O histórico fica neste aparelho: exporte para backup
         ou para o celular.
       </p>
+
+      <PlacarDeAcerto p={placarAcerto(historico)} />
 
       <div className="abas-mini">
         {(Object.keys(FILTROS) as FiltroPainel[]).map((f) => (

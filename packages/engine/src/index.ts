@@ -19,5 +19,6 @@ export * from './relatorio';
 export * from './apuracao';
 export * from './banca';
 export * from './v4';
+export * from './entradas';
 export * from './promocoes';
 export * from './movimento';

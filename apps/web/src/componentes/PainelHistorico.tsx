@@ -3,7 +3,7 @@
  * das unidades acumuladas. Tudo vem de painel() em historico.ts (1 unidade por entrada).
  */
 import { useState, type ReactNode } from 'react';
-import type { Painel } from '../historico';
+import { JOGOS_PARA_CONFIAR, type Painel, type PlacarAcerto } from '../historico';
 import { Icone, type NomeIcone } from './ui';
 
 const n2 = (x: number) => x.toFixed(2).replace('.', ',');
@@ -85,6 +85,66 @@ export function CartoesPainel({ p, rotulo = 'Entradas' }: { p: Painel; rotulo?: 
         titulo="Odd média"
         valor={p.oddMedia === null ? vazio : n2(p.oddMedia)}
       />
+    </div>
+  );
+}
+
+/** O teste real da lista "Melhores entradas": a chance prometida × o que aconteceu, por faixa. */
+export function PlacarDeAcerto({ p }: { p: PlacarAcerto }) {
+  const faltam = Math.max(0, JOGOS_PARA_CONFIAR - p.apuradas);
+  const linhas = [...p.faixas.filter((f) => f.apuradas), ...(p.apuradas ? [p.total] : [])];
+  return (
+    <div className="caixa placar-acerto">
+      <h3>Placar de acerto das Melhores entradas</h3>
+      <p className="miudo">
+        Conta a 1ª entrada de cada jogo, valendo 1 unidade, tendo você apostado ou não.
+        {p.pendentes > 0 && ` ${p.pendentes} aguardando o placar.`}
+      </p>
+      {linhas.length === 0 ? (
+        <p className="miudo">
+          Ainda sem jogo apurado. Registre os placares das análises com entrada para o placar
+          começar.
+        </p>
+      ) : (
+        <div className="tabela-rolavel">
+          <table>
+            <thead>
+              <tr>
+                <th>Chance estimada</th>
+                <th>Jogos</th>
+                <th>Green / Red</th>
+                <th>Acertou</th>
+                <th>Prometeu</th>
+                <th>Odd pedia</th>
+                <th>Unidades</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((f) => (
+                <tr key={f.nome} className={f === p.total ? 'linha-total' : undefined}>
+                  <td>{f.nome}</td>
+                  <td>{f.apuradas}</td>
+                  <td>
+                    {f.green} / {f.red}
+                    {f.devolvidas > 0 && ` (${f.devolvidas} dev.)`}
+                  </td>
+                  <td>{f.acerto === null ? '—' : p1(f.acerto)}</td>
+                  <td>{f.chanceMedia === null ? '—' : p1(f.chanceMedia)}</td>
+                  <td>{f.minimoMedio === null ? '—' : p1(f.minimoMedio)}</td>
+                  <td className={f.unidades >= 0 ? 'positivo' : 'negativo'}>
+                    {sinal(f.unidades, n2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className={faltam ? 'dica' : 'miudo'}>
+        {faltam
+          ? `Ainda cedo para confiar: ${p.apuradas} de ${JOGOS_PARA_CONFIAR} jogos apurados. Até lá, o resultado pode ser só sorte. Use valores pequenos.`
+          : 'O método se paga se "Acertou" ficar acima de "Odd pedia" e as unidades forem positivas.'}
+      </p>
     </div>
   );
 }

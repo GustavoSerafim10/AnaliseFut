@@ -8,6 +8,8 @@ import {
   ajustarDQ,
   analisarJogo,
   analisarV4,
+  melhoresEntradas,
+  type ResultadoEntradas,
   avaliarDQ,
   detectarMovimentos,
   pesoModelo,
@@ -117,6 +119,8 @@ export interface Derivado {
   /** o que falta para o motor de apoio V3.3 (estatísticas) */
   pendencias: string[];
   v4: ResultadoV4 | null;
+  /** a lista principal: maior chance de green na faixa de odds, acima do mínimo da odd */
+  entradas: ResultadoEntradas | null;
   movimentos: Movimento[];
   atrasos: Atraso[];
   /** travas da banca recebidas do histórico (só repassadas para a tela) */
@@ -287,33 +291,44 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
 
   // V4.0: decisão contra a referência; o V3.3 entra como apoio quando há λ do modelo
   let v4: ResultadoV4 | null = null;
+  let entradas: ResultadoEntradas | null = null;
   if (!pendenciasV4.length) {
     const argumentos = r.redTeam.argumentos.map((a) => a.trim()).filter(Boolean);
+    const apoio = lambda
+      ? {
+          lambdas: resultado?.lambdaModelo.ajustado ?? lambda.lambdas,
+          contagens: lambdasContagem,
+          dq: dq.dq,
+          w: pesoModelo(dq.dq, {
+            mercadoMuitoLiquido: r.config.mercadoMuitoLiquido,
+            escalacaoIncerta,
+          }),
+          jogosMin:
+            modeloCasa.stats && modeloFora.stats
+              ? Math.min(modeloCasa.stats.jogos, modeloFora.stats.jogos)
+              : undefined,
+          priorNeutro: lambda.priorNeutro,
+          favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
+        }
+      : undefined;
+    const jogo = { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) };
     v4 = analisarV4({
-      jogo: { casa: r.jogo.casa, fora: r.jogo.fora, inicio: inicioIso(r) },
+      jogo,
       linhas: oddsValidas,
       ligaPrincipal: r.config.ligaTop,
       escalacaoIncerta,
       noticia: r.noticia,
       fatoNovo: r.explicacaoDivergencia.trim() || undefined,
-      apoio: lambda
-        ? {
-            lambdas: resultado?.lambdaModelo.ajustado ?? lambda.lambdas,
-            contagens: lambdasContagem,
-            dq: dq.dq,
-            w: pesoModelo(dq.dq, {
-              mercadoMuitoLiquido: r.config.mercadoMuitoLiquido,
-              escalacaoIncerta,
-            }),
-            jogosMin:
-              modeloCasa.stats && modeloFora.stats
-                ? Math.min(modeloCasa.stats.jogos, modeloFora.stats.jogos)
-                : undefined,
-            priorNeutro: lambda.priorNeutro,
-            favoritoLigaMaisForte: r.config.favoritoLigaMaisForte,
-          }
-        : undefined,
+      apoio,
       redTeam: argumentos.length || r.redTeam.sobreviveu ? { ...r.redTeam, argumentos } : undefined,
+      banca: num(r.banca),
+      travas,
+    });
+    entradas = melhoresEntradas({
+      jogo,
+      linhas: oddsValidas,
+      apoio,
+      ligaPrincipal: r.config.ligaTop,
       banca: num(r.banca),
       travas,
     });
@@ -362,6 +377,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     pendenciasV4,
     pendencias,
     v4,
+    entradas,
     movimentos,
     atrasos,
     travas,
