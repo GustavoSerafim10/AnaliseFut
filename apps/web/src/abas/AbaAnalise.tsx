@@ -2,7 +2,6 @@ import {
   NOME_ESTATISTICA,
   NOMES_TESE,
   relatorioEmTexto,
-  type EntradaSugerida,
   type Relatorio,
   type ResultadoAnalise,
 } from '@pe/engine';
@@ -17,7 +16,7 @@ import { Distribuicao } from '../componentes/Distribuicao';
 import { FormAposta } from '../componentes/FormAposta';
 import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
-import { MelhoresEntradas } from '../componentes/MelhoresEntradas';
+import { MelhoresEntradas, type EscolhaEntrada } from '../componentes/MelhoresEntradas';
 import { PainelV4 } from '../componentes/PainelV4';
 import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
 import type { Derivado } from '../dados';
@@ -77,7 +76,7 @@ function textoAnalise(d: Derivado, rel: Relatorio, res: ResultadoAnalise): strin
   ].join('\n');
 }
 
-const entradaDaLista = (e: EntradaSugerida): NonNullable<ResumoAnalise['entrada']> => ({
+const entradaDaLista = (e: EscolhaEntrada): NonNullable<ResumoAnalise['entrada']> => ({
   linha: e.linha as OddLine,
   descricao: e.descricao.replace('Ganha se: ', ''),
   odd: e.odd,
@@ -113,7 +112,7 @@ export function AbaAnalise({
 }) {
   const [copiado, setCopiado] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
-  const [daLista, setDaLista] = useState<EntradaSugerida | null>(null);
+  const [daLista, setDaLista] = useState<{ e: EscolhaEntrada; aviso?: string } | null>(null);
   const resumo = d.v4 || d.resultado ? resumir(r, d) : null;
   const [salvo, setSalvo] = useState(false);
   const res = d.resultado;
@@ -183,20 +182,21 @@ export function AbaAnalise({
       <MelhoresEntradas
         d={d}
         podeEntrar={!apostaFeita}
-        onEntrar={(e) => {
+        onEntrar={(e, aviso) => {
           setEntrando(false);
-          setDaLista(e);
+          setDaLista({ e, aviso });
         }}
       />
       {daLista && !apostaFeita && (
         <FormAposta
-          key={daLista.chave}
-          entrada={entradaDaLista(daLista)}
+          key={daLista.e.chave}
+          entrada={entradaDaLista(daLista.e)}
+          aviso={daLista.aviso}
           decisao={resumo?.decisao ?? null}
           daLista
           onCancelar={() => setDaLista(null)}
           onConfirmar={(ap) => {
-            onEntrar({ ...ap, entrada: entradaDaLista(daLista) });
+            onEntrar({ ...ap, entrada: entradaDaLista(daLista.e) });
             setDaLista(null);
             setSalvo(true);
           }}
@@ -264,7 +264,7 @@ export function AbaAnalise({
             >
               💾 {salvoNoHistorico ? 'Atualizar no histórico' : 'Salvar no histórico'}
             </button>
-            {resumo?.entrada && !apostaFeita && (
+            {resumo?.entrada && resumo.decisao === 'BET' && !apostaFeita && (
               <button
                 className={resumo.decisao === 'BET' ? 'primario' : ''}
                 onClick={() => {

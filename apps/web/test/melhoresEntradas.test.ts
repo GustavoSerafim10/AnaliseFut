@@ -119,13 +119,35 @@ describe('tela', () => {
       }),
     );
   const base = { entradas: [], recusadas: [] };
+  const lidas = derivar(r).opcoes;
   it('explica quando faltam as estatísticas', () => {
-    expect(tela({ entradas: { ...base, status: 'sem_estatisticas' } })).toContain(
+    expect(tela({ opcoes: [], entradas: { ...base, status: 'sem_estatisticas' } })).toContain(
       'Faltam as estatísticas',
     );
   });
   it('dia sem entrada é uma resposta, não um erro', () => {
-    expect(tela({ entradas: { ...base, status: 'ok' } })).toContain('não tem entrada');
+    expect(tela({ opcoes: [], entradas: { ...base, status: 'ok' } })).toContain('não tem entrada');
+  });
+  it('com a lista vazia ainda dá para escolher e registrar qualquer aposta lida', () => {
+    const html = tela({ opcoes: lidas, entradas: { ...base, status: 'sem_estatisticas' } });
+    expect(lidas).toHaveLength(4);
+    expect(html).toContain('mesmo com NO BET');
+    expect(html).toContain('sair mais de 2,5 gols');
+  });
+  it('uma aposta escolhida fora da lista é a que vale na apuração', () => {
+    const o = lidas.find((x) => x.linha.linha === 2.5 && x.linha.lado === 'under')!;
+    const ent = {
+      linha: o.linha as (typeof r.odds)[number],
+      descricao: o.descricao,
+      odd: o.odd,
+      casa: o.casa,
+      ev: o.ev,
+      pFinal: o.chance,
+    };
+    const aposta = { odd: o.odd, casa: o.casa, feitaEm: '2099-10-26T10:00:00-03:00', entrada: ent };
+    const { lista } = salvarNoHistorico([], r, derivar(r), aposta);
+    const a = apurar({ ...lista[0], resultado: { casa: 1, fora: 0, registradoEm: 'x' } });
+    expect(a).toMatchObject({ ok: true, resultado: 1 });
   });
   it('sem estatísticas a análise salva não inventa entrada', () => {
     expect(resumir(r, derivar(r)).confianca).toEqual([]);

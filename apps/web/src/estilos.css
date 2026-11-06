@@ -4717,3 +4717,20 @@ button.cl-linha:hover {
     width: 100%;
   }
 }
+
+.entrada-escolher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borda);
+}
+.entrada-escolher label {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.entrada-escolher select {
+  width: 100%;
+}

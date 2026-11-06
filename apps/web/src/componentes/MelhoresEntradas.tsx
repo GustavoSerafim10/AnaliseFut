@@ -7,6 +7,7 @@ import {
   ODD_MAX_ENTRADA,
   ODD_MIN_ENTRADA,
   type EntradaSugerida,
+  type OpcaoAposta,
   type StatusEntradas,
 } from '@pe/engine';
 import { useState } from 'react';
@@ -24,6 +25,13 @@ const MENSAGEM: Record<Exclude<StatusEntradas, 'ok'>, string> = {
   dados_fracos: `Poucos dados dos times para confiar na estimativa. Em escanteios e cartões, o mínimo é de ${JOGOS_MIN_NICHO} jogos.`,
   sem_mercados: `Nenhum mercado com os dois lados lidos e odd de ${faixa}. Cole mais prints da casa.`,
 };
+
+/** O que é preciso para registrar uma aposta, venha da lista ou do seletor. */
+export type EscolhaEntrada = Pick<
+  EntradaSugerida,
+  'chave' | 'linha' | 'descricao' | 'odd' | 'casa' | 'chance' | 'ev'
+> &
+  Partial<Pick<EntradaSugerida, 'stake' | 'stakeValor'>>;
 
 function Cartao({
   e,
@@ -80,10 +88,22 @@ export function MelhoresEntradas({
 }: {
   d: Derivado;
   podeEntrar: boolean;
-  onEntrar: (e: EntradaSugerida) => void;
+  onEntrar: (e: EscolhaEntrada, aviso?: string) => void;
 }) {
   const [verRecusadas, setVerRecusadas] = useState(false);
+  const [escolhida, setEscolhida] = useState('');
   const r = d.entradas;
+  const avisoBanca = r?.bloqueio
+    ? `${r.bloqueio}: a trava da banca pede para não apostar agora. Registre só se você já apostou, para a banca ficar certa.`
+    : undefined;
+  const opcao = d.opcoes.find((o) => o.chave === escolhida);
+  const avisoDaOpcao = (o: OpcaoAposta) => {
+    const motivo = r?.recusadas.find((x) => x.chave === o.selecao)?.motivo;
+    const fora = motivo
+      ? `Esta aposta ficou fora da lista: ${motivo}.`
+      : `Esta aposta não está entre as Melhores entradas${o.temEstimativa ? '' : ', e o site não tem estimativa de chance para ela'}.`;
+    return [fora, 'Ela conta no seu painel normalmente.', avisoBanca].filter(Boolean).join(' ');
+  };
   return (
     <section className="painel melhores-entradas" aria-label="Melhores entradas">
       <div className="entradas-cabecalho">
@@ -98,7 +118,8 @@ export function MelhoresEntradas({
       {r && r.status !== 'ok' && <p className="entradas-vazio">{MENSAGEM[r.status]}</p>}
       {r?.bloqueio && r.entradas.length > 0 && (
         <div className="caixa alerta">
-          <strong>Não aposte agora:</strong> {r.bloqueio}. A lista fica só para acompanhar.
+          <strong>Não aposte agora:</strong> {r.bloqueio}. Se você já apostou, registre abaixo para
+          a banca ficar certa.
         </div>
       )}
       {r?.status === 'ok' && r.entradas.length === 0 && (
@@ -115,8 +136,8 @@ export function MelhoresEntradas({
                 key={e.chave}
                 e={e}
                 n={i + 1}
-                podeEntrar={podeEntrar && !r.bloqueio}
-                onEntrar={() => onEntrar(e)}
+                podeEntrar={podeEntrar}
+                onEntrar={() => onEntrar(e, avisoBanca)}
               />
             ))}
           </ol>
@@ -145,6 +166,36 @@ export function MelhoresEntradas({
             </ul>
           )}
         </>
+      )}
+      {podeEntrar && d.opcoes.length > 0 && (
+        <div className="entrada-escolher">
+          <label>
+            Entrou em outra aposta? Escolha qualquer mercado lido, mesmo com NO BET
+            <select value={escolhida} onChange={(x) => setEscolhida(x.target.value)}>
+              <option value="">Selecione a aposta</option>
+              {d.opcoes.map((o) => (
+                <option key={o.chave} value={o.chave}>
+                  {sem(o.descricao)} @ {dec(o.odd)} · {o.casa}
+                  {o.temEstimativa && ` · chance ${Math.round(o.chance * 100)}%`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="entrada-botao"
+            disabled={!opcao}
+            onClick={() => {
+              if (!opcao) return;
+              const naLista = r?.entradas.find(
+                (x) => x.chave === opcao.selecao && x.casa === opcao.casa && x.odd === opcao.odd,
+              );
+              if (naLista) onEntrar(naLista, avisoBanca);
+              else onEntrar(opcao, avisoDaOpcao(opcao));
+            }}
+          >
+            Entrei nessa
+          </button>
+        </div>
       )}
     </section>
   );

@@ -9,6 +9,8 @@ import {
   analisarJogo,
   analisarV4,
   melhoresEntradas,
+  opcoesDeAposta,
+  type OpcaoAposta,
   type ResultadoEntradas,
   avaliarDQ,
   detectarMovimentos,
@@ -121,6 +123,8 @@ export interface Derivado {
   v4: ResultadoV4 | null;
   /** a lista principal: maior chance de green na faixa de odds, acima do mínimo da odd */
   entradas: ResultadoEntradas | null;
+  /** toda aposta lida: o usuário pode registrar a que decidir, mesmo fora da lista */
+  opcoes: OpcaoAposta[];
   movimentos: Movimento[];
   atrasos: Atraso[];
   /** travas da banca recebidas do histórico (só repassadas para a tela) */
@@ -292,6 +296,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   // V4.0: decisão contra a referência; o V3.3 entra como apoio quando há λ do modelo
   let v4: ResultadoV4 | null = null;
   let entradas: ResultadoEntradas | null = null;
+  let opcoes: OpcaoAposta[] = [];
   if (!pendenciasV4.length) {
     const argumentos = r.redTeam.argumentos.map((a) => a.trim()).filter(Boolean);
     const apoio = lambda
@@ -332,6 +337,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       banca: num(r.banca),
       travas,
     });
+    opcoes = opcoesDeAposta({ jogo, linhas: oddsValidas, apoio });
   }
 
   // movimento entre prints: cada print lido sozinho, com o seu horário
@@ -378,6 +384,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     pendencias,
     v4,
     entradas,
+    opcoes,
     movimentos,
     atrasos,
     travas,

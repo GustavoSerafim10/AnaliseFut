@@ -10,13 +10,16 @@ export function FormAposta({
   entrada,
   decisao,
   daLista,
+  aviso,
   onConfirmar,
   onCancelar,
 }: {
   entrada: NonNullable<ResumoAnalise['entrada']>;
   decisao: ResumoAnalise['decisao'];
-  /** veio da lista "Melhores entradas", que tem critério próprio */
+  /** escolhida pelo usuário na lista ou no seletor: não passa pela decisão da análise técnica */
   daLista?: boolean;
+  /** o que o usuário precisa saber antes de confirmar esta aposta */
+  aviso?: string;
   onConfirmar: (a: ApostaFeita) => void;
   onCancelar: () => void;
 }) {
@@ -39,6 +42,7 @@ export function FormAposta({
           contar no seu painel mesmo assim.
         </div>
       )}
+      {aviso && <div className="caixa alerta">{aviso}</div>}
       <div className="grade3">
         <label>
           Odd que você pegou

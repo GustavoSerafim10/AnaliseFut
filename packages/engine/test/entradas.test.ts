@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { melhoresEntradas, type PedidoEntradas } from '../src/entradas';
+import { melhoresEntradas, opcoesDeAposta, type PedidoEntradas } from '../src/entradas';
 import type { LinhaOdd } from '../src/tipos';
 import type { ApoioModelo } from '../src/v4';
 
@@ -129,6 +129,30 @@ describe('melhores entradas', () => {
     expect(liga.recusadas.some((x) => /azarão/.test(x.motivo))).toBe(true);
     const pequena = melhoresEntradas(pedido(linhas, { apoio: apoioAzarao, ligaPrincipal: false }));
     expect(pequena.recusadas.some((x) => /azarão/.test(x.motivo))).toBe(false);
+  });
+
+  it('qualquer aposta lida pode ser escolhida, inclusive a de odd fora da faixa', () => {
+    const op = opcoesDeAposta(pedido(ou('1win', 0.5, 1.08, 8)));
+    expect(op).toHaveLength(2);
+    expect(op.every((o) => o.temEstimativa)).toBe(true);
+  });
+
+  it('aposta sem mercado completo e sem estatísticas entra sem estimativa de chance', () => {
+    const [o] = opcoesDeAposta(pedido(ou('1win', 2.5, 1.9, 1.9).slice(0, 1), { apoio: undefined }));
+    expect(o.temEstimativa).toBe(false);
+    expect(o.chance).toBeCloseTo(1 / 1.9);
+    expect(o.ev).toBeCloseTo(0);
+  });
+
+  it('a mesma aposta lida em dois prints aparece uma vez, com a odd mais recente', () => {
+    const velha = ou('1win', 2.5, 1.9, 1.9).map((l) => ({
+      ...l,
+      horarioColeta: '2099-10-26T10:00:00-03:00',
+    }));
+    const nova = ou('1win', 2.5, 1.8, 2.0);
+    const op = opcoesDeAposta(pedido([...velha, ...nova]));
+    expect(op).toHaveLength(2);
+    expect(op.find((o) => o.linha.lado === 'over')?.odd).toBe(1.8);
   });
 
   it('as travas da banca reduzem a aposta e avisam', () => {

@@ -18,7 +18,7 @@ import {
   type Liquidador,
 } from './mercados';
 import { RHO_PADRAO } from './poisson';
-import { mediana, precificar } from './precificacao';
+import { chaveSelecao, mediana, precificar } from './precificacao';
 import type { LinhaOdd } from './tipos';
 import {
   ehAfiada,
@@ -248,4 +248,69 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
   entradas.sort((a, b) => b.chance - a.chance || b.ev - a.ev);
   if (!entradas.length && !recusadas.length) return vazio('sem_mercados');
   return { status: 'ok', entradas: entradas.slice(0, MAX_ENTRADAS), recusadas, bloqueio };
+}
+
+/** Uma aposta lida que o usuário pode registrar por conta própria, esteja ou não na lista. */
+export interface OpcaoAposta {
+  /** identifica a aposta na casa */
+  chave: string;
+  /** a mesma chave de EntradaSugerida e EntradaRecusada */
+  selecao: string;
+  linha: LinhaOdd;
+  descricao: string;
+  odd: number;
+  casa: string;
+  chance: number;
+  ev: number;
+  /** false = sem mercado completo nem estatísticas: a chance é só a que a odd pede */
+  temEstimativa: boolean;
+}
+
+/** Todas as apostas lidas que o site consegue apurar depois do jogo, em ordem alfabética. */
+export function opcoesDeAposta(
+  e: Pick<PedidoEntradas, 'jogo' | 'linhas' | 'apoio'>,
+): OpcaoAposta[] {
+  const nomes = { casa: e.jogo.casa, fora: e.jogo.fora };
+  const ap = e.apoio;
+  const modelo =
+    ap && ap.w !== null
+      ? criarModelo(ap.lambdas, ap.rho ?? RHO_PADRAO, ap.fracao1T ?? FRACAO_1T, ap.contagens)
+      : null;
+  const mercado = new Map(
+    precificar(e.linhas, { devig3: 'shin' }).selecoes.map((s) => [s.chave, s.pMercado]),
+  );
+  const unicas = new Map<string, LinhaOdd>();
+  for (const l of e.linhas) {
+    if (!Number.isFinite(l.odd) || l.odd <= 1 || !criarLiquidador(l).ok) continue;
+    const chave = `${l.casa.trim().toLowerCase()}#${chaveSelecao(l)}`;
+    const atual = unicas.get(chave);
+    if (!atual || (l.horarioColeta ?? '') > (atual.horarioColeta ?? '')) unicas.set(chave, l);
+  }
+  return [...unicas]
+    .map(([chave, l]): OpcaoAposta => {
+      const selecao = chaveSelecao(l);
+      const r = criarLiquidador(l);
+      const pMercado = mercado.get(selecao) ?? null;
+      const liq = r.ok && modelo && !faltaNoModelo(r.liq, modelo) ? r.liq : null;
+      const dist = liq && modelo ? distribuicaoModelo(liq, modelo) : null;
+      const pModelo = dist ? probEfetiva(dist) : null;
+      const efetiva = oddEfetiva(l.casa, l.odd);
+      const w = r.ok && r.nivel === 3 ? Math.min(ap?.w ?? 0, W_MAX_NIVEL3) : (ap?.w ?? 0);
+      const chance =
+        pModelo !== null && pMercado !== null
+          ? blend(pModelo, pMercado, w)
+          : (pMercado ?? pModelo ?? 1 / efetiva);
+      return {
+        chave,
+        selecao,
+        linha: l,
+        descricao: descreverAposta(l, nomes),
+        odd: l.odd,
+        casa: l.casa,
+        chance,
+        ev: (dist ? fracaoEmRisco(dist) : 1) * (chance * efetiva - 1),
+        temEstimativa: pModelo !== null || pMercado !== null,
+      };
+    })
+    .sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR') || a.odd - b.odd);
 }
