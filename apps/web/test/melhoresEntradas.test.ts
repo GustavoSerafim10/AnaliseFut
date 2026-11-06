@@ -15,6 +15,7 @@ import {
   minhasEntradas,
   painel,
   placarAcerto,
+  podeSalvarSozinho,
   registrarAposta,
   registrarResultado,
   resumir,
@@ -166,6 +167,19 @@ describe('mais de uma aposta no mesmo jogo', () => {
     const irma = lista.find((e) => e.irmaDe)!;
     expect(irma.resultado?.casa).toBe(1);
     expect(irma.resultado?.oddFechamento).toBeUndefined();
+  });
+});
+
+describe('salvar no histórico', () => {
+  it('salva sozinho qualquer decisão, para o levantamento depois', () => {
+    const d = derivar(r);
+    expect(d.v4?.decisao).not.toBe('BET');
+    expect(podeSalvarSozinho(r, d)).toBe(true);
+    const { lista } = salvarNoHistorico([], r, d);
+    expect(lista[0].resumo.decisao).toBe(d.v4?.decisao);
+  });
+  it('jogo novo vem com "Liga bem coberta" desmarcada', () => {
+    expect(rascunhoNovo().config.ligaTop).toBe(false);
   });
 });
 

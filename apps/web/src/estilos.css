@@ -4753,3 +4753,8 @@ button.cl-linha:hover {
 .entrada-cenarios {
   font-weight: 600;
 }
+
+/* comparativo de odds: a barra lateral fica sempre visível, com a lista curta ou completa */
+.tabela-rolavel:has(> .tabela-odds) {
+  overflow-x: scroll;
+}

@@ -244,56 +244,6 @@ export function AbaAnalise({
           }}
         />
       )}
-      <details className="caixa analise-tecnica">
-        <summary>
-          Análise técnica: preço contra a referência
-          {d.v4 && <span className="marca">{d.v4.rotulo}</span>}
-        </summary>
-        <p className="dica">
-          É o critério mais rígido do site: só aprova com Pinnacle/Betfair ou 4+ casas. Serve para
-          conferir o preço. Pode dizer NO BET mesmo com entrada na lista acima.
-        </p>
-        <Indicadores d={d} />
-        <div className="grade-analise">
-          <div className="coluna">
-            <CentroDecisao d={d} />
-            <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
-          </div>
-          <div className="coluna">
-            <ComparativoOdds d={d} />
-            <Auditoria r={r} d={d} />
-          </div>
-        </div>
-        <GrafoDecisao d={d} />
-        <PainelV4 r={r} setR={setR} d={d} />
-      </details>
-
-      <h3>Situação dos dados</h3>
-      <p className="dica">
-        Esta aba se atualiza sozinha: cada print, texto ou correção nas outras abas recalcula tudo
-        na hora.
-      </p>
-      <div className="situacao">
-        {situacao.map((s) => (
-          <span key={s.nome} className={s.ok ? 'ok' : s.obrigatorio ? 'falta' : 'opcional'}>
-            {s.ok ? '✓' : s.obrigatorio ? '✗' : '○'} {s.nome}
-            {s.detalhe && <small> {s.detalhe}</small>}
-          </span>
-        ))}
-      </div>
-
-      {!d.pendenciasV4.length && d.pendencias.length > 0 && (
-        <div className="caixa">
-          <strong>Motor de apoio (V3.3) desligado:</strong> sem ele não há filtro do modelo, preço
-          de nicho (R3) nem previsão.
-          <ul className="miudo">
-            {d.pendencias.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {(d.v4 || res) && (
         <>
           <div className="linha-acoes">
@@ -360,6 +310,56 @@ export function AbaAnalise({
             />
           </label>
         </>
+      )}
+
+      <details className="caixa analise-tecnica">
+        <summary>
+          Análise técnica: preço contra a referência
+          {d.v4 && <span className="marca">{d.v4.rotulo}</span>}
+        </summary>
+        <p className="dica">
+          É o critério mais rígido do site: só aprova com Pinnacle/Betfair ou 4+ casas. Serve para
+          conferir o preço. Pode dizer NO BET mesmo com entrada na lista acima.
+        </p>
+        <Indicadores d={d} />
+        <div className="grade-analise">
+          <div className="coluna">
+            <CentroDecisao d={d} />
+            <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
+          </div>
+          <div className="coluna">
+            <ComparativoOdds d={d} />
+            <Auditoria r={r} d={d} />
+          </div>
+        </div>
+        <GrafoDecisao d={d} />
+        <PainelV4 r={r} setR={setR} d={d} />
+      </details>
+
+      <h3>Situação dos dados</h3>
+      <p className="dica">
+        Esta aba se atualiza sozinha: cada print, texto ou correção nas outras abas recalcula tudo
+        na hora.
+      </p>
+      <div className="situacao">
+        {situacao.map((s) => (
+          <span key={s.nome} className={s.ok ? 'ok' : s.obrigatorio ? 'falta' : 'opcional'}>
+            {s.ok ? '✓' : s.obrigatorio ? '✗' : '○'} {s.nome}
+            {s.detalhe && <small> {s.detalhe}</small>}
+          </span>
+        ))}
+      </div>
+
+      {!d.pendenciasV4.length && d.pendencias.length > 0 && (
+        <div className="caixa">
+          <strong>Motor de apoio (V3.3) desligado:</strong> sem ele não há filtro do modelo, preço
+          de nicho (R3) nem previsão.
+          <ul className="miudo">
+            {d.pendencias.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {res && rel && (

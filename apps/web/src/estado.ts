@@ -94,7 +94,7 @@ export function rascunhoNovo(): Rascunho {
       hora: '',
     },
     config: {
-      ligaTop: true,
+      ligaTop: false,
       favoritoLigaMaisForte: false,
       escalacaoProvavel: false,
       escalacaoIncerta: false,
