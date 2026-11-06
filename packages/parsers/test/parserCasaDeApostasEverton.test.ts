@@ -58,7 +58,11 @@ describe('CasaDeApostas: aba da casa não é título de mercado', () => {
     expect(odd('primeiro_gol', 'casa')).toEqual([1.49]);
   });
   it('cartões, escala de escanteios e par/ímpar ficam sem modelo', () => {
-    const fora = r.linhas.filter((l) => [2.8, 5.01, 2.39, 2.73, 3.07, 7.05].includes(l.odd));
+    const fora = r.linhas.filter((l) => [5.01, 2.39, 2.73, 3.07, 7.05].includes(l.odd));
     expect(fora).toEqual([]);
+    // 2,80 só é odd com modelo nos escanteios 1x2 do 1º tempo, não no cartão 1x2 do Everton
+    expect(r.linhas.filter((l) => l.odd === 2.8).every((l) => l.mercado === 'escanteios_1x2')).toBe(
+      true,
+    );
   });
 });
