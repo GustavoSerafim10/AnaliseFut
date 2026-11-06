@@ -102,6 +102,33 @@ describe('melhores entradas', () => {
     );
   });
 
+  it('empate devolve: a chance de green não conta o empate, e o sinal não é forte', () => {
+    const dnb = (lado: string, odd: number): LinhaOdd => ({
+      casa: '1win',
+      mercado: 'DNB',
+      lado,
+      odd,
+      periodo: 'FT',
+      horarioColeta: H,
+    });
+    const r = melhoresEntradas(
+      pedido([dnb('1', 1.56), dnb('2', 2.33)], {
+        apoio: apoio({ lambdas: { casa: 2.16, fora: 1.27 } }),
+      }),
+    );
+    const e = r.entradas[0];
+    expect(e.chanceDevolve).toBeGreaterThan(0.15);
+    expect(e.chanceGreen).toBeCloseTo(e.chance * (1 - e.chanceDevolve));
+    expect(e.chanceGreen).toBeLessThan(e.chance);
+    expect(e.forca).toBe('media');
+  });
+
+  it('sem devolução possível, a chance de green é a própria chance', () => {
+    const e = melhoresEntradas(pedido(ou('1win', 1.5, 1.4, 3.0))).entradas[0];
+    expect(e.chanceDevolve).toBeCloseTo(0);
+    expect(e.chanceGreen).toBeCloseTo(e.chance);
+  });
+
   it('chance baixa ou sem folga sobre o mínimo não recebe sinal forte', () => {
     const r = melhoresEntradas(
       pedido(ou('1win', 2.5, 1.86, 2.0), { apoio: apoio({ lambdas: { casa: 1.7, fora: 1.3 } }) }),

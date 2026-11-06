@@ -4749,3 +4749,7 @@ button.cl-linha:hover {
   cursor: pointer;
   font-size: 14px;
 }
+
+.entrada-cenarios {
+  font-weight: 600;
+}

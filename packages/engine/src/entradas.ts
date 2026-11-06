@@ -49,8 +49,12 @@ export interface EntradaSugerida {
   descricao: string;
   odd: number;
   casa: string;
-  /** chance estimada de green */
+  /** chance sem contar a devolução: é ela que se compara com o mínimo da odd */
   chance: number;
+  /** chance de green de fato: num "empate devolve", o empate não conta como green */
+  chanceGreen: number;
+  /** chance de a aposta ser devolvida (empate no empate anula, linha exata) */
+  chanceDevolve: number;
   /** acerto mínimo para a odd não dar prejuízo */
   minimo: number;
   pModelo: number;
@@ -209,7 +213,9 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     }
     const w = r.nivel === 3 ? Math.min(ap.w, W_MAX_NIVEL3) : ap.w;
     const chance = blend(pModelo, pMercado, w);
-    const ev = fracaoEmRisco(dist) * (chance * efetiva - 1);
+    const emRisco = fracaoEmRisco(dist);
+    const chanceGreen = chance * emRisco;
+    const ev = emRisco * (chance * efetiva - 1);
     if (ev <= 0) {
       recusar(`chance de ${pct(chance)}, abaixo do mínimo de ${pct(minimo)} da odd`);
       continue;
@@ -225,6 +231,8 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
       odd: melhor.odd,
       casa: melhor.casa,
       chance,
+      chanceGreen,
+      chanceDevolve: 1 - emRisco,
       minimo,
       pModelo,
       pMercado,
@@ -235,7 +243,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
       forca:
         r.nivel !== 3 &&
         (ap.dq === 'A' || ap.dq === 'B') &&
-        chance >= CHANCE_SINAL_FORTE &&
+        chanceGreen >= CHANCE_SINAL_FORTE &&
         chance - minimo >= FOLGA_SINAL_FORTE &&
         Math.abs(pModelo - pMercado) <= DIVERGENCIA_SINAL_FORTE
           ? 'forte'
@@ -245,7 +253,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     });
   }
 
-  entradas.sort((a, b) => b.chance - a.chance || b.ev - a.ev);
+  entradas.sort((a, b) => b.chanceGreen - a.chanceGreen || b.ev - a.ev);
   if (!entradas.length && !recusadas.length) return vazio('sem_mercados');
   return { status: 'ok', entradas: entradas.slice(0, MAX_ENTRADAS), recusadas, bloqueio };
 }
@@ -261,6 +269,7 @@ export interface OpcaoAposta {
   odd: number;
   casa: string;
   chance: number;
+  chanceGreen: number;
   ev: number;
   /** false = sem mercado completo nem estatísticas: a chance é só a que a odd pede */
   temEstimativa: boolean;
@@ -300,6 +309,7 @@ export function opcoesDeAposta(
         pModelo !== null && pMercado !== null
           ? blend(pModelo, pMercado, w)
           : (pMercado ?? pModelo ?? 1 / efetiva);
+      const emRisco = dist ? fracaoEmRisco(dist) : 1;
       return {
         chave,
         selecao,
@@ -308,7 +318,8 @@ export function opcoesDeAposta(
         odd: l.odd,
         casa: l.casa,
         chance,
-        ev: (dist ? fracaoEmRisco(dist) : 1) * (chance * efetiva - 1),
+        chanceGreen: chance * emRisco,
+        ev: emRisco * (chance * efetiva - 1),
         temEstimativa: pModelo !== null || pMercado !== null,
       };
     })

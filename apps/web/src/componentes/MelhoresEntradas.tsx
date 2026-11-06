@@ -45,11 +45,12 @@ function Cartao({
   registrada: boolean;
   onEntrar: () => void;
 }) {
+  const temDevolucao = e.chanceDevolve >= 0.005;
   return (
     <li className={`entrada-item ${e.forca}`}>
       <div className="entrada-chance">
-        <strong>{Math.round(e.chance * 100)}%</strong>
-        <span>chance estimada</span>
+        <strong>{Math.round(e.chanceGreen * 100)}%</strong>
+        <span>chance de green</span>
       </div>
       <div className="entrada-corpo">
         <div className="entrada-topo">
@@ -63,8 +64,16 @@ function Cartao({
           <b>
             @ {dec(e.odd)} na {e.casa}
           </b>{' '}
-          · a odd pede {pct(e.minimo)} de acerto
+          {temDevolucao
+            ? `· sem contar a devolução: ${pct(e.chance)}, e a odd pede ${pct(e.minimo)}`
+            : `· a odd pede ${pct(e.minimo)} de acerto`}
         </p>
+        {temDevolucao && (
+          <p className="entrada-cenarios">
+            Green {Math.round(e.chanceGreen * 100)}% · devolve {Math.round(e.chanceDevolve * 100)}%
+            · red {Math.round((1 - e.chanceGreen - e.chanceDevolve) * 100)}%
+          </p>
+        )}
         <p className="miudo">
           Estatísticas {pct(e.pModelo)} · {e.referenciaAfiada ? 'referência afiada' : 'mercado'}{' '}
           {pct(e.pMercado)} · {e.casas} casa{e.casas > 1 ? 's' : ''}
@@ -116,7 +125,7 @@ export function MelhoresEntradas({
     <section className="painel melhores-entradas" aria-label="Melhores entradas">
       <div className="entradas-cabecalho">
         <h3>Melhores entradas</h3>
-        <span className="miudo">odds de {faixa}, da maior para a menor chance</span>
+        <span className="miudo">odds de {faixa}, da maior para a menor chance de green</span>
       </div>
       {!r && (
         <p className="entradas-vazio">
@@ -201,7 +210,7 @@ export function MelhoresEntradas({
                 {livres.map((o) => (
                   <option key={o.chave} value={o.chave}>
                     {sem(o.descricao)} @ {dec(o.odd)} · {o.casa}
-                    {o.temEstimativa && ` · chance ${Math.round(o.chance * 100)}%`}
+                    {o.temEstimativa && ` · green ${Math.round(o.chanceGreen * 100)}%`}
                   </option>
                 ))}
               </select>
