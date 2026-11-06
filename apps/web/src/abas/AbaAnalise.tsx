@@ -136,6 +136,7 @@ export function AbaAnalise({
   onRegistrarMultipla?: (m: Multipla) => void;
 }) {
   const [erroMultipla, setErroMultipla] = useState<string | null>(null);
+  const [multiplaSalva, setMultiplaSalva] = useState(false);
   const jogoAtual = `${r.jogo.casa || 'Mandante'} × ${r.jogo.fora || 'Visitante'}`;
   const inicioAtual = inicioIso(r);
   const naMultipla = new Set(
@@ -156,6 +157,7 @@ export function AbaAnalise({
       temEstimativa,
     });
     setErroMultipla(res.erro ?? null);
+    setMultiplaSalva(false);
     setMontando(res.pernas);
   };
   const [copiado, setCopiado] = useState<string | null>(null);
@@ -278,9 +280,16 @@ export function AbaAnalise({
         }}
         onRegistrar={(m) => {
           setErroMultipla(null);
+          setMultiplaSalva(true);
           onRegistrarMultipla(m);
         }}
       />
+      {multiplaSalva && !montando.length && (
+        <div className="caixa ok">
+          <strong>Múltipla registrada ✓</strong> Ela está no Histórico, no quadro Múltiplas, e é
+          apurada quando você registrar o placar de cada jogo.
+        </div>
+      )}
       {daLista && (
         <FormAposta
           key={daLista.e.chave}

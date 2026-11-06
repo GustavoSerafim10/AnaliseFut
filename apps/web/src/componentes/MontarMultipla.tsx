@@ -96,8 +96,8 @@ export function MontarMultipla({
                 </div>
               </dl>
               <p className="miudo">
-                Só paga se todas baterem. A odd sobe, mas a margem da casa também se multiplica e
-                um erro de estimativa pesa mais. Sem histórico comprovado, use um valor pequeno.
+                Só paga se todas baterem. A odd sobe, mas a margem da casa também se multiplica e um
+                erro de estimativa pesa mais. Sem histórico comprovado, use um valor pequeno.
               </p>
               {iniciou && (
                 <div className="caixa alerta">
@@ -176,7 +176,12 @@ export function MontarMultipla({
   );
 }
 
-const SELO = { green: '🟢 GREEN', red: '🔴 RED', devolvida: '⚪ DEVOLVIDA', pendente: '⏳ PENDENTE' };
+const SELO = {
+  green: '🟢 GREEN',
+  red: '🔴 RED',
+  devolvida: '⚪ DEVOLVIDA',
+  pendente: '⏳ PENDENTE',
+};
 const SELO_PERNA = {
   green: '🟢',
   'meio-green': '🟢½',
@@ -199,7 +204,7 @@ export function PainelMultiplas({
   if (!multiplas.length) return null;
   const b = balancoMultiplas(multiplas, historico);
   return (
-    <details className="caixa painel-multiplas">
+    <details className="caixa painel-multiplas" open>
       <summary>
         <strong>Múltiplas ({b.total})</strong>{' '}
         <span className="miudo">
