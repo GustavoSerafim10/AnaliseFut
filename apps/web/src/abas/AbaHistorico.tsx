@@ -6,7 +6,7 @@ import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado'
 import { EscolherAposta } from '../componentes/EscolherAposta';
 import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
-import { juntarMultiplas, type Multipla } from '../multiplas';
+import { juntarMultiplas, painelComMultiplas, type Multipla } from '../multiplas';
 import { CartoesPainel, CurvaUnidades, PlacarDeAcerto } from '../componentes/PainelHistorico';
 import {
   apostasDoJogo,
@@ -285,11 +285,12 @@ export function AbaHistorico({
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'alerta'; texto: string } | null>(null);
   const [json, setJson] = useState('');
   const [filtro, setFiltro] = useState<FiltroPainel>(() =>
-    minhasEntradas(historico).length ? 'entradas' : 'papel',
+    minhasEntradas(historico).length || multiplas.length ? 'entradas' : 'papel',
   );
   const [entrandoEm, setEntrandoEm] = useState<string | null>(null);
   const daVez = filtrar(historico, filtro);
-  const pn = painel(daVez);
+  const pn =
+    filtro === 'entradas' ? painelComMultiplas(painel(daVez), multiplas, historico) : painel(daVez);
   // no papel entram também as análises sem entrada candidata (só para registrar o placar)
   const lista = filtro === 'entradas' ? daVez : historico.filter((e) => !e.aposta);
   const bets = minhasEntradas(historico);
@@ -369,16 +370,12 @@ export function AbaHistorico({
       </p>
 
       <PlacarDeAcerto p={placarAcerto(historico)} />
-      <PainelMultiplas
-        multiplas={multiplas}
-        historico={historico}
-        onApagar={(id) => setMultiplas(multiplas.filter((m) => m.id !== id))}
-      />
 
       <div className="abas-mini">
         {(Object.keys(FILTROS) as FiltroPainel[]).map((f) => (
           <button key={f} className={f === filtro ? 'ativo' : ''} onClick={() => setFiltro(f)}>
-            {FILTROS[f].nome} ({filtrar(historico, f).length})
+            {FILTROS[f].nome} (
+            {filtrar(historico, f).length + (f === 'entradas' ? multiplas.length : 0)})
           </button>
         ))}
       </div>
@@ -491,17 +488,27 @@ export function AbaHistorico({
       </details>
 
       <h3>
-        {FILTROS[filtro].nome} ({lista.length})
+        {FILTROS[filtro].nome} ({lista.length + (filtro === 'entradas' ? multiplas.length : 0)})
       </h3>
 
-      {historico.length === 0 && <p>Nenhuma análise salva ainda.</p>}
-      {historico.length > 0 && lista.length === 0 && (
-        <p className="miudo">
-          {filtro === 'entradas'
-            ? 'Nenhuma entrada ainda. Quando apostar, use "Entrei nessa aposta" na Análise (ou aqui, em No papel).'
-            : 'Nenhuma análise sem entrada.'}
-        </p>
+      {filtro === 'entradas' && (
+        <PainelMultiplas
+          multiplas={multiplas}
+          historico={historico}
+          onApagar={(id) => setMultiplas(multiplas.filter((m) => m.id !== id))}
+        />
       )}
+
+      {historico.length === 0 && <p>Nenhuma análise salva ainda.</p>}
+      {historico.length > 0 &&
+        lista.length === 0 &&
+        !(filtro === 'entradas' && multiplas.length) && (
+          <p className="miudo">
+            {filtro === 'entradas'
+              ? 'Nenhuma entrada ainda. Quando apostar, use "Entrei nessa aposta" na Análise (ou aqui, em No papel).'
+              : 'Nenhuma análise sem entrada.'}
+          </p>
+        )}
       {lista.map((e) => {
         const ap = apurar(e);
         const auto = apurarAuto(e);

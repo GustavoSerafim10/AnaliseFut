@@ -10,6 +10,7 @@ import {
   balancoMultiplas,
   juntarMultiplas,
   juntarPerna,
+  painelComMultiplas,
   resumirMultipla,
   type Multipla,
   type PernaMultipla,
@@ -82,7 +83,9 @@ describe('montagem', () => {
     expect(juntarPerna([A], C).pernas).toHaveLength(2);
   });
   it('o mesmo nome em outro dia é outro jogo', () => {
-    const volta = perna('A × B', ou('over', 2.5, 1.9), 1.9, { inicio: '2099-12-01T17:00:00-03:00' });
+    const volta = perna('A × B', ou('over', 2.5, 1.9), 1.9, {
+      inicio: '2099-12-01T17:00:00-03:00',
+    });
     expect(juntarPerna([A], volta).pernas).toHaveLength(2);
   });
 });
@@ -134,6 +137,42 @@ describe('apuração', () => {
     );
     expect(b).toMatchObject({ total: 3, green: 1, red: 1, pendentes: 1 });
     expect(b.unidades).toBeCloseTo(1.1 - 1);
+  });
+});
+
+describe('números de Minhas entradas', () => {
+  const vazio = {
+    entradas: 1,
+    green: 1,
+    red: 0,
+    devolvidas: 0,
+    pendentes: 0,
+    winrate: 1,
+    unidades: 0.5,
+    roi: 0.5,
+    evMedio: 0.02,
+    oddMedia: 1.5,
+    curva: [{ id: 'a', jogo: 'X', data: '2099-11-01', lucro: 0.5, acumulado: 0.5 }],
+  };
+  it('soma a múltipla às apostas simples, nos cartões e na curva', () => {
+    const p = painelComMultiplas(
+      vazio,
+      [multipla({ odd: 2.2 })],
+      [jogo('A × B', 1, 0), jogo('C × D', 2, 1)],
+    );
+    expect(p).toMatchObject({ entradas: 2, green: 2, red: 0, pendentes: 0, winrate: 1 });
+    expect(p.unidades).toBeCloseTo(1.7);
+    expect(p.roi).toBeCloseTo(0.85);
+    expect(p.oddMedia).toBeCloseTo((1.5 + 2.2) / 2);
+    expect(p.curva.map((x) => x.acumulado)).toEqual([0.5, expect.closeTo(1.7)]);
+  });
+  it('múltipla pendente conta como entrada, sem mexer nas unidades', () => {
+    const p = painelComMultiplas(vazio, [multipla()], [jogo('A × B', 1, 0)]);
+    expect(p).toMatchObject({ entradas: 2, pendentes: 1, unidades: 0.5 });
+    expect(p.curva).toHaveLength(1);
+  });
+  it('sem múltipla, o painel fica igual', () => {
+    expect(painelComMultiplas(vazio, [], [])).toBe(vazio);
   });
 });
 

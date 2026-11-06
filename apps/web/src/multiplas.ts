@@ -5,7 +5,7 @@
  */
 import { apurarAposta, chaveSelecao, type ApostaBanca, type LinhaOdd } from '@pe/engine';
 import type { OddLine } from '@pe/schemas';
-import type { EntradaHistorico } from './historico';
+import type { EntradaHistorico, Painel, PontoCurva } from './historico';
 
 const CHAVE = 'pe-multiplas-v1';
 const CHAVE_MONTANDO = 'pe-multipla-montando-v1';
@@ -175,7 +175,10 @@ export interface BalancoMultiplas {
   unidades: number;
 }
 
-export function balancoMultiplas(lista: Multipla[], historico: EntradaHistorico[]): BalancoMultiplas {
+export function balancoMultiplas(
+  lista: Multipla[],
+  historico: EntradaHistorico[],
+): BalancoMultiplas {
   const b: BalancoMultiplas = {
     total: lista.length,
     pendentes: 0,
@@ -217,4 +220,55 @@ export function apostasDeMultiplas(
 export function juntarMultiplas(atuais: Multipla[], novas: Multipla[]): Multipla[] {
   const ids = new Set(atuais.map((m) => m.id));
   return [...atuais, ...novas.filter((m) => !ids.has(m.id))];
+}
+
+/** Os números de "Minhas entradas" com as múltiplas somadas às apostas simples. */
+export function painelComMultiplas(
+  p: Painel,
+  lista: Multipla[],
+  historico: EntradaHistorico[],
+): Painel {
+  if (!lista.length) return p;
+  const r: Painel = { ...p, curva: [...p.curva], entradas: p.entradas + lista.length };
+  let somaEv = (p.evMedio ?? 0) * p.entradas;
+  let somaOdd = (p.oddMedia ?? 0) * p.entradas;
+  const novos: PontoCurva[] = [];
+  for (const m of lista) {
+    const a = apurarMultipla(m, historico);
+    somaOdd += m.odd;
+    somaEv += m.pernas.reduce((s, x) => s * (1 + x.ev), 1) - 1;
+    if (a.situacao === 'pendente') {
+      r.pendentes++;
+      continue;
+    }
+    if (a.situacao === 'green') r.green++;
+    else if (a.situacao === 'red') r.red++;
+    else r.devolvidas++;
+    r.unidades += a.lucro ?? 0;
+    novos.push({
+      id: m.id,
+      jogo: `Múltipla @ ${m.odd}`,
+      data: m.pernas
+        .map((x) => x.inicio)
+        .sort()
+        .at(-1)!
+        .slice(0, 10),
+      lucro: a.lucro ?? 0,
+      acumulado: 0,
+    });
+  }
+  const apuradas = r.green + r.red + r.devolvidas;
+  r.winrate = r.green + r.red ? r.green / (r.green + r.red) : null;
+  r.roi = apuradas ? r.unidades / apuradas : null;
+  r.evMedio = somaEv / r.entradas;
+  r.oddMedia = somaOdd / r.entradas;
+  // a curva segue a ordem dos jogos, com as múltiplas no dia da última perna
+  let acumulado = 0;
+  r.curva = [...r.curva, ...novos]
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .map((x) => {
+      acumulado += x.lucro;
+      return { ...x, acumulado };
+    });
+  return r;
 }
