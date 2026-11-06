@@ -30,7 +30,7 @@ const MENSAGEM: Record<Exclude<StatusEntradas, 'ok'>, string> = {
 /** O que é preciso para registrar uma aposta, venha da lista ou do seletor. */
 export type EscolhaEntrada = Pick<
   EntradaSugerida,
-  'chave' | 'linha' | 'descricao' | 'odd' | 'casa' | 'chance' | 'ev'
+  'chave' | 'linha' | 'descricao' | 'odd' | 'casa' | 'chance' | 'chanceGreen' | 'ev'
 > &
   Partial<Pick<EntradaSugerida, 'stake' | 'stakeValor'>>;
 
@@ -38,12 +38,16 @@ function Cartao({
   e,
   n,
   registrada,
+  naMultipla,
   onEntrar,
+  onMultipla,
 }: {
   e: EntradaSugerida;
   n: number;
   registrada: boolean;
+  naMultipla: boolean;
   onEntrar: () => void;
+  onMultipla?: () => void;
 }) {
   const temDevolucao = e.chanceDevolve >= 0.005;
   return (
@@ -82,13 +86,23 @@ function Cartao({
           {e.stakeValor !== undefined && ` = R$ ${dec(e.stakeValor)}`}
         </p>
       </div>
-      {registrada ? (
-        <span className="entrada-registrada">✓ Registrada</span>
-      ) : (
-        <button className="entrada-botao" onClick={onEntrar}>
-          Entrei nessa
-        </button>
-      )}
+      <div className="entrada-acoes">
+        {registrada ? (
+          <span className="entrada-registrada">✓ Registrada</span>
+        ) : (
+          <button className="entrada-botao" onClick={onEntrar}>
+            Entrei nessa
+          </button>
+        )}
+        {onMultipla &&
+          (naMultipla ? (
+            <span className="entrada-registrada">✓ Na múltipla</span>
+          ) : (
+            <button className="entrada-botao discreto" onClick={onMultipla}>
+              + Múltipla
+            </button>
+          ))}
+      </div>
     </li>
   );
 }
@@ -96,8 +110,10 @@ function Cartao({
 export function MelhoresEntradas({
   d,
   registradas,
+  naMultipla,
   dataErrada,
   onEntrar,
+  onMultipla,
 }: {
   d: Derivado;
   /** o jogo está cadastrado num dia anterior ao dos prints ou ao de hoje */
@@ -105,6 +121,9 @@ export function MelhoresEntradas({
   /** apostas já registradas neste jogo: o mesmo mercado não entra duas vezes */
   registradas: Set<string>;
   onEntrar: (e: EscolhaEntrada, aviso?: string) => void;
+  /** apostas deste jogo já na múltipla em montagem */
+  naMultipla?: Set<string>;
+  onMultipla?: (e: EscolhaEntrada, temEstimativa: boolean) => void;
 }) {
   const [verRecusadas, setVerRecusadas] = useState(false);
   const [escolhida, setEscolhida] = useState('');
@@ -169,7 +188,9 @@ export function MelhoresEntradas({
                 e={e}
                 n={i + 1}
                 registrada={registradas.has(`${e.casa.trim().toLowerCase()}#${e.chave}`)}
+                naMultipla={!!naMultipla?.has(`${e.casa.trim().toLowerCase()}#${e.chave}`)}
                 onEntrar={() => onEntrar(e, avisoBanca)}
+                onMultipla={onMultipla && (() => onMultipla(e, true))}
               />
             ))}
           </ol>
@@ -201,7 +222,7 @@ export function MelhoresEntradas({
       )}
       {livres.length > 0 && (
         <details className="entrada-outra">
-          <summary>Entrei em outra aposta, fora da lista</summary>
+          <summary>Outra aposta, fora da lista</summary>
           <div className="entrada-escolher">
             <label>
               Escolha qualquer mercado lido, mesmo com NO BET
@@ -230,6 +251,19 @@ export function MelhoresEntradas({
             >
               Entrei nessa
             </button>
+            {onMultipla && (
+              <button
+                className="entrada-botao discreto"
+                disabled={!opcao}
+                onClick={() => {
+                  if (!opcao) return;
+                  onMultipla(opcao, opcao.temEstimativa);
+                  setEscolhida('');
+                }}
+              >
+                + Múltipla
+              </button>
+            )}
           </div>
         </details>
       )}

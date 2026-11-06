@@ -26,6 +26,7 @@ import type { OddLine } from '@pe/schemas';
 import { abrirDeposito, migrarHistorico, type Deposito } from './armazem';
 import type { Derivado } from './dados';
 import { inicioIso, isoLocal, type Rascunho } from './estado';
+import type { Multipla } from './multiplas';
 
 const CHAVE = 'pe-historico-v1';
 const CHAVE_BANCA = 'pe-banca-v1';
@@ -530,6 +531,8 @@ export function travasDoHistorico(
   lista: EntradaHistorico[],
   bancaInicial: number,
   agora = isoLocal(new Date()),
+  /** apostas de fora da lista, como as múltiplas */
+  extras: ApostaBanca[] = [],
 ): TravasBanca {
   const apostas: ApostaBanca[] = apostasFeitas(lista).map((e) => {
     const a = apurar(e);
@@ -540,7 +543,7 @@ export function travasDoHistorico(
       apuradaEm: e.resultado?.registradoEm,
     };
   });
-  return calcularTravas(bancaInicial, apostas, agora);
+  return calcularTravas(bancaInicial, [...apostas, ...extras], agora);
 }
 
 /** as entradas de verdade (botão "Entrei"), base do painel */
@@ -755,6 +758,7 @@ export interface ExtrasBackup {
   rascunho?: Rascunho;
   cores?: Record<string, { cor1: string; cor2: string }>;
   escudos?: Record<string, { imagem: string; cor1?: string; cor2?: string }>;
+  multiplas?: Multipla[];
 }
 
 export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {}): string {
@@ -767,12 +771,13 @@ export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {
 
 export function lerExtrasBackup(texto: string): ExtrasBackup {
   try {
-    const { banca, rascunho, cores, escudos } = JSON.parse(texto) as ExtrasBackup;
+    const { banca, rascunho, cores, escudos, multiplas } = JSON.parse(texto) as ExtrasBackup;
     return {
       ...(banca !== undefined ? { banca } : {}),
       ...(rascunho ? { rascunho } : {}),
       ...(cores ? { cores } : {}),
       ...(escudos ? { escudos } : {}),
+      ...(Array.isArray(multiplas) ? { multiplas } : {}),
     };
   } catch {
     return {};

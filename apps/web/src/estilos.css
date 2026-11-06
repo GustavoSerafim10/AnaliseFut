@@ -4758,3 +4758,77 @@ button.cl-linha:hover {
 .tabela-rolavel:has(> .tabela-odds) {
   overflow-x: scroll;
 }
+
+/* múltiplas */
+.entrada-acoes {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  text-align: center;
+}
+.montar-multipla {
+  margin-bottom: 16px;
+  border-color: var(--borda-forte);
+}
+.multipla-pernas {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.multipla-pernas li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--cartao-2);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+.multipla-pernas li span {
+  flex: 1;
+  min-width: 0;
+}
+.multipla-pernas small {
+  display: block;
+  color: var(--suave);
+}
+.multipla-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px 16px;
+  margin: 0 0 10px;
+}
+.multipla-resumo dt {
+  color: var(--suave);
+  font-size: 12px;
+}
+.multipla-resumo dd {
+  margin: 2px 0 0;
+  font-family: var(--fonte-tecnica);
+  font-size: 24px;
+}
+.multipla-linha {
+  padding: 10px 0;
+  border-top: 1px solid var(--borda);
+}
+.multipla-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.multipla-topo .perigo {
+  margin-left: auto;
+}
+.multipla-linha ul {
+  margin: 6px 0 0;
+}
+@media (max-width: 560px) {
+  .entrada-acoes {
+    width: 100%;
+  }
+}

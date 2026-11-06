@@ -17,9 +17,11 @@ import { FormAposta } from '../componentes/FormAposta';
 import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
 import { MelhoresEntradas, type EscolhaEntrada } from '../componentes/MelhoresEntradas';
+import { MontarMultipla } from '../componentes/MontarMultipla';
 import { PainelV4 } from '../componentes/PainelV4';
 import {
   dec,
+  inicioIso,
   isoLocal,
   num,
   pct,
@@ -35,6 +37,7 @@ import {
   type EntradaHistorico,
   type ResumoAnalise,
 } from '../historico';
+import { chaveDaPerna, juntarPerna, type Multipla, type PernaMultipla } from '../multiplas';
 import type { PropsAba } from './tipos';
 
 const CLASSE: Record<ResultadoAnalise['decisao'], string> = {
@@ -118,13 +121,43 @@ export function AbaAnalise({
   onEntrar,
   salvoNoHistorico,
   apostas = [],
+  montando = [],
+  setMontando = () => undefined,
+  onRegistrarMultipla = () => undefined,
 }: PropsAba & {
   onSalvar: () => void;
   onEntrar: (a: ApostaFeita) => void;
   salvoNoHistorico: boolean;
   /** as apostas já registradas neste jogo */
   apostas?: EntradaHistorico[];
+  /** a múltipla em montagem: continua ao abrir outro jogo */
+  montando?: PernaMultipla[];
+  setMontando?: (l: PernaMultipla[]) => void;
+  onRegistrarMultipla?: (m: Multipla) => void;
 }) {
+  const [erroMultipla, setErroMultipla] = useState<string | null>(null);
+  const jogoAtual = `${r.jogo.casa || 'Mandante'} × ${r.jogo.fora || 'Visitante'}`;
+  const inicioAtual = inicioIso(r);
+  const naMultipla = new Set(
+    montando
+      .filter((p) => p.jogo === jogoAtual && p.inicio === inicioAtual)
+      .map((p) => chaveDaPerna(p)),
+  );
+  const adicionarPerna = (e: EscolhaEntrada, temEstimativa: boolean) => {
+    const res = juntarPerna(montando, {
+      jogo: jogoAtual,
+      inicio: inicioAtual,
+      linha: e.linha as OddLine,
+      descricao: e.descricao.replace('Ganha se: ', ''),
+      odd: e.odd,
+      casa: e.casa,
+      chanceGreen: e.chanceGreen,
+      ev: e.ev,
+      temEstimativa,
+    });
+    setErroMultipla(res.erro ?? null);
+    setMontando(res.pernas);
+  };
   const [copiado, setCopiado] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
   const [daLista, setDaLista] = useState<{ e: EscolhaEntrada; aviso?: string } | null>(null);
@@ -216,6 +249,8 @@ export function AbaAnalise({
       <MelhoresEntradas
         d={d}
         registradas={new Set(apostas.map(chaveDaAposta))}
+        naMultipla={naMultipla}
+        onMultipla={adicionarPerna}
         dataErrada={
           dataCerta > r.jogo.data
             ? { atual: r.jogo.data, certa: dataCerta, corrigir: corrigirData }
@@ -227,6 +262,23 @@ export function AbaAnalise({
             ? `Você já tem ${apostas.length} aposta${apostas.length > 1 ? 's' : ''} neste jogo: apostas do mesmo jogo costumam ganhar ou perder juntas, então o risco aumenta.`
             : undefined;
           setDaLista({ e, aviso: [aviso, outras].filter(Boolean).join(' ') || undefined });
+        }}
+      />
+      <MontarMultipla
+        pernas={montando}
+        erro={erroMultipla}
+        bloqueio={d.entradas?.bloqueio}
+        onRemover={(i) => {
+          setErroMultipla(null);
+          setMontando(montando.filter((_, j) => j !== i));
+        }}
+        onLimpar={() => {
+          setErroMultipla(null);
+          setMontando([]);
+        }}
+        onRegistrar={(m) => {
+          setErroMultipla(null);
+          onRegistrarMultipla(m);
         }}
       />
       {daLista && (

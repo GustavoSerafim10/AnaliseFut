@@ -38,6 +38,15 @@ import {
   travasDoHistorico,
   type EntradaHistorico,
 } from './historico';
+import {
+  apostasDeMultiplas,
+  carregarMontando,
+  carregarMultiplas,
+  gravarMontando,
+  gravarMultiplas,
+  type Multipla,
+  type PernaMultipla,
+} from './multiplas';
 
 type Aba =
   | {
@@ -71,11 +80,24 @@ export function App() {
     location.hash = hash;
     location.reload();
   };
+  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(avisoDoBanco);
   const [historico, setHistoricoState] = useState<EntradaHistorico[]>(carregarHistorico);
   const [bancaInicial, setBancaInicialState] = useState<number | null>(carregarBancaInicial);
   const setBancaInicial = (v: number | null) => {
     setBancaInicialState(v);
     gravarBancaInicial(v);
+  };
+  const [multiplas, setMultiplasState] = useState<Multipla[]>(carregarMultiplas);
+  const [montando, setMontandoState] = useState<PernaMultipla[]>(carregarMontando);
+  const setMultiplas = (l: Multipla[]) => {
+    setMultiplasState(l);
+    setAvisoHistorico(
+      gravarMultiplas(l) ? null : 'Não consegui gravar a múltipla neste aparelho: exporte o backup.',
+    );
+  };
+  const setMontando = (l: PernaMultipla[]) => {
+    setMontandoState(l);
+    gravarMontando(l);
   };
   // travas da banca (V4.0 seção 6) pelas apostas registradas, sem contar a análise aberta
   const travas = useMemo(
@@ -84,12 +106,13 @@ export function App() {
         ? travasDoHistorico(
             historico.filter((e) => e.id !== r.idHistorico),
             bancaInicial,
+            undefined,
+            apostasDeMultiplas(multiplas, historico),
           )
         : undefined,
-    [historico, bancaInicial, r.idHistorico],
+    [historico, bancaInicial, r.idHistorico, multiplas],
   );
   const d = useMemo(() => derivar(r, travas), [r, travas]);
-  const [avisoHistorico, setAvisoHistorico] = useState<string | null>(avisoDoBanco);
   useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);
@@ -383,6 +406,16 @@ export function App() {
             onEntrar={salvarAnalise}
             salvoNoHistorico={!!historico.find((e) => e.id === r.idHistorico)}
             apostas={apostasDoJogo(historico, r.idHistorico)}
+            montando={montando}
+            setMontando={setMontando}
+            onRegistrarMultipla={(m) => {
+              if (demo) {
+                alert('Isto é só o jogo de exemplo: nada é salvo no histórico.');
+                return;
+              }
+              setMultiplas([m, ...multiplas]);
+              setMontando([]);
+            }}
           />
         )}
         {aba.id === 'historico' && (
@@ -393,6 +426,8 @@ export function App() {
             bancaInicial={bancaInicial}
             setBancaInicial={setBancaInicial}
             travas={travas ?? null}
+            multiplas={multiplas}
+            setMultiplas={setMultiplas}
             rascunhoAtual={r}
             restaurarRascunho={(x) => {
               if (r.jogo.casa || r.jogo.fora) return false;

@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { FormAposta } from '../componentes/FormAposta';
+import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
+import { juntarMultiplas, type Multipla } from '../multiplas';
 import { CartoesPainel, CurvaUnidades, PlacarDeAcerto } from '../componentes/PainelHistorico';
 import {
   apurar,
@@ -73,6 +75,8 @@ interface Props {
   bancaInicial: number | null;
   setBancaInicial: (v: number | null) => void;
   travas: TravasBanca | null;
+  multiplas?: Multipla[];
+  setMultiplas?: (l: Multipla[]) => void;
   rascunhoAtual: Rascunho;
   /** false = já há uma análise aberta: ela fica */
   restaurarRascunho: (r: Rascunho) => boolean;
@@ -271,6 +275,8 @@ export function AbaHistorico({
   bancaInicial,
   setBancaInicial,
   travas,
+  multiplas = [],
+  setMultiplas = () => undefined,
   rascunhoAtual,
   restaurarRascunho,
 }: Props) {
@@ -311,6 +317,7 @@ export function AbaHistorico({
           banca: bancaInicial,
           rascunho: rascunhoAtual,
           ...identidadesSalvas(),
+          multiplas,
         }),
       ],
       { type: 'application/json' },
@@ -336,6 +343,10 @@ export function AbaHistorico({
       setBancaInicial(x.banca);
       veio.push('banca');
     }
+    if (x.multiplas?.length) {
+      setMultiplas(juntarMultiplas(multiplas, x.multiplas));
+      veio.push('múltiplas');
+    }
     if (x.cores || x.escudos) {
       juntarIdentidades(x);
       veio.push('cores e escudos');
@@ -356,6 +367,11 @@ export function AbaHistorico({
       </p>
 
       <PlacarDeAcerto p={placarAcerto(historico)} />
+      <PainelMultiplas
+        multiplas={multiplas}
+        historico={historico}
+        onApagar={(id) => setMultiplas(multiplas.filter((m) => m.id !== id))}
+      />
 
       <div className="abas-mini">
         {(Object.keys(FILTROS) as FiltroPainel[]).map((f) => (
