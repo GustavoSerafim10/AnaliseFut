@@ -4832,3 +4832,12 @@ button.cl-linha:hover {
     width: 100%;
   }
 }
+
+.escolher-aposta {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0;
+}
+.escolher-aposta select {
+  width: 100%;
+}

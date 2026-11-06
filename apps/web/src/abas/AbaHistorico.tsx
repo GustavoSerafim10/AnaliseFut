@@ -3,12 +3,13 @@ import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } f
 import { useEffect, useState } from 'react';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
-import { FormAposta } from '../componentes/FormAposta';
+import { EscolherAposta } from '../componentes/EscolherAposta';
 import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { juntarMultiplas, type Multipla } from '../multiplas';
 import { CartoesPainel, CurvaUnidades, PlacarDeAcerto } from '../componentes/PainelHistorico';
 import {
+  apostasDoJogo,
   apurar,
   apurarAuto,
   balanco,
@@ -24,6 +25,7 @@ import {
   minhasEntradas,
   painel,
   placarAcerto,
+  registrarAposta,
   registrarResultado,
   situacao,
   temPlacar,
@@ -587,23 +589,27 @@ export function AbaHistorico({
                   desfazer
                 </button>
               </p>
+            ) : null}
+            {entrandoEm === e.id ? (
+              <EscolherAposta
+                e={e}
+                registradas={apostasDoJogo(historico, e.irmaDe ?? e.id)}
+                onCancelar={() => setEntrandoEm(null)}
+                onConfirmar={(aposta, r, d) => {
+                  const { lista } = registrarAposta(
+                    historico,
+                    { ...r, idHistorico: e.irmaDe ?? e.id },
+                    d,
+                    aposta,
+                  );
+                  setHistorico(lista);
+                  setEntrandoEm(null);
+                }}
+              />
             ) : (
-              ent &&
-              (entrandoEm === e.id ? (
-                <FormAposta
-                  entrada={ent}
-                  decisao={e.resumo.decisao}
-                  onCancelar={() => setEntrandoEm(null)}
-                  onConfirmar={(aposta) => {
-                    mudar(e.id, { aposta });
-                    setEntrandoEm(null);
-                  }}
-                />
-              ) : (
-                <button className="mini" onClick={() => setEntrandoEm(e.id)}>
-                  ✅ Entrei nessa aposta
-                </button>
-              ))
+              <button className="mini" onClick={() => setEntrandoEm(e.id)}>
+                {e.aposta ? '+ Outra aposta neste jogo' : '✅ Entrei em uma aposta deste jogo'}
+              </button>
             )}
             {ap && !ap.ok && <div className="caixa alerta">Apuração: {ap.falta}</div>}
             {ent && !auto?.ok && (

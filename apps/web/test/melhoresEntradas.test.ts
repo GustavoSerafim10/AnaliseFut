@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { EscolherAposta, rascunhoRelido } from '../src/componentes/EscolherAposta';
 import { MelhoresEntradas } from '../src/componentes/MelhoresEntradas';
 import { PlacarDeAcerto } from '../src/componentes/PainelHistorico';
 import { derivar, type Derivado } from '../src/dados';
@@ -180,6 +181,54 @@ describe('salvar no histórico', () => {
   });
   it('jogo novo vem com "Liga bem coberta" desmarcada', () => {
     expect(rascunhoNovo().config.ligaTop).toBe(false);
+  });
+});
+
+describe('entrar em uma aposta pelo Histórico', () => {
+  it('oferece as apostas lidas, relendo os prints, e registra a escolhida', () => {
+    const comPrint: Rascunho = {
+      ...r,
+      idHistorico: 'x',
+      // a odd guardada veio de um leitor antigo; o print diz 1.60
+      odds: [{ ...r.odds[0], odd: 9, fonte: 'ocr' }],
+      prints: {
+        'odds:1win': [
+          { nome: 'p.png', texto: 'Total\nmais de 1.5 1,60 menos de 1.5 2,30', capturadoEm: '' },
+        ],
+      },
+    } as unknown as Rascunho;
+    const relido = rascunhoRelido(comPrint);
+    const d = derivar(relido);
+    const over = d.opcoes.find((o) => o.linha.lado === 'over')!;
+    expect(over.odd).toBe(1.6);
+    const { lista } = salvarNoHistorico([], comPrint, derivar(comPrint));
+    const html = renderToString(
+      createElement(EscolherAposta, {
+        e: lista[0],
+        registradas: [],
+        onConfirmar: () => undefined,
+        onCancelar: () => undefined,
+      }),
+    );
+    expect(html).toContain('Em qual aposta você entrou?');
+    expect(html).toContain('sair mais de 1,5 gols');
+    const aposta = {
+      odd: 1.6,
+      casa: '1win',
+      feitaEm: '2099-10-26T10:00:00-03:00',
+      entrada: {
+        linha: over.linha as (typeof r.odds)[number],
+        descricao: 'sair mais de 1,5 gols.',
+        odd: 1.6,
+        casa: '1win',
+        ev: 0,
+        pFinal: 0.7,
+      },
+    };
+    const fim = registrarAposta(lista, relido, d, aposta).lista;
+    expect(fim).toHaveLength(1);
+    expect(fim[0].resumo.entrada?.descricao).toBe('sair mais de 1,5 gols.');
+    expect(fim[0].aposta?.odd).toBe(1.6);
   });
 });
 
