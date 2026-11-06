@@ -78,6 +78,14 @@ const TITULO_COM_INFO = /[A-Za-zÀ-ú]{3,}.*\s(?:[({][^)}]{0,2}[)}]?|[O©®])$/;
 /** "Toulouse FC 211": odd com a vírgula perdida no fim de um rótulo; não é título de mercado */
 const ODD_SEM_SEPARADOR = /[A-Za-zÀ-ú)]\s\d{3}$/;
 
+/**
+ * Aba da casa no topo do print ("CRIAR APOSTA ESCANTEIOS", "CARTÕES"): não é título de mercado. Com
+ * o print cortado, a primeira linha é de um mercado cujo título ficou no print anterior: lida como
+ * "escanteios" sem time, "Coventry mais de 3.5 @ 1.65" virou total do jogo com EV falso de 12,9%.
+ */
+const ABA_DA_CASA =
+  /^(CRIAR APOSTA\s*)?(MERCADOS PRINCIPAIS|ESCANTEIOS|CART(Õ|O)ES|ESPECIAIS|COMBOS|JOGADORES|ESTAT(Í|I)STICAS|N(Ú|U)MERO DE GOLS|RESULTADO|QUEM MARCAR(Á|A) GOLS\??)$/;
+
 const CONFIANCA_OCR = 0.6;
 const CONFIANCA_CORRIGIDA = 0.45;
 
@@ -384,6 +392,12 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
   for (const bruta of linhasTexto) {
     if (ehBarraDeAbas(bruta)) continue;
+    if (ABA_DA_CASA.test(bruta)) {
+      mercado = null;
+      colunas = null;
+      rotulosPendentes = null;
+      continue;
+    }
 
     const oddSemSeparador = !!mercado && ODD_SEM_SEPARADOR.test(bruta);
     if (!temNumeroDecimal(bruta) && !/^[\d\s.]+$/.test(bruta) && !oddSemSeparador) {

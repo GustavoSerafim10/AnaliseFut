@@ -46,7 +46,7 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [/total.*cart(ao|oes) amarelos?|cart(ao|oes) amarelos?.*total/, 'cartoes_total'],
   [/cart(ao|oes)|amarelo/, 'outro'],
   [/primeiro escanteio|1o escanteio|primeiro canto/, 'primeiro_escanteio'],
-  [/(escanteios?|cantos?) (impar|par)\b/, 'outro'],
+  [/(escanteios?|cantos?) (impar|par)\b|escala de escanteios/, 'outro'],
   [/handicap de escanteios|escanteios?.*handicap|cantos?.*handicap/, 'escanteios_ah'],
   [/(escanteios?|cantos?).*(resultado|1 ?x ?2)|corners?.*result/, 'escanteios_1x2'],
   [/(escanteios?|cantos?)[. ]*(total|mais\/menos|over)?/, 'escanteios_total'],
