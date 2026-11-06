@@ -72,6 +72,12 @@ const ORDEM_PADRAO: Partial<Record<TipoMercado, string[]>> = {
  */
 const TITULO_COM_SETA = /[A-Za-zÀ-ú]{3,}.*\s[Aa~^»=—–-]$/;
 
+/** título com o ícone de informação no fim, lido como "(3)", "(O)", "O" ou "®" (CasaDeApostas) */
+const TITULO_COM_INFO = /[A-Za-zÀ-ú]{3,}.*\s(?:[({][^)}]{0,2}[)}]?|[O©®])$/;
+
+/** "Toulouse FC 211": odd com a vírgula perdida no fim de um rótulo; não é título de mercado */
+const ODD_SEM_SEPARADOR = /[A-Za-zÀ-ú)]\s\d{3}$/;
+
 const CONFIANCA_OCR = 0.6;
 const CONFIANCA_CORRIGIDA = 0.45;
 
@@ -92,6 +98,12 @@ export function normalizar1win(texto: string): string {
           return `${lado[0].toUpperCase()}${lado.slice(1).toLowerCase()} De ${v}`;
         },
       )
+      // CasaDeApostas: "{-1.5)" é "(-1.5)"; "mals de 9.5" é "mais de 9.5"
+      .replace(/\{(?=[+-]\d)/g, '(')
+      .replace(/\bmals\b/gi, 'mais')
+      // "Mais De 1.5 1177 Menos De 1.5": a vírgula da odd virou dígito; sem isto o 1.5 do lado de
+      // lá era tomado pela odd. A casa mostra 2 casas decimais
+      .replace(/\b(De \d+\.\d) (\d)(\d{2})\d(?=\s|$)/g, '$1 $2.$3')
       // "+05" / "-05": linha de handicap com o ponto perdido (com sinal e zero à esquerda,
       // só pode ser ±0.5; odd nunca tem sinal)
       .replace(/(^|[\s,])([+-])0(\d)(?![\d.,])/gm, '$1$20.$3')
@@ -268,6 +280,8 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
       return comoLado(reconhecerTime(rotulo, jogo));
     }
     case 'vencer_sem_sofrer': {
+      const simNao = ctx.time ? ladoSimNao(rotulo) : null;
+      if (simNao) return { lado: simNao, time: ctx.time };
       const time = reconhecerTime(rotulo, jogo);
       return time ? { lado: 'sim', time } : null;
     }
@@ -371,7 +385,8 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   for (const bruta of linhasTexto) {
     if (ehBarraDeAbas(bruta)) continue;
 
-    if (!temNumeroDecimal(bruta) && !/^[\d\s.]+$/.test(bruta)) {
+    const oddSemSeparador = !!mercado && ODD_SEM_SEPARADOR.test(bruta);
+    if (!temNumeroDecimal(bruta) && !/^[\d\s.]+$/.test(bruta) && !oddSemSeparador) {
       const t = semAcento(bruta);
       // cabeçalho de tabela "Abaixo De | Acima De" / "Menos | Mais" — só essas palavras
       // ("Gols Mais/Menos" é título de mercado, não cabeçalho)
@@ -388,7 +403,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         mercado = titulo;
         colunas = null;
         rotulosPendentes = null;
-      } else if (TITULO_COM_SETA.test(bruta)) {
+      } else if (TITULO_COM_SETA.test(bruta) || TITULO_COM_INFO.test(bruta)) {
         // título que o motor não conhece: as odds dele não podem cair no mercado de cima
         // ("Vencer Ambos Os Tempos" depois do primeiro gol: "Atlético Mineiro 8.0" virava 1º gol @ 8)
         mercado = { mercado: 'outro', periodo: 'FT' };
@@ -562,7 +577,11 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
       if (precisaLinha && linha === undefined && rotulo.length > 0) {
         // "AcimaDed.5 1.6": a linha grudou no rótulo e saiu ilegível; nas colunas
         // Menos | Mais a fileira tem uma linha só, a do lado de lá
-        if (linhaDaFileira !== undefined && /^(abaixo|acima)de\S*\d/i.test(rotulo.join('')))
+        // "menosdedb 1.24" (CasaDeApostas): idem, sem nenhum dígito legível
+        if (
+          linhaDaFileira !== undefined &&
+          /^(abaixo|acima)de\S*\d|^(abaixo|acima|menos|mais)de\S+$/i.test(rotulo.join(''))
+        )
           linha = linhaDaFileira;
         else {
           linha = n;

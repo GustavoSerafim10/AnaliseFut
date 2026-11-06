@@ -16,6 +16,7 @@ import type { Derivado } from '../dados';
 const sem = (s: string) => s.replace('Ganha se: ', '');
 const dec = (x: number) => x.toFixed(2).replace('.', ',');
 const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
+const dataBr = (iso: string) => iso.split('-').reverse().join('/');
 const faixa = `${dec(ODD_MIN_ENTRADA)} a ${dec(ODD_MAX_ENTRADA)}`;
 
 const MENSAGEM: Record<Exclude<StatusEntradas, 'ok'>, string> = {
@@ -86,9 +87,12 @@ function Cartao({
 export function MelhoresEntradas({
   d,
   registradas,
+  dataErrada,
   onEntrar,
 }: {
   d: Derivado;
+  /** o jogo está cadastrado num dia anterior ao dos prints ou ao de hoje */
+  dataErrada?: { atual: string; certa: string; corrigir: () => void };
   /** apostas já registradas neste jogo: o mesmo mercado não entra duas vezes */
   registradas: Set<string>;
   onEntrar: (e: EscolhaEntrada, aviso?: string) => void;
@@ -119,7 +123,22 @@ export function MelhoresEntradas({
           Preencha o jogo e cole as odds e as estatísticas para ver as entradas.
         </p>
       )}
-      {r && r.status !== 'ok' && <p className="entradas-vazio">{MENSAGEM[r.status]}</p>}
+      {r?.status === 'jogo_iniciado' && dataErrada ? (
+        <div className="caixa alerta">
+          <p>
+            <strong>
+              O jogo está cadastrado para {dataBr(dataErrada.atual)}, mas o certo parece ser{' '}
+              {dataBr(dataErrada.certa)}.
+            </strong>{' '}
+            Por isso o site acha que ele já começou.
+          </p>
+          <button className="primario" onClick={dataErrada.corrigir}>
+            Corrigir a data para {dataBr(dataErrada.certa)}
+          </button>
+        </div>
+      ) : (
+        r && r.status !== 'ok' && <p className="entradas-vazio">{MENSAGEM[r.status]}</p>
+      )}
       {r?.bloqueio && r.entradas.length > 0 && (
         <div className="caixa alerta">
           <strong>Não aposte agora:</strong> {r.bloqueio}. Se você já apostou, registre abaixo para
@@ -172,35 +191,38 @@ export function MelhoresEntradas({
         </>
       )}
       {livres.length > 0 && (
-        <div className="entrada-escolher">
-          <label>
-            Entrou em outra aposta? Escolha qualquer mercado lido, mesmo com NO BET
-            <select value={escolhida} onChange={(x) => setEscolhida(x.target.value)}>
-              <option value="">Selecione a aposta</option>
-              {livres.map((o) => (
-                <option key={o.chave} value={o.chave}>
-                  {sem(o.descricao)} @ {dec(o.odd)} · {o.casa}
-                  {o.temEstimativa && ` · chance ${Math.round(o.chance * 100)}%`}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="entrada-botao"
-            disabled={!opcao}
-            onClick={() => {
-              if (!opcao) return;
-              const naLista = r?.entradas.find(
-                (x) => x.chave === opcao.selecao && x.casa === opcao.casa && x.odd === opcao.odd,
-              );
-              if (naLista) onEntrar(naLista, avisoBanca);
-              else onEntrar(opcao, avisoDaOpcao(opcao));
-              setEscolhida('');
-            }}
-          >
-            Entrei nessa
-          </button>
-        </div>
+        <details className="entrada-outra">
+          <summary>Entrei em outra aposta, fora da lista</summary>
+          <div className="entrada-escolher">
+            <label>
+              Escolha qualquer mercado lido, mesmo com NO BET
+              <select value={escolhida} onChange={(x) => setEscolhida(x.target.value)}>
+                <option value="">Selecione a aposta</option>
+                {livres.map((o) => (
+                  <option key={o.chave} value={o.chave}>
+                    {sem(o.descricao)} @ {dec(o.odd)} · {o.casa}
+                    {o.temEstimativa && ` · chance ${Math.round(o.chance * 100)}%`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="entrada-botao"
+              disabled={!opcao}
+              onClick={() => {
+                if (!opcao) return;
+                const naLista = r?.entradas.find(
+                  (x) => x.chave === opcao.selecao && x.casa === opcao.casa && x.odd === opcao.odd,
+                );
+                if (naLista) onEntrar(naLista, avisoBanca);
+                else onEntrar(opcao, avisoDaOpcao(opcao));
+                setEscolhida('');
+              }}
+            >
+              Entrei nessa
+            </button>
+          </div>
+        </details>
       )}
     </section>
   );

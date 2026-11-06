@@ -198,6 +198,18 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
           <p className="miudo">O que você corrigiu à mão não muda.</p>
         </div>
       )}
+      {defasadas === 0 && (r.prints[grupo] ?? []).length > 0 && (
+        <p className="miudo">
+          O leitor melhorou ou faltou alguma odd?{' '}
+          <button
+            className="discreto mini"
+            onClick={() => setR((x) => comPrints(x, x.prints[grupo] ?? []))}
+          >
+            Reler os prints
+          </button>{' '}
+          sem colar de novo. O que você corrigiu à mão não muda.
+        </p>
+      )}
       {leitura.avisos
         .filter((a) => !a.startsWith('horário'))
         // com odds de outros prints, "nenhuma odd" é só um print sem mercado com modelo: a lista

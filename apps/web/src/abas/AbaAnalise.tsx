@@ -5,7 +5,7 @@ import {
   type Relatorio,
   type ResultadoAnalise,
 } from '@pe/engine';
-import { CAMPOS_STATS, DEF_CAMPO, type CampoStat } from '@pe/parsers';
+import { CAMPOS_STATS, DEF_CAMPO, dataDoPrint, type CampoStat } from '@pe/parsers';
 import type { OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { montarPromptClaude } from '../claude';
@@ -18,7 +18,15 @@ import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
 import { MelhoresEntradas, type EscolhaEntrada } from '../componentes/MelhoresEntradas';
 import { PainelV4 } from '../componentes/PainelV4';
-import { dec, num, pct, ROTULO_DESFALQUE, type NivelDesfalque, type Rascunho } from '../estado';
+import {
+  dec,
+  isoLocal,
+  num,
+  pct,
+  ROTULO_DESFALQUE,
+  type NivelDesfalque,
+  type Rascunho,
+} from '../estado';
 import type { Derivado } from '../dados';
 import {
   chaveDaAposta,
@@ -124,6 +132,25 @@ export function AbaAnalise({
   const [salvo, setSalvo] = useState(false);
   const res = d.resultado;
   const rel = d.relatorio;
+  // data certa do jogo: a escrita nos prints da casa; sem ela, hoje
+  const dataCerta =
+    Object.entries(r.prints)
+      .filter(([g]) => g.startsWith('odds:'))
+      .flatMap(([, ls]) => ls.map((l) => dataDoPrint(l.texto)))
+      .filter((x): x is string => !!x)
+      .sort()
+      .at(-1) ?? isoLocal(new Date()).slice(0, 10);
+  const corrigirData = () =>
+    setR((x) => ({
+      ...x,
+      jogo: { ...x.jogo, data: dataCerta },
+      // as odds já lidas foram coletadas no dia certo, não no dia errado do cadastro
+      odds: x.odds.map((l) =>
+        l.horarioColeta?.startsWith(x.jogo.data)
+          ? { ...l, horarioColeta: dataCerta + l.horarioColeta.slice(x.jogo.data.length) }
+          : l,
+      ),
+    }));
   const nome = (t: 'casa' | 'fora') => r.jogo[t] || (t === 'casa' ? 'Mandante' : 'Visitante');
 
   const corrigir = (campo: CampoStat, time: 'casa' | 'fora', valor: string) =>
@@ -189,6 +216,11 @@ export function AbaAnalise({
       <MelhoresEntradas
         d={d}
         registradas={new Set(apostas.map(chaveDaAposta))}
+        dataErrada={
+          dataCerta > r.jogo.data
+            ? { atual: r.jogo.data, certa: dataCerta, corrigir: corrigirData }
+            : undefined
+        }
         onEntrar={(e, aviso) => {
           setEntrando(false);
           const outras = apostas.length

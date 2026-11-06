@@ -16,10 +16,18 @@ function dataDoCabecalho(t: string): { data: string; hora?: string } | null {
     /(\d{1,2}) de (jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\w*\.? de (20\d{2})(?:,? *(\d{2}:\d{2}))?/.exec(
       t,
     );
-  if (!m) return null;
+  if (!m) {
+    // "06/11/26" sozinho na linha, abaixo da hora do jogo (CasaDeApostas)
+    const curta = /(?:^|\n)\D{0,3}(\d{2})\/(\d{2})\/(\d{2})\D{0,3}(?:\n|$)/.exec(t);
+    return curta ? { data: `20${curta[3]}-${curta[2]}-${curta[1]}` } : null;
+  }
   const mes = String(MESES.indexOf(m[2]) + 1).padStart(2, '0');
   return { data: `${m[3]}-${mes}-${m[1].padStart(2, '0')}`, hora: m[4] };
 }
+
+/** Data do jogo escrita no print da casa, ou null. */
+export const dataDoPrint = (texto: string): string | null =>
+  dataDoCabecalho(semAcento(texto))?.data ?? null;
 
 /** Nomes da fileira do resultado: "Milão 1.32 Empate 5.4 Ferencváros 9.6" ou só os rótulos. */
 function timesDaFileira(linhas: string[]): [string, string] | null {

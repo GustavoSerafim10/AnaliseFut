@@ -4740,3 +4740,12 @@ button.cl-linha:hover {
   color: var(--ok);
   font-weight: 600;
 }
+
+.entrada-outra {
+  margin-top: 8px;
+}
+.entrada-outra > summary {
+  color: var(--suave);
+  cursor: pointer;
+  font-size: 14px;
+}

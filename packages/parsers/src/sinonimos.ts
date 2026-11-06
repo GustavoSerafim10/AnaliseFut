@@ -24,7 +24,8 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
     // "Resultado + total" e o handicap europeu de 3 vias ("Resultado com handicap")
     // 99Play: "Handicap 1×2" (3 vias, "Começa 0:2"), "Botafogo SP devolve aposta" (é dupla chance
     // com devolução, não o empate anula), "Qual equipe vai marcar", "Botafogo SP para marcar"
-    /handicap 1 ?[x×] ?2|(?<!empate )devolve aposta|qual equipe|para marcar|^\S* ?marcador\b|vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
+    // CasaDeApostas: "Handicap 0:1" (3 vias), "<time> para vencer um dos tempos", "<time> sem sofrer gols"
+    /handicap \d ?: ?\d|vencer (em )?(ambos|um)( dos| os)? tempos|(?<!vencer )sem sofrer|handicap 1 ?[x×] ?2|(?<!empate )devolve aposta|qual equipe|para marcar|^\S* ?marcador\b|vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
     'outro',
   ],
   // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -
@@ -45,12 +46,13 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   [/total.*cart(ao|oes) amarelos?|cart(ao|oes) amarelos?.*total/, 'cartoes_total'],
   [/cart(ao|oes)|amarelo/, 'outro'],
   [/primeiro escanteio|1o escanteio|primeiro canto/, 'primeiro_escanteio'],
+  [/(escanteios?|cantos?) (impar|par)\b/, 'outro'],
   [/handicap de escanteios|escanteios?.*handicap|cantos?.*handicap/, 'escanteios_ah'],
-  [/escanteios?.*resultado|cantos?.*resultado|corners?.*result/, 'escanteios_1x2'],
+  [/(escanteios?|cantos?).*(resultado|1 ?x ?2)|corners?.*result/, 'escanteios_1x2'],
   [/(escanteios?|cantos?)[. ]*(total|mais\/menos|over)?/, 'escanteios_total'],
   [/chutes|finalizac|impediment|laterais|tiros de meta/, 'outro'],
   [/resultado correto|placar (exato|correto)|resultado exato/, 'placar_exato'],
-  [/intervalo ?\/ ?final|intervalo final|ht ?\/ ?ft/, 'intervalo_final'],
+  [/intervalo ?[/f]+ ?final|intervalo final|ht ?\/ ?ft/, 'intervalo_final'],
   [/dupla (chance|hipotese)|(chance|hipotese) dupla|double chance/, 'DC'],
   [/empate anula|empate devolve|draw no bet|\bdnb\b/, 'DNB'],
   [
@@ -59,7 +61,7 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   ],
   [/marcar em ambos os tempos/, 'marcar_2_tempos'],
   [/vencer sem sofrer/, 'vencer_sem_sofrer'],
-  [/primeiro gol|marcar o primeiro|marca primeiro/, 'primeiro_gol'],
+  [/primeiro gol|proximo gol|marcar o primeiro|marca primeiro/, 'primeiro_gol'],
   [/ultimo gol|marcar o ultimo/, 'ultimo_gol'],
   [/handicap europeu|handicap 3/, 'AH_europeu'],
   [/handicap( asiatico)?/, 'AH'],
@@ -148,7 +150,13 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
     if (sobra) return { mercado: 'outro', periodo };
   }
   for (const [re, mercado] of SINONIMOS_MERCADO) {
-    if (re.test(t)) return { mercado, periodo };
+    if (!re.test(t)) continue;
+    // CasaDeApostas: "Toulouse FC Vencer sem sofrer gols", com os lados "sim" e "não"
+    const time =
+      mercado === 'vencer_sem_sofrer'
+        ? reconhecerTime(t.replace(/vencer sem sofrer.*/, ' '), jogo)
+        : null;
+    return time ? { mercado, periodo, time } : { mercado, periodo };
   }
   return null;
 }

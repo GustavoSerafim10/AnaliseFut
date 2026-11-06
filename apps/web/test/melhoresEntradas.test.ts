@@ -211,6 +211,20 @@ describe('tela', () => {
       'Faltam as estatísticas',
     );
   });
+  it('jogo com a data errada oferece corrigir, em vez de só dizer que começou', () => {
+    const html = renderToString(
+      createElement(MelhoresEntradas, {
+        d: { opcoes: [], entradas: { ...base, status: 'jogo_iniciado' } } as unknown as Derivado,
+        registradas: new Set<string>(),
+        dataErrada: { atual: '2026-11-05', certa: '2026-11-06', corrigir: () => undefined },
+        onEntrar: () => undefined,
+      }),
+    );
+    const texto = html.replace(/<!-- -->/g, '');
+    expect(texto).toContain('cadastrado para 05/11/2026');
+    expect(texto).toContain('Corrigir a data para 06/11/2026');
+    expect(html).not.toContain('O jogo já começou');
+  });
   it('aposta já registrada sai do seletor', () => {
     const k = lidas[0].chave;
     const html = renderToString(

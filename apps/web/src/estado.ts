@@ -127,7 +127,11 @@ export function carregarRascunho(): Rascunho {
     if (s) {
       const salvo = JSON.parse(s) as Partial<Rascunho>;
       const novo = rascunhoNovo();
-      return { ...novo, ...salvo, config: { ...novo.config, ...salvo.config } };
+      const junto = { ...novo, ...salvo, config: { ...novo.config, ...salvo.config } };
+      // rascunho vazio de ontem: sem isto, o jogo de hoje nasce com a data de ontem e parece iniciado
+      return junto.jogo.casa || junto.jogo.fora
+        ? junto
+        : { ...junto, jogo: { ...junto.jogo, data: novo.jogo.data } };
     }
   } catch {
     /* sem storage (aba privada etc.): começa vazio */
