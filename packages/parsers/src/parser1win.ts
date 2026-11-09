@@ -87,7 +87,8 @@ const ABA_DA_CASA =
   /^(CRIAR APOSTA\s*)?(MERCADOS PRINCIPAIS|ESCANTEIOS|CART(Õ|O)ES|ESPECIAIS|COMBOS|JOGADORES|ESTAT(Í|I)STICAS|N(Ú|U)MERO DE GOLS|RESULTADO|QUEM MARCAR(Á|A) GOLS\??)$/;
 
 /** Quadro "Dicas da partida" da PlayOn: repete odds soltas, fora de qualquer mercado. */
-const DICAS_DA_CASA = /^dicas? da partida|\bindica \d+%/i;
+const DICAS_DA_CASA = /\bindica \d+%/i;
+const ABRE_DICAS = /^dicas? da partida/i;
 
 /** Linha de gols sem a vírgula ("05", "15", "275"; escanteios: "95", "105"). */
 function linhaSemPonto(tok: string, mercado: TipoMercado): number {
@@ -120,12 +121,17 @@ export function normalizar1win(texto: string): string {
       // CasaDeApostas: "{-1.5)" é "(-1.5)"; "mals de 9.5" é "mais de 9.5"
       .replace(/\{(?=[+-]\d)/g, '(')
       .replace(/\bmals\b/gi, 'mais')
+      // PlayOn: erros do OCR nas palavras dos botões e nos títulos
+      .replace(/\bmenor\b/gi, 'Menos')
+      .replace(/\bnan\b/gi, 'Não')
+      .replace(/escantel/gi, 'escantei')
       // "Mais De 1.5 1177 Menos De 1.5": a vírgula da odd virou dígito; sem isto o 1.5 do lado de
       // lá era tomado pela odd. A casa mostra 2 casas decimais
       .replace(/\b(De \d+\.\d) (\d)(\d{2})\d(?=\s|$)/g, '$1 $2.$3')
       // "+05" / "-05": linha de handicap com o ponto perdido (com sinal e zero à esquerda,
       // só pode ser ±0.5; odd nunca tem sinal)
-      .replace(/(^|[\s,])([+-])0(\d)(?![\d.,])/gm, '$1$20.$3')
+      // PlayOn: "1+075", com o número do time colado
+      .replace(/(^|[\s,])([12]?)([+-])0(\d{1,2})(?![\d.,])/gm, '$1$2$30.$4')
       // "CR Flamengo O 1.03" → "CR Flamengo 0 1.03"
       .replace(/([ \t])[Oo](?=[ \t]+\d)/g, '$10')
       // "Atlético-MG1 1.49" → "Atlético-MG 1 1.49"
@@ -235,7 +241,7 @@ function ladoResultado(rotulo: string, jogo: NomesTimes, comEmpate: boolean): st
   if (comEmpate && /^(x|empate|draw)$/.test(r)) return 'X';
   if (/^(casa|mandante)$/.test(r)) return '1';
   if (/^(fora|visitante)$/.test(r)) return '2';
-  const t = reconhecerTime(r, jogo);
+  const t = reconhecerTime(r, jogo, true);
   return t === 'casa' ? '1' : t === 'fora' ? '2' : null;
 }
 
@@ -268,7 +274,7 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
         ? 'casa'
         : /^(2|v2)$/.test(r)
           ? 'fora'
-          : reconhecerTime(rotulo, jogo);
+          : reconhecerTime(rotulo, jogo, true);
       return time ? { lado: time } : null;
     }
     case '1X2':
@@ -299,12 +305,12 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
     case 'ultimo_gol':
     case 'primeiro_escanteio': {
       if (/sem (gol|escanteio)|nenhum/.test(semAcento(rotulo))) return { lado: 'nenhum' };
-      return comoLado(reconhecerTime(rotulo, jogo));
+      return comoLado(reconhecerTime(rotulo, jogo, true));
     }
     case 'vencer_sem_sofrer': {
       const simNao = ctx.time ? ladoSimNao(rotulo) : null;
       if (simNao) return { lado: simNao, time: ctx.time };
-      const time = reconhecerTime(rotulo, jogo);
+      const time = reconhecerTime(rotulo, jogo, true);
       return time ? { lado: 'sim', time } : null;
     }
     default:
@@ -376,6 +382,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   let rotulosPendentes: string | null = null;
   /** linha que vem no título do mercado ("Total de escanteios 9,5") */
   let linhaDoTitulo: number | undefined;
+  let emDicas = false;
   const orfas: string[] = [];
   const lidasPorMercado: ResultadoParser['lidasPorMercado'] = [];
 
@@ -408,6 +415,12 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
   for (const bruta of linhasTexto) {
     if (ehBarraDeAbas(bruta)) continue;
+    if (ABRE_DICAS.test(bruta)) emDicas = true;
+    // o quadro de dicas só termina no primeiro título de mercado de verdade
+    if (emDicas) {
+      if (temNumeroDecimal(bruta) || !detectarTituloMercado(bruta, ctx.jogo)) continue;
+      emDicas = false;
+    }
     if (ABA_DA_CASA.test(bruta) || DICAS_DA_CASA.test(bruta)) {
       mercado = null;
       colunas = null;
@@ -417,13 +430,18 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     }
 
     // PlayOn: o título traz a linha num selo ("Escanteios no 1º tempo (asiático) 4,5")
-    const comSelo = /^(.*[A-Za-zÀ-ú)])\s+(\d+\.\d+)(?:\s+\S{1,2})?$/.exec(bruta);
-    const tituloComSelo = comSelo ? detectarTituloMercado(comSelo[1], ctx.jogo) : null;
+    // sem a vírgula só vale se terminar em 5 ("45", "65") e o quadro não estiver recolhido ("9 Vv")
+    const comSelo = /^(.*[A-Za-zÀ-ú)])\s+(\d+(?:\.\d+)?)(?:\s+(\S{1,2}))?$/.exec(bruta);
+    const seloValido =
+      !!comSelo &&
+      (comSelo[2].includes('.') || (/^\d+5$/.test(comSelo[2]) && !/^v/i.test(comSelo[3] ?? '')));
+    const tituloComSelo =
+      comSelo && seloValido ? detectarTituloMercado(comSelo[1], ctx.jogo) : null;
     if (comSelo && tituloComSelo && COM_LINHA.has(tituloComSelo.mercado)) {
       mercado = tituloComSelo;
       colunas = null;
       rotulosPendentes = null;
-      linhaDoTitulo = Number(comSelo[2]);
+      linhaDoTitulo = linhaSemPonto(comSelo[2], tituloComSelo.mercado);
       continue;
     }
 
@@ -523,6 +541,19 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         if (o && o.odd > 1) emitir({ lado: n === '1' ? 'casa' : 'fora' }, o, Number(l));
       }
       continue;
+    }
+
+    // PlayOn com o rótulo ilegível ("0.25 140.25 1.86 2-0.25 1.80", "1 1H 137 2-1 2.73"): a linha
+    // da coluna da esquerda é a do mandante
+    const ahPelaColuna = /^([+-]?\d+(?:\.\d+)?)\s+1\S*\s+(\S+)\s+2\S*\s+(\S+)$/.exec(bruta);
+    if (ahPelaColuna && HANDICAPS.has(mercado.mercado)) {
+      const L = Number(ahPelaColuna[1]);
+      const [o1, o2] = [lerOdd(ahPelaColuna[2]), lerOdd(ahPelaColuna[3])];
+      if (o1 && o2 && o1.odd > 1 && o2.odd > 1) {
+        emitir({ lado: 'casa' }, o1, L);
+        emitir({ lado: 'fora' }, o2, L === 0 ? 0 : -L);
+        continue;
+      }
     }
 
     // dupla chance com os rótulos cortados pela largura do botão ("Botafogo SP ou er 1.15

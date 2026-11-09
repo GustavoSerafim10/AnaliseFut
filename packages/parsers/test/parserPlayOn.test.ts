@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { lerOddsCasa } from '../src';
+import { juntarLinhas, lerOddsCasa, lerOddsCasaConsenso } from '../src';
 
 // PlayOn, Sabadell × Real Sociedad B (09/11/2026). Texto montado a partir dos prints do celular,
 // com os erros de OCR vistos na tela do site ("0,5" → "05"); as odds foram conferidas nos prints
@@ -66,6 +66,69 @@ describe('PlayOn', () => {
   it('mercado combinado e "não sofre gol" não viram Ambas nem total', () => {
     expect(r.linhas.filter((l) => l.mercado === 'ambas')).toEqual([]);
     expect(r.linhas.some((l) => l.odd === 10.64 || (l.odd === 2.23 && l.linha === undefined))).toBe(
+      false,
+    );
+  });
+});
+
+describe('PlayOn: OCR real, Kristiansund × Valerenga (4 leituras de cada print)', () => {
+  const prints: { texto: string; releituras: string[] }[] = JSON.parse(
+    readFileSync(
+      new URL('./fixtures-reais/playon-kristiansund-releituras.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const ler = (fora: string) =>
+    juntarLinhas(
+      lerOddsCasaConsenso(prints, {
+        jogo: { casa: 'Kristiansund', fora },
+        casa: 'PlayOn',
+        data: '2026-11-09',
+      }).linhas,
+    ).linhas;
+  const de = (ls: ReturnType<typeof ler>, m: string, lado: string, linha?: number, time?: string) =>
+    ls.find(
+      (l) =>
+        l.mercado === m &&
+        l.lado === lado &&
+        l.linha === linha &&
+        l.time === time &&
+        l.periodo === 'FT',
+    )?.odd;
+  for (const fora of ['Valerenga', 'Valarenga'])
+    it(`time digitado "${fora}": o total do jogo não recebe o do time`, () => {
+      const ls = ler(fora);
+      expect(de(ls, 'total', 'over', 1.5)).toBe(1.06);
+      expect(de(ls, 'total', 'under', 1.5)).toBe(6.75);
+      expect(de(ls, 'total', 'over', 5.5)).toBe(5.34);
+      expect(de(ls, 'total_time', 'over', 1.5, 'fora')).toBe(1.58);
+      expect(de(ls, 'total', 'over', 0.5)).toBeUndefined();
+    });
+  it('handicap com o rótulo ilegível', () => {
+    const ls = ler('Valerenga');
+    expect(de(ls, 'AH', 'casa', 0.25)).toBe(1.86);
+    expect(de(ls, 'AH', 'fora', -0.25)).toBe(1.8);
+    expect(de(ls, 'AH', 'casa', 0.75)).toBe(1.53);
+    expect(de(ls, 'AH', 'fora', -0.75)).toBe(2.28);
+    expect(de(ls, 'AH', 'casa', 1)).toBe(1.37);
+    expect(de(ls, 'AH', 'fora', -1)).toBe(2.73);
+  });
+  it('selo sem vírgula e "Escantelos"', () => {
+    const ls = ler('Valerenga');
+    expect(de(ls, 'escanteios_total', 'over', 11.5)).toBe(1.83);
+    expect(de(ls, 'escanteios_total', 'under', 11.5)).toBe(1.83);
+    expect(de(ls, 'escanteios_time', 'over', 4.5, 'casa')).toBe(1.7);
+    expect(de(ls, 'escanteios_time', 'under', 6.5, 'fora')).toBe(1.78);
+  });
+  it('as Dicas e os mercados combinados não geram odd', () => {
+    const ls = ler('Valerenga');
+    expect(
+      ls
+        .filter((l) => l.mercado === 'ambas' && l.periodo === 'FT')
+        .map((l) => l.odd)
+        .sort(),
+    ).toEqual([1.33, 2.94]);
+    expect(ls.some((l) => Number.isFinite(l.linha) && Math.abs(l.linha as number) > 12)).toBe(
       false,
     );
   });

@@ -128,6 +128,7 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
         ' ',
       ),
       jogo,
+      true,
     );
     const cartoes = /cart(ao|oes)|amarelo/.test(t);
     if (time)
@@ -144,6 +145,9 @@ export function detectarTituloMercado(linha: string, jogo: NomesTimes): MercadoD
       };
     // "<nome que não reconheço> total": é total de um time, nunca do jogo. Virar total do jogo já
     // deu EV falso duas vezes ("Milão total" 2.5 @ 1.74/2.08 contra 2.61/1.49 do jogo)
+    // PlayOn: "Total de gols do <time>" nunca é o total do jogo, mesmo sem reconhecer o nome
+    if (/\btotal de gols d[oae]s? (?!jogo|partida|confronto)[a-z]/.test(t))
+      return { mercado: 'outro', periodo };
     const antes = /^(.*)\btota(l|is)\b[^a-z]*(a\b)?[^a-z]*$/.exec(t)?.[1] ?? '';
     const sobra = antes
       .replace(
