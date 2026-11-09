@@ -36,7 +36,8 @@ function timesDaFileira(linhas: string[]): [string, string] | null {
   for (const l of linhas) {
     if (/\b(ou|e)\b|\d:\d/.test(l) || l.split('empate').length !== 2) continue;
     const m = comOdds.exec(l) ?? (/\d/.test(l) ? null : soRotulos.exec(l));
-    if (m) return [m[1], m[2]];
+    // "Casa Empate Fora" (PlayOn) são rótulos, não nomes de times
+    if (m && !/^(casa|mandante)$/.test(m[1])) return [m[1], m[2]];
   }
   return null;
 }

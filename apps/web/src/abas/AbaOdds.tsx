@@ -9,6 +9,7 @@ import {
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
+import { ConferenciaLeitura } from '../componentes/ConferenciaLeitura';
 import { RadarOdds } from '../componentes/RadarOdds';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { FUSO, type Leitura, type Rascunho } from '../estado';
@@ -222,6 +223,12 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
           <p className="miudo">Se alguma for uma odd, adicione à mão abaixo.</p>
         </details>
       )}
+
+      <ConferenciaLeitura
+        a={leitura.auditoria}
+        naoEntendidas={leitura.naoReconhecidas.length}
+        nomes={nomes}
+      />
 
       <RadarOdds linhas={d.oddsValidas} nomes={nomes} />
 

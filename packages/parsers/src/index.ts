@@ -1,6 +1,7 @@
 import { chaveSelecao, type LinhaOdd } from '@pe/engine';
 import type { OddLine } from '@pe/schemas';
 import { detectarCasa, detectarFonte, type FonteDetectada } from './fonte';
+import { checarSanidade } from './sanidade';
 import {
   parse1win,
   parse1winVarios,
@@ -54,6 +55,38 @@ export function lerOddsCasa(textos: string[], ctx: ContextoCasa): ResultadoParse
   return r;
 }
 
+/** O que as leituras dos prints confirmaram e o que precisa ser conferido. */
+export interface AuditoriaLeitura {
+  /** quantas vezes os prints foram lidos */
+  leituras: number;
+  total: number;
+  confirmadas: number;
+  divergentes: { linha: OddLine; valores: { odd: number; votos: number }[] }[];
+  /** entrou na análise, mas só a primeira leitura viu */
+  umaLeitura: OddLine[];
+  /** só uma releitura viu: ficou de fora */
+  descartadas: OddLine[];
+  foraDaAnalise: { linha: OddLine; motivo: string }[];
+  semOutroLado: OddLine[];
+}
+
+/** Sanidade das odds finais: o que sai da análise e o que veio sem o outro lado. */
+function comSanidade(linhas: OddLine[]): Pick<AuditoriaLeitura, 'foraDaAnalise' | 'semOutroLado'> {
+  const problemas = checarSanidade(linhas as LinhaOdd[]);
+  const fora = new Map<number, string>();
+  for (const p of problemas)
+    if (p.nivel === 'erro' && !fora.has(p.indice)) fora.set(p.indice, p.mensagem);
+  const sem = new Set(
+    problemas
+      .filter((p) => p.nivel === 'alerta' && /sem (todos os lados|o outro lado)/.test(p.mensagem))
+      .map((p) => p.indice),
+  );
+  return {
+    foraDaAnalise: [...fora].map(([i, motivo]) => ({ linha: linhas[i], motivo })),
+    semOutroLado: linhas.filter((_, i) => sem.has(i) && !fora.has(i)),
+  };
+}
+
 /**
  * Vários jogos de leitura dos mesmos prints: cada jogo é lido inteiro (um print herda o mercado
  * de outro) e cada odd vai por votos. Empate fica com a primeira leitura. Odd que a primeira
@@ -63,13 +96,27 @@ export function lerOddsCasaConsenso(
   prints: { texto: string; releituras?: string[] }[],
   ctx: ContextoCasa,
   minVotosSemPrimeira = 2,
-): ResultadoParser {
+): ResultadoParser & { auditoria: AuditoriaLeitura } {
   const principal = lerOddsCasa(
     prints.map((p) => p.texto),
     ctx,
   );
   const jogos = Math.max(0, ...prints.map((p) => p.releituras?.length ?? 0));
-  if (!jogos) return principal;
+  if (!jogos) {
+    const unicas = juntarLinhas(principal.linhas).linhas;
+    return {
+      ...principal,
+      auditoria: {
+        leituras: 1,
+        total: unicas.length,
+        confirmadas: 0,
+        divergentes: [],
+        umaLeitura: [],
+        descartadas: [],
+        ...comSanidade(unicas),
+      },
+    };
+  }
   const leituras = [juntarLinhas(principal.linhas).linhas];
   for (let j = 0; j < jogos; j++) {
     const comEsta = prints.flatMap((p, i) =>
@@ -92,12 +139,41 @@ export function lerOddsCasaConsenso(
   });
   const naPrimeira = new Set(leituras[0].map((l) => chaveSelecao(l as LinhaOdd)));
   const linhas: OddLine[] = [];
+  const divergentes: AuditoriaLeitura['divergentes'] = [];
+  const umaLeitura: OddLine[] = [];
+  const descartadas: OddLine[] = [];
+  let confirmadas = 0;
   for (const [k, porOdd] of votos) {
     let melhor: OddLine[] = [];
     for (const v of porOdd.values()) if (v.length > melhor.length) melhor = v;
-    if (naPrimeira.has(k) || melhor.length >= minVotosSemPrimeira) linhas.push(melhor[0]);
+    if (!naPrimeira.has(k) && melhor.length < minVotosSemPrimeira) {
+      // linha que não anda de 0,25 em 0,25 é lixo do OCR: não precisa de conferência
+      const l = melhor[0].linha;
+      if (l === undefined || Number.isInteger(l * 4)) descartadas.push(melhor[0]);
+      continue;
+    }
+    linhas.push(melhor[0]);
+    if (porOdd.size > 1)
+      divergentes.push({
+        linha: melhor[0],
+        valores: [...porOdd].map(([odd, v]) => ({ odd, votos: v.length })),
+      });
+    else if (melhor.length === 1) umaLeitura.push(melhor[0]);
+    else confirmadas++;
   }
-  return { ...principal, linhas };
+  return {
+    ...principal,
+    linhas,
+    auditoria: {
+      leituras: leituras.length,
+      total: linhas.length,
+      confirmadas,
+      divergentes,
+      umaLeitura,
+      descartadas,
+      ...comSanidade(linhas),
+    },
+  };
 }
 
 /** Texto do OCR → odds. Layout desconhecido = aviso, nunca valor inventado. */

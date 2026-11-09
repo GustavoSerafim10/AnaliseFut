@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { juntarLinhas, lerOddsCasa, lerOddsCasaConsenso } from '../src';
+import { conferirPrintOdds, juntarLinhas, lerOddsCasa, lerOddsCasaConsenso } from '../src';
 
 // PlayOn, Sabadell × Real Sociedad B (09/11/2026). Texto montado a partir dos prints do celular,
 // com os erros de OCR vistos na tela do site ("0,5" → "05"); as odds foram conferidas nos prints
@@ -152,5 +152,56 @@ describe('PlayOn: erros vistos em FC Botosani × Otelul Galati (OCR real)', () =
       ['over', 3.5, 3.15],
       ['under', 3.5, 1.29],
     ]);
+  });
+});
+
+describe('conferência da leitura', () => {
+  const prints: { texto: string; releituras: string[] }[] = JSON.parse(
+    readFileSync(
+      new URL('./fixtures-reais/playon-kristiansund-releituras.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const ctx = {
+    jogo: { casa: 'Kristiansund', fora: 'Valerenga' },
+    casa: 'PlayOn',
+    data: '2026-11-09',
+  };
+  it('prints reais: quase tudo confirmado e a soma fecha', () => {
+    const r = lerOddsCasaConsenso(prints, ctx);
+    const a = r.auditoria;
+    expect(a.leituras).toBe(4);
+    expect(a.confirmadas + a.divergentes.length + a.umaLeitura.length).toBe(a.total);
+    expect(a.confirmadas).toBeGreaterThan(a.total * 0.8);
+  });
+  it('sem releituras avisa que foi uma leitura só', () => {
+    const a = lerOddsCasaConsenso([{ texto: prints[0].texto }], ctx).auditoria;
+    expect(a.leituras).toBe(1);
+    expect(a.confirmadas).toBe(0);
+  });
+  it('mostra a divergência com os votos e o que foi descartado', () => {
+    const t = (o: string) => `Total de gols A\n2,5 Mais ${o} Menos 1,90`;
+    const a = lerOddsCasaConsenso(
+      [{ texto: t('1,80'), releituras: [t('1,80'), t('1,30')] }],
+      ctx,
+    ).auditoria;
+    expect(a.divergentes[0].valores).toEqual([
+      { odd: 1.8, votos: 2 },
+      { odd: 1.3, votos: 1 },
+    ]);
+    const b = lerOddsCasaConsenso(
+      [{ texto: 'Total de gols A', releituras: [t('1,80'), 'Total de gols A'] }],
+      ctx,
+    ).auditoria;
+    expect(b.descartadas).toHaveLength(2);
+    expect(b.total).toBe(0);
+  });
+  it('"Casa Empate Fora" não dispara o aviso de times', () => {
+    expect(
+      conferirPrintOdds('Quem tem mais escanteios A\nCasa Empate Fora\n2,80 9,17 1,60', {
+        jogo: ctx.jogo,
+        oddsLidas: 3,
+      }),
+    ).toBeNull();
   });
 });

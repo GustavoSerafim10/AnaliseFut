@@ -87,7 +87,7 @@ const ABA_DA_CASA =
   /^(CRIAR APOSTA\s*)?(MERCADOS PRINCIPAIS|ESCANTEIOS|CART(Õ|O)ES|ESPECIAIS|COMBOS|JOGADORES|ESTAT(Í|I)STICAS|N(Ú|U)MERO DE GOLS|RESULTADO|QUEM MARCAR(Á|A) GOLS\??)$/;
 
 /** Quadro "Dicas da partida" da PlayOn: repete odds soltas, fora de qualquer mercado. */
-const DICAS_DA_CASA = /\bindica \d+%/i;
+const DICAS_DA_CASA = /\bindica \d+%|mais prov[aá]v|\bchance \(odd|jogo equilibrado/i;
 const ABRE_DICAS = /^dicas? da partida/i;
 
 /** Linha de gols sem a vírgula ("05", "15", "275"; escanteios: "95", "105"). */

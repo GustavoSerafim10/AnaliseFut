@@ -6387,3 +6387,22 @@ td:nth-child(3) > .cc-duelo i {
   margin: 10px 0 0;
   color: var(--rotulo);
 }
+.cc-conf-grupo {
+  margin-top: 10px;
+  font-size: 14px;
+}
+.cc-conf-grupo summary span {
+  margin-left: 4px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.14);
+  font-size: 12.5px;
+}
+.cc-conf-grupo ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.cc-conf-grupo small {
+  color: var(--suave);
+  font-size: 12.5px;
+}

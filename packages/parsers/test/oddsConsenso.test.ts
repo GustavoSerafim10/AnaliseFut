@@ -56,7 +56,7 @@ describe('votação entre leituras das odds', () => {
   it('sem releituras, é a leitura de sempre', () => {
     const p = [{ texto: texto('1.75') }];
     expect(over(lerOddsCasaConsenso(p, ctx))).toBe(1.75);
-    expect(lerOddsCasaConsenso(p, ctx)).toEqual(lerOddsCasa([p[0].texto], ctx));
+    expect(lerOddsCasaConsenso(p, ctx)).toMatchObject(lerOddsCasa([p[0].texto], ctx));
   });
   it('dois contra um: ganha a odd com mais votos', () => {
     const p = [{ texto: texto('1.15'), releituras: [texto('1.75'), texto('1.75')] }];
