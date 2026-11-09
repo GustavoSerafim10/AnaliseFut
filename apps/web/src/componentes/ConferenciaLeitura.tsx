@@ -52,20 +52,17 @@ export function ConferenciaLeitura({
   nomes: NomesTimes;
 }) {
   if (!a.total && !a.descartadas.length) return null;
-  const atencao =
-    a.divergentes.length +
-    a.umaLeitura.length +
-    a.descartadas.length +
-    a.foraDaAnalise.length +
-    a.semOutroLado.length +
-    naoEntendidas;
+  // entraram na análise sem confirmação: só estas pedem um olhar antes de apostar
+  const conferir = a.divergentes.length + a.umaLeitura.length + a.semOutroLado.length;
+  const naoEntraram = a.foraDaAnalise.length + a.descartadas.length + naoEntendidas;
   return (
     <Painel
       titulo="Conferência da leitura"
       icone="escudo"
       extra={
         <span className="cc-extra-texto">
-          {atencao ? `${atencao} para conferir` : 'nada para conferir'}
+          {conferir ? `${conferir} para conferir` : 'tudo confirmado'}
+          {naoEntraram > 0 && ` · ${naoEntraram} não entraram`}
         </span>
       }
     >
