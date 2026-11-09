@@ -8,7 +8,7 @@ import {
 import type { OddLine } from '@pe/schemas';
 import { FUSO, num } from '../estado';
 
-const LADOS: Partial<Record<TipoMercado, string[]>> = {
+export const LADOS: Partial<Record<TipoMercado, string[]>> = {
   '1X2': ['1', 'X', '2'],
   DC: ['1X', '12', 'X2'],
   DNB: ['1', '2'],

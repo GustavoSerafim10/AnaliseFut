@@ -13,7 +13,8 @@ import { RadarOdds } from '../componentes/RadarOdds';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { FUSO, type Leitura, type Rascunho } from '../estado';
 import { familiaMercado } from '../camadas';
-import { aplicarLeitura, oddsDefasadas } from '../oddsDaCasa';
+import { FormOddManual } from '../componentes/FormOddManual';
+import { aplicarLeitura, incluirOddManual, oddsDefasadas } from '../oddsDaCasa';
 import type { PropsAba } from './tipos';
 
 const ORDEM_MERCADO: TipoMercado[] = [
@@ -251,19 +252,11 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
           </div>
         );
       })}
-      <button
-        onClick={() =>
-          setR((x) => ({
-            ...x,
-            odds: [
-              ...x.odds,
-              { casa, mercado: '1X2', lado: '1', odd: 2, periodo: 'FT', fonte: 'manual' },
-            ],
-          }))
-        }
-      >
-        + Adicionar odd à mão
-      </button>
+      <FormOddManual
+        casa={casa}
+        nomes={nomes}
+        onAdicionar={(nova) => setR((x) => ({ ...x, odds: incluirOddManual(x.odds, nova) }))}
+      />
 
       <details>
         <summary>Importar JSON</summary>

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OddLine } from '@pe/schemas';
-import { aplicarLeitura, oddsDefasadas } from '../src/oddsDaCasa';
+import {
+  aplicarLeitura,
+  oddsDefasadas,
+  incluirOddManual,
+  montarOddManual,
+} from '../src/oddsDaCasa';
 import { podeSalvarSozinho } from '../src/historico';
 import { rascunhoNovo } from '../src/estado';
 import type { Derivado } from '../src/dados';
@@ -82,5 +87,42 @@ describe('data de um cadastro novo', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 10, 5, 22, 30));
     expect(rascunhoNovo().jogo.data).toBe('2026-11-05');
+  });
+});
+
+describe('odd digitada à mão', () => {
+  const base = {
+    mercado: 'AH',
+    periodo: 'FT',
+    lado: 'casa',
+    time: '',
+    linha: '0',
+    odd: '1,55',
+  } as const;
+  const h = '2026-11-09T14:40:00-03:00';
+  it('handicap 0 do mandante', () => {
+    const r = montarOddManual(base, 'PlayOn', h);
+    expect(r).toMatchObject({ linha: { mercado: 'AH', linha: 0, odd: 1.55, fonte: 'manual' } });
+  });
+  it('sem odd ou sem linha não entra', () => {
+    expect(montarOddManual({ ...base, odd: '' }, 'PlayOn', h)).toHaveProperty('erro');
+    expect(montarOddManual({ ...base, linha: '' }, 'PlayOn', h)).toHaveProperty('erro');
+    expect(
+      montarOddManual({ ...base, mercado: 'total_time', lado: 'over', linha: '1.5' }, 'PlayOn', h),
+    ).toHaveProperty('erro');
+  });
+  it('tira os cartões vazios do botão antigo e não duplica a seleção', () => {
+    const r = montarOddManual(base, 'PlayOn', h);
+    if ('erro' in r) throw new Error(r.erro);
+    const vazio = {
+      casa: 'PlayOn',
+      mercado: '1X2',
+      lado: '1',
+      odd: 2,
+      periodo: 'FT',
+      fonte: 'manual',
+    } as never;
+    const lista = incluirOddManual([vazio, vazio, r.linha], { ...r.linha, odd: 1.6 });
+    expect(lista.map((l) => l.odd)).toEqual([1.6]);
   });
 });

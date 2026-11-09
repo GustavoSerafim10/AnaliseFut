@@ -6378,3 +6378,12 @@ td:nth-child(3) > .cc-duelo i {
 .cc-extra-texto {
   white-space: nowrap;
 }
+.form-odd-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+.form-odd-previa {
+  margin: 10px 0 0;
+  color: var(--rotulo);
+}
