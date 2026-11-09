@@ -15,6 +15,16 @@ export function AbaDesfalques({ r, setR, d }: PropsAba) {
         modo="lados"
         {...acoesPrints(setR, 'desfalques')}
       />
+      {d.desfalques.length === 0 && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={!!r.semDesfalques}
+            onChange={(e) => setR((x) => ({ ...x, semDesfalques: e.target.checked }))}
+          />
+          Sem desfalques: conferi e os dois times estão completos
+        </label>
+      )}
       {d.avisosDesfalques.map((a) => (
         <div key={a} className="caixa alerta miudo">
           ⚠️ {a}

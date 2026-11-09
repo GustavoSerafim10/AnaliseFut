@@ -189,7 +189,11 @@ export function App() {
         {
           aba: { id: 'desfalques' },
           rotulo: 'Desfalques',
-          marca: contagem('desfalques') ? String(contagem('desfalques')) : undefined,
+          marca: contagem('desfalques')
+            ? String(contagem('desfalques'))
+            : r.semDesfalques
+              ? '—'
+              : undefined,
         },
       ],
     },

@@ -82,6 +82,23 @@ describe('jogo de exemplo (#demo)', () => {
   });
 });
 
+describe('"Sem desfalques"', () => {
+  const sem: Rascunho = {
+    ...rascunhoExemplo(),
+    prints: { ...rascunhoExemplo().prints, desfalques: [] },
+    flashscore: '',
+  };
+  it('sem marcar, o jogo fica como desfalques não informados', () => {
+    expect(derivar(sem).dq.motivos.join(' ')).toContain('desfalques não informados');
+    expect(derivar(sem).dq.dq).toBe('C');
+  });
+  it('marcado, conta como informado e libera o DQ B', () => {
+    const d = derivar({ ...sem, semDesfalques: true });
+    expect(d.dq.motivos.join(' ')).not.toContain('desfalques não informados');
+    expect(['A', 'B']).toContain(d.dq.dq);
+  });
+});
+
 describe('estádio animado e figurinhas', () => {
   it('rosto vira a foto escolhida no aparelho; sem foto, cabeça estilizada', () => {
     const foto = 'data:image/jpeg;base64,AAAA';

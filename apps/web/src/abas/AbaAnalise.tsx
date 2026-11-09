@@ -231,7 +231,11 @@ export function AbaAnalise({
       obrigatorio: true,
     },
     { nome: 'Flashscore', ok: !!d.flash, obrigatorio: false },
-    { nome: 'Desfalques', ok: d.desfalques.length > 0, obrigatorio: false },
+    {
+      nome: 'Desfalques',
+      ok: d.desfalques.length > 0 || !!r.semDesfalques,
+      obrigatorio: false,
+    },
     {
       nome: 'Odds',
       ok: d.oddsValidas.length > 0,

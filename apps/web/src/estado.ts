@@ -60,6 +60,8 @@ export interface Rascunho {
   flashscore: string;
   /** o jogo não tem texto de análise no Flashscore (não conta como fonte) */
   flashscoreSemTexto: boolean;
+  /** conferido: os dois times estão completos (conta como desfalques informados) */
+  semDesfalques?: boolean;
   /** correções manuais das estatísticas: `${campo}.${time}` → valor */
   correcoes: Record<string, number>;
   desfalqueAtaque: { casa: NivelDesfalque; fora: NivelDesfalque };

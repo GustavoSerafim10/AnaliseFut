@@ -150,9 +150,11 @@ export function AbaJogo({
       nome: 'Desfalques',
       detalhe: d.desfalques.length
         ? `${d.desfalques.length} desfalque(s)`
-        : 'Quem está fora do jogo',
+        : r.semDesfalques
+          ? 'Times completos'
+          : 'Quem está fora do jogo',
       icone: 'pessoas',
-      estado: d.desfalques.length ? 'ok' : 'pendente',
+      estado: d.desfalques.length || r.semDesfalques ? 'ok' : 'pendente',
       ir: abrir && (() => abrir('desfalques')),
     },
   ];

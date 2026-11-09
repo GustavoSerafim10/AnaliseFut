@@ -43,7 +43,7 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
             .join(', ') || 'nenhum informado'
         }`,
       );
-  }
+  } else if (r.semDesfalques) l.push('', '# Desfalques: nenhum (times completos)');
   if (d.classificacao.some((c) => c.doJogo)) {
     l.push('', '# Classificação');
     for (const c of d.classificacao.filter((x) => x.doJogo)) {

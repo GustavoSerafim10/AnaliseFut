@@ -222,7 +222,9 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   );
 
   const desfalquesConhecidos =
-    desfalques.length > 0 || !!flash?.trechos.some((t) => t.categoria === 'desfalques');
+    desfalques.length > 0 ||
+    !!r.semDesfalques ||
+    !!flash?.trechos.some((t) => t.categoria === 'desfalques');
   const fontesStats = [
     sofa && Object.keys(sofa.campos).length,
     sup && Object.keys(sup.campos).length,
