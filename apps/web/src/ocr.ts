@@ -219,16 +219,22 @@ interface Preparado {
  * - médio (gramado verde do SofaScore): só pixel branco (menor canal RGB > 150) vira tinta;
  * - claro: limiar normal.
  */
-async function preprocessar(arquivo: File, modo: ModoOcr = 'bloco'): Promise<Preparado> {
+async function preprocessar(
+  arquivo: File,
+  modo: ModoOcr = 'bloco',
+  variante: { escala?: number; corte?: number } = {},
+): Promise<Preparado> {
   const img = await createImageBitmap(arquivo);
-  const escala = Math.max(
-    1,
-    Math.min(
-      4,
-      Math.round(4000 / img.width),
-      Math.floor(Math.sqrt(16e6 / (img.width * img.height))),
-    ),
-  );
+  const escala =
+    variante.escala ??
+    Math.max(
+      1,
+      Math.min(
+        4,
+        Math.round(4000 / img.width),
+        Math.floor(Math.sqrt(16e6 / (img.width * img.height))),
+      ),
+    );
   const origem = document.createElement('canvas');
   origem.width = img.width;
   origem.height = img.height;
@@ -281,10 +287,58 @@ async function preprocessar(arquivo: File, modo: ModoOcr = 'bloco'): Promise<Pre
   // tema claro (Futamina, Jogou, 1win clara): rótulos cinza-claro em caixa cinza somem na
   // binarização do Tesseract; a curva (gama 2) escurece os tons médios e mantém o fundo
   const gama = !inverter && modo === 'bloco';
-  for (let i = 0; i < px.length; i += 4)
-    px[i] = px[i + 1] = px[i + 2] = inverter ? 255 - px[i] : gama ? (px[i] * px[i]) / 255 : px[i];
+  const { corte } = variante;
+  for (let i = 0; i < px.length; i += 4) {
+    const c = px[i];
+    px[i] =
+      px[i + 1] =
+      px[i + 2] =
+        corte !== undefined
+          ? (inverter ? c >= corte : c <= corte)
+            ? 0
+            : 255
+          : inverter
+            ? 255 - c
+            : gama
+              ? (c * c) / 255
+              : c;
+  }
   ctx.putImageData(dados, 0, 0);
   return { cinza, binario, meio, original, escala };
+}
+
+/**
+ * Estatísticas: cada leitura erra em campos diferentes. São 5 leituras do mesmo print, e o
+ * parser vota campo a campo (lerEstatisticasConsenso). Em prints reais do SofaScore a 100%, 75%
+ * e 60% de zoom, de 76 valores: uma leitura = 65 certos e 2 errados; cinco = 75 certos e 0 errados.
+ */
+export async function lerComReleituras(
+  arquivo: File,
+  progresso?: (p: number) => void,
+): Promise<{ texto: string; releituras: string[] }> {
+  const w = await obterWorker();
+  const total = 5;
+  const ler = async (n: number, canvas: HTMLCanvasElement) => {
+    aoProgredir = (p) => progresso?.((n + p) / total);
+    return (await w.recognize(canvas)).data.text;
+  };
+  try {
+    const { cinza, escala } = await preprocessar(arquivo);
+    const texto = await ler(0, cinza);
+    const variantes = [
+      ...[3, 2].filter((e) => e < escala).map((e) => ({ escala: e })),
+      { escala, corte: 130 },
+      { escala, corte: 90 },
+    ];
+    const releituras: string[] = [];
+    for (const v of variantes) {
+      const n = total - variantes.length + releituras.length;
+      releituras.push(await ler(n, (await preprocessar(arquivo, 'bloco', v)).cinza));
+    }
+    return { texto, releituras };
+  } finally {
+    aoProgredir = null;
+  }
 }
 
 export async function lerImagem(

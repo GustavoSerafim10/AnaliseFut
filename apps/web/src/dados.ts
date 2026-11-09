@@ -49,7 +49,7 @@ import {
   lerOddsCasa,
   lerClassificacao,
   lerDesfalques,
-  lerEstatisticas,
+  lerEstatisticasConsenso,
   lerTextoFlashscore,
   lerUltimas,
   type Desfalque,
@@ -152,12 +152,14 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   const nomes = { casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' };
   const temTimes = !!(r.jogo.casa && r.jogo.fora);
 
-  const sofa = juntarLeiturasStats(
-    textos(r, 'sofascore').map((t) => lerEstatisticas(t, 'sofascore', nomes)),
-  );
-  const sup = juntarLeiturasStats(
-    textos(r, 'superscore').map((t) => lerEstatisticas(t, 'superscore', nomes)),
-  );
+  const lerFonte = (fonte: 'sofascore' | 'superscore') =>
+    juntarLeiturasStats(
+      (r.prints[fonte] ?? []).map((l) =>
+        lerEstatisticasConsenso([l.texto, ...(l.releituras ?? [])], fonte, nomes),
+      ),
+    );
+  const sofa = lerFonte('sofascore');
+  const sup = lerFonte('superscore');
   const tabela = consolidar({ sofascore: sofa, superscore: sup }, r.correcoes);
   const modeloCasa = estatisticasParaModelo(tabela, 'casa');
   const modeloFora = estatisticasParaModelo(tabela, 'fora');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isoLocal, pct, type Leitura } from '../estado';
-import { lerImagem, type ModoOcr } from '../ocr';
+import { lerComReleituras, lerImagem, type ModoOcr } from '../ocr';
 
 interface Props {
   rotulo: string;
@@ -9,6 +9,8 @@ interface Props {
   desabilitado?: boolean;
   /** 'lados': nomes com posição no campo (escalação); 'tabela': classificação em colunas */
   modo?: ModoOcr;
+  /** estatísticas: lê o print várias vezes, e os valores vão por votos */
+  releituras?: boolean;
   /** o que este print trouxe ("Escanteios 6 · Gols 4") */
   descrever?: (texto: string) => string;
   /** aviso quando o print parece ser de outro jogo ou da área errada */
@@ -43,6 +45,7 @@ export function UploadPrints({
   leituras,
   desabilitado,
   modo,
+  releituras,
   descrever,
   conferir,
   onLido,
@@ -67,12 +70,12 @@ export function UploadPrints({
       const arq = lista[i];
       setFila({ atual: arq.name, feitos: i, total: lista.length, p: 0 });
       try {
-        const texto = await lerImagem(
-          arq,
-          (p) => setFila({ atual: arq.name, feitos: i, total: lista.length, p }),
-          modo,
-        );
-        onLido({ arquivo: arq.name, texto, capturadoEm: isoLocal(new Date(arq.lastModified)) });
+        const aoProgredir = (p: number) =>
+          setFila({ atual: arq.name, feitos: i, total: lista.length, p });
+        const lido = releituras
+          ? await lerComReleituras(arq, aoProgredir)
+          : { texto: await lerImagem(arq, aoProgredir, modo) };
+        onLido({ arquivo: arq.name, ...lido, capturadoEm: isoLocal(new Date(arq.lastModified)) });
       } catch (e) {
         setErro(`Falha ao ler ${arq.name}: ${(e as Error).message}`);
       }

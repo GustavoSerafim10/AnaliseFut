@@ -849,6 +849,53 @@ function coerencia(l: LeituraStats): LeituraStats {
   return l;
 }
 
+/**
+ * Várias leituras do MESMO print (ampliações diferentes erram em campos diferentes): cada valor
+ * de cada time vai por votos. Empate fica com a leitura que veio primeiro.
+ */
+export function lerEstatisticasConsenso(
+  textos: string[],
+  fonte: FonteStats,
+  jogo: NomesTimes,
+): LeituraStats {
+  const leituras = textos.map((t) => lerEstatisticas(t, fonte, jogo));
+  if (leituras.length === 1) return leituras[0];
+  const campos: LeituraStats['campos'] = {};
+  for (const c of new Set(leituras.flatMap((l) => Object.keys(l.campos) as CampoStat[]))) {
+    const votar = (t: 'casa' | 'fora') => {
+      const votos = new Map<number, ValorLido[]>();
+      for (const l of leituras) {
+        const v = l.campos[c];
+        if (v?.[t] !== undefined) votos.set(v[t]!, [...(votos.get(v[t]!) ?? []), v]);
+      }
+      let melhor: [number, ValorLido[]] | undefined;
+      for (const par of votos) if (!melhor || par[1].length > melhor[1].length) melhor = par;
+      return melhor;
+    };
+    const casa = votar('casa');
+    const fora = votar('fora');
+    if (!casa && !fora) {
+      campos[c] = leituras.find((l) => l.campos[c])!.campos[c];
+      continue;
+    }
+    const origem = casa?.[1][0] ?? fora![1][0];
+    const doLado = (v: ValorLido | undefined, outro: 'casa' | 'fora') =>
+      (v?.avisos ?? []).filter((a) => !a.startsWith(`[${outro}]`));
+    campos[c] = {
+      casa: casa?.[0],
+      fora: fora?.[0],
+      bruto: origem.bruto,
+      avisos: [...new Set([...doLado(casa?.[1][0], 'fora'), ...doLado(fora?.[1][0], 'casa')])],
+    };
+  }
+  const outros: LeituraStats['outros'] = [];
+  for (const o of leituras.flatMap((l) => l.outros))
+    if (!outros.some((x) => x.rotulo === o.rotulo)) outros.push(o);
+  // o valor que uma leitura não viu pode ter vindo de outra: a falta real aparece nas pendências
+  const avisos = leituras[0].avisos.filter((a) => !a.includes('só um valor legível'));
+  return { ...leituras[0], campos, outros, avisos };
+}
+
 /** Junta a leitura de vários prints do mesmo site (rolagem com sobreposição). */
 export function juntarLeiturasStats(leituras: LeituraStats[]): LeituraStats | null {
   if (!leituras.length) return null;

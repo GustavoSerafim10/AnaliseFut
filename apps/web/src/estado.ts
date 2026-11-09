@@ -11,6 +11,8 @@ const CHAVE = 'pe-rascunho-v2';
 export interface Leitura {
   arquivo: string;
   texto: string;
+  /** outras leituras do mesmo print (estatísticas: os valores vão por votos) */
+  releituras?: string[];
   /** hora em que o print foi salvo (ISO, fuso de Brasília): serve de horário de coleta */
   capturadoEm?: string;
 }

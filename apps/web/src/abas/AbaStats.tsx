@@ -35,6 +35,7 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         leituras={r.prints[fonte] ?? []}
         desabilitado={semTimes}
         conferir={conferirPrintEstatisticas}
+        releituras
         {...acoesPrints(setR, fonte)}
       />
 
