@@ -11,7 +11,7 @@ import {
   resumirCamada,
 } from '../src/camadas';
 import { CentroComando } from '../src/componentes/CentroComando';
-import { rascunhoNovo } from '../src/estado';
+import { CASAS_PADRAO, comCasasPadrao, rascunhoNovo } from '../src/estado';
 import { placarAcerto, type EntradaHistorico } from '../src/historico';
 
 const linha = (lado: 'over' | 'under', n: number, odd: number) =>
@@ -189,5 +189,23 @@ describe('números do painel', () => {
     const fora = jogo('2', [3, 1], { entrada: entrada('over', 2.5, 2) });
     expect(ehMelhorEntrada([e, fora], e)).toBe(true);
     expect(ehMelhorEntrada([e, fora], fora)).toBe(false);
+  });
+});
+
+describe('casas padrão', () => {
+  it('análise nova já vem com as sete casas', () => {
+    expect(rascunhoNovo().casas).toEqual(CASAS_PADRAO);
+  });
+  it('análise aberta ganha as que faltam, sem repetir', () => {
+    const r = comCasasPadrao({
+      ...rascunhoNovo(),
+      casas: ['1WIN', 'Outra'],
+      casasPadrao: undefined,
+    });
+    expect(r.casas).toEqual(['1WIN', 'Outra', ...CASAS_PADRAO.slice(1)]);
+  });
+  it('casa removida não volta', () => {
+    const r = { ...rascunhoNovo(), casas: ['1win'] };
+    expect(comCasasPadrao(r).casas).toEqual(['1win']);
   });
 });

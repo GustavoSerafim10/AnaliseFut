@@ -81,11 +81,11 @@ export function AbaPromocoes({ d }: PropsAba) {
 
   const doJogo = d.v4?.avaliadas ?? [];
   return (
-    <section className="passo">
+    <section className="passo promo-painel">
       <h2>Promoções (S4)</h2>
       <p className="dica">
         Calcule o EV real antes de aceitar: odd turbinada, freebet, aposta sem risco e bônus com
-        rollover. Use o P_true da referência (Pinnacle/consenso), nunca a odd da própria casa.
+        rollover. Use o P_true da referência (consenso das casas), nunca a odd da própria casa.
       </p>
       <div className="abas-mini">
         {(Object.keys(NOMES) as Tipo[]).map((t) => (

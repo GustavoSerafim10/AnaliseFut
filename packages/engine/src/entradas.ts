@@ -187,7 +187,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
       timeFavorecido(r.liq) === azarao
     ) {
       recusar(
-        `aposta no azarão: em liga principal, o modelo tende a subestimar o favorito. Só com Pinnacle/Betfair ou ${MIN_CASAS_CONSENSO}+ casas`,
+        `aposta no azarão: em liga principal, o modelo tende a subestimar o favorito. Só com ${MIN_CASAS_CONSENSO}+ casas no jogo`,
       );
       continue;
     }

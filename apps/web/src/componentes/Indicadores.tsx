@@ -90,7 +90,10 @@ export function Indicadores({ d }: { d: Derivado }) {
           destaque={lam ? <Numero valor={lam[t]} formato={n2} /> : indisponivel}
           rodape={
             lam && (
-              <Barra valor={lam[t] / maxL} cor={t === 'casa' ? 'var(--amarelo)' : 'var(--ciano)'} />
+              <Barra
+                valor={lam[t] / maxL}
+                cor={t === 'casa' ? 'var(--realce)' : 'var(--violeta)'}
+              />
             )
           }
         >

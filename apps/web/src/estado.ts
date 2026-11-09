@@ -8,6 +8,16 @@ import type { OddLine } from '@pe/schemas';
 export const FUSO = '-03:00';
 const CHAVE = 'pe-rascunho-v2';
 
+export const CASAS_PADRAO = [
+  '1win',
+  'Betsul',
+  'CasaDeApostas',
+  'Bet365',
+  'Superbet',
+  'Betano',
+  'Betfair',
+];
+
 export interface Leitura {
   arquivo: string;
   texto: string;
@@ -69,6 +79,8 @@ export interface Rascunho {
   desfalqueAtaque: { casa: NivelDesfalque; fora: NivelDesfalque };
   desfalqueDefesa: { casa: NivelDesfalque; fora: NivelDesfalque };
   casas: string[];
+  /** as casas padrão já foram acrescentadas a esta análise */
+  casasPadrao?: boolean;
   odds: OddLine[];
   explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
@@ -114,7 +126,8 @@ export function rascunhoNovo(): Rascunho {
     correcoes: {},
     desfalqueAtaque: { casa: 'auto', fora: 'auto' },
     desfalqueDefesa: { casa: 'nenhum', fora: 'nenhum' },
-    casas: ['1win'],
+    casas: [...CASAS_PADRAO],
+    casasPadrao: true,
     odds: [],
     explicacaoDivergencia: '',
     redTeam: { argumentos: ['', '', ''], atacaPremissa: false, sobreviveu: false },
@@ -125,13 +138,29 @@ export function rascunhoNovo(): Rascunho {
   };
 }
 
+/** Análise aberta de antes das casas padrão ganha as que faltam, uma vez: casa removida não volta. */
+export function comCasasPadrao(r: Rascunho): Rascunho {
+  if (r.casasPadrao) return r;
+  const tem = new Set(r.casas.map((c) => c.trim().toLowerCase()));
+  return {
+    ...r,
+    casas: [...r.casas, ...CASAS_PADRAO.filter((c) => !tem.has(c.toLowerCase()))],
+    casasPadrao: true,
+  };
+}
+
 export function carregarRascunho(): Rascunho {
   try {
     const s = localStorage.getItem(CHAVE);
     if (s) {
       const salvo = JSON.parse(s) as Partial<Rascunho>;
       const novo = rascunhoNovo();
-      const junto = { ...novo, ...salvo, config: { ...novo.config, ...salvo.config } };
+      const junto = comCasasPadrao({
+        ...novo,
+        ...salvo,
+        casasPadrao: salvo.casasPadrao,
+        config: { ...novo.config, ...salvo.config },
+      });
       // rascunho vazio de ontem: sem isto, o jogo de hoje nasce com a data de ontem e parece iniciado
       return junto.jogo.casa || junto.jogo.fora
         ? junto

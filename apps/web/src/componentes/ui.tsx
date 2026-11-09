@@ -123,9 +123,9 @@ export const GLOSSARIO = {
   edge: 'Edge: P_true − probabilidade implícita da odd (1/odd). Em pontos percentuais: quanto o preço justo supera o preço pago.',
   justa: 'Odd justa: 1 / P_true. Abaixo dela o preço não paga o risco.',
   ptrue:
-    'P_true: probabilidade "verdadeira" usada na decisão. Vem da Pinnacle/Betfair sem margem (R1), do consenso de 4+ casas (R2) ou do modelo + consenso nos nichos (R3).',
+    'P_true: probabilidade "verdadeira" usada na decisão. Vem do consenso de 4+ casas (R2), de uma casa afiada sem margem (R1) ou do modelo + consenso nos nichos (R3).',
   dq: 'Data Quality: nota A–E da qualidade das estatísticas (amostra, xG, fontes, desfalques, liga).',
-  gate: 'Gate: EV mínimo exigido para BET, que depende da referência (2% contra a Pinnacle, 3,5% no consenso, 5% nos nichos) e da odd.',
+  gate: 'Gate: EV mínimo exigido para BET, que depende da referência (3,5% no consenso, 2% contra casa afiada, 5% nos nichos) e da odd.',
   minima:
     'Odd mínima: abaixo dela o EV cai para baixo do gate. É a margem de segurança da entrada.',
 } as const;

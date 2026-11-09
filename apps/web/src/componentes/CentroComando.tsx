@@ -101,7 +101,19 @@ export function Painel({
   );
 }
 
-function Medidor({ r }: { r: ResumoCamada }) {
+export function Arco({
+  fracao,
+  numero,
+  linhas,
+  rotuloAria,
+  marcas = [],
+}: {
+  fracao: number | null;
+  numero: string;
+  linhas: string[];
+  rotuloAria: string;
+  marcas?: { p: number; classe: string }[];
+}) {
   const C = 110;
   const R = 86;
   const ponto = (graus: number, raio: number) => {
@@ -111,45 +123,53 @@ function Medidor({ r }: { r: ResumoCamada }) {
   const [x0, y0] = ponto(150, R);
   const [x1, y1] = ponto(390, R);
   const arco = `M${x0},${y0} A${R},${R} 0 1 1 ${x1},${y1}`;
-  const marca = (p: number, classe: string) => {
-    const g = 150 + 240 * p;
-    const [a, b] = ponto(g, R - 15);
-    const [c, d] = ponto(g, R + 15);
-    return <line className={classe} x1={a} y1={b} x2={c} y2={d} />;
-  };
-  const decididas = r.green + r.red;
+  return (
+    <svg className="cc-arco" viewBox="0 0 220 190" role="img" aria-label={rotuloAria}>
+      <path className="cc-medidor-trilho" d={arco} pathLength={100} />
+      {fracao !== null && (
+        <path
+          className="cc-medidor-valor"
+          d={arco}
+          pathLength={100}
+          strokeDasharray={`${fracao * 100} 100`}
+        />
+      )}
+      {marcas.map(({ p, classe }) => {
+        const g = 150 + 240 * p;
+        const [a, b] = ponto(g, R - 15);
+        const [e, f] = ponto(g, R + 15);
+        return <line key={classe} className={classe} x1={a} y1={b} x2={e} y2={f} />;
+      })}
+      <text className="cc-medidor-numero" x={C} y={112} textAnchor="middle">
+        {numero}
+      </text>
+      {linhas.map((l, i) => (
+        <text key={l} className="cc-medidor-rotulo" x={C} y={136 + i * 18} textAnchor="middle">
+          {l}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function Medidor({ r }: { r: ResumoCamada }) {
+  const marcas = [
+    ...(r.pedia !== null ? [{ p: r.pedia, classe: 'cc-marca-pedia' }] : []),
+    ...(r.prometido !== null ? [{ p: r.prometido, classe: 'cc-marca-prometido' }] : []),
+  ];
   return (
     <div className="cc-medidor">
-      <svg
-        viewBox="0 0 220 190"
-        role="img"
-        aria-label={
+      <Arco
+        fracao={r.acerto}
+        numero={r.acerto === null ? '—' : p1(r.acerto)}
+        linhas={['ACERTO REAL', `${r.green} green · ${r.red} red`]}
+        rotuloAria={
           r.acerto === null
             ? 'Acerto: ainda sem jogo apurado'
-            : `Acerto de ${p1(r.acerto)} em ${decididas} apostas`
+            : `Acerto de ${p1(r.acerto)} em ${r.green + r.red} apostas`
         }
-      >
-        <path className="cc-medidor-trilho" d={arco} pathLength={100} />
-        {r.acerto !== null && (
-          <path
-            className="cc-medidor-valor"
-            d={arco}
-            pathLength={100}
-            strokeDasharray={`${r.acerto * 100} 100`}
-          />
-        )}
-        {r.pedia !== null && marca(r.pedia, 'cc-marca-pedia')}
-        {r.prometido !== null && marca(r.prometido, 'cc-marca-prometido')}
-        <text className="cc-medidor-numero" x={C} y={112} textAnchor="middle">
-          {r.acerto === null ? '—' : p1(r.acerto)}
-        </text>
-        <text className="cc-medidor-rotulo" x={C} y={136} textAnchor="middle">
-          ACERTO REAL
-        </text>
-        <text className="cc-medidor-rotulo" x={C} y={154} textAnchor="middle">
-          {r.green} green · {r.red} red
-        </text>
-      </svg>
+        marcas={marcas}
+      />
       <ul className="cc-legenda">
         <li>
           <i className="cc-leg-real" /> Real
@@ -665,7 +685,7 @@ export function CentroComando({ historico }: { historico: EntradaHistorico[] }) 
           <Icone nome="info" tamanho={22} />
           <p>
             {camada === 'bet'
-              ? 'Nenhum BET neste recorte. Com poucas casas e sem Pinnacle/Betfair, a análise técnica raramente dá BET: esta camada enche quando as referências entrarem.'
+              ? 'Nenhum BET neste recorte. Com poucas casas, a análise técnica raramente dá BET: cole 4 ou mais casas no mesmo jogo e esta camada começa a encher.'
               : 'Nenhuma melhor entrada neste recorte ainda. Analise jogos e registre os placares.'}
           </p>
         </section>

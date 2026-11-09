@@ -24,8 +24,8 @@ export function Distribuicao({ d, nomes }: { d: Derivado; nomes: { casa: string;
         ]
       : [null, ''];
   const linhas: [string, string][] = [
-    [nomes.casa, 'var(--amarelo)'],
-    ['Empate', 'var(--ciano)'],
+    [nomes.casa, 'var(--realce)'],
+    ['Empate', 'var(--violeta)'],
     [nomes.fora, 'var(--violeta)'],
   ];
   return (

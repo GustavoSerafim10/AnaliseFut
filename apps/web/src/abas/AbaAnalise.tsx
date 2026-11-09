@@ -16,6 +16,7 @@ import { Distribuicao } from '../componentes/Distribuicao';
 import { FormAposta } from '../componentes/FormAposta';
 import { GrafoDecisao } from '../componentes/GrafoDecisao';
 import { Indicadores } from '../componentes/Indicadores';
+import { CockpitAnalise } from '../componentes/CockpitAnalise';
 import { MelhoresEntradas, type EscolhaEntrada } from '../componentes/MelhoresEntradas';
 import { MontarMultipla } from '../componentes/MontarMultipla';
 import { PainelV4 } from '../componentes/PainelV4';
@@ -241,13 +242,18 @@ export function AbaAnalise({
       ok: d.oddsValidas.length > 0,
       obrigatorio: true,
       detalhe: r.odds.length
-        ? `${r.odds.length} · ${r.casas.length} casa(s)${d.errosOdds ? ` · ${d.errosOdds} com erro fora` : ''}`
+        ? `${r.odds.length} · ${new Set(r.odds.map((o) => o.casa)).size} casa(s)${d.errosOdds ? ` · ${d.errosOdds} com erro fora` : ''}`
         : '',
     },
   ];
 
   return (
     <section className="passo">
+      <CockpitAnalise
+        d={d}
+        situacao={situacao}
+        nomes={{ casa: nome('casa'), fora: nome('fora') }}
+      />
       <MelhoresEntradas
         d={d}
         registradas={new Set(apostas.map(chaveDaAposta))}
@@ -379,8 +385,8 @@ export function AbaAnalise({
           {d.v4 && <span className="marca">{d.v4.rotulo}</span>}
         </summary>
         <p className="dica">
-          É o critério mais rígido do site: só aprova com Pinnacle/Betfair ou 4+ casas. Serve para
-          conferir o preço. Pode dizer NO BET mesmo com entrada na lista acima.
+          É o critério mais rígido do site: nos mercados principais, pede 4 ou mais casas no mesmo
+          jogo. Serve para conferir o preço. Pode dizer NO BET mesmo com entrada na lista acima.
         </p>
         <Indicadores d={d} />
         <div className="grade-analise">
@@ -396,20 +402,6 @@ export function AbaAnalise({
         <GrafoDecisao d={d} />
         <PainelV4 r={r} setR={setR} d={d} />
       </details>
-
-      <h3>Situação dos dados</h3>
-      <p className="dica">
-        Esta aba se atualiza sozinha: cada print, texto ou correção nas outras abas recalcula tudo
-        na hora.
-      </p>
-      <div className="situacao">
-        {situacao.map((s) => (
-          <span key={s.nome} className={s.ok ? 'ok' : s.obrigatorio ? 'falta' : 'opcional'}>
-            {s.ok ? '✓' : s.obrigatorio ? '✗' : '○'} {s.nome}
-            {s.detalhe && <small> {s.detalhe}</small>}
-          </span>
-        ))}
-      </div>
 
       {!d.pendenciasV4.length && d.pendencias.length > 0 && (
         <div className="caixa">

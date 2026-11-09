@@ -134,7 +134,7 @@ export function AbaJogo({
     {
       nome: 'Odds das casas',
       detalhe: r.odds.length
-        ? `${r.odds.length} odds · ${r.casas.length} casa(s)`
+        ? `${r.odds.length} odds · ${new Set(r.odds.map((o) => o.casa)).size} casa(s)`
         : 'Referência + casa onde vai apostar',
       icone: 'mercado',
       estado: !r.odds.length

@@ -21,7 +21,7 @@ const GRUPOS: { re: RegExp; titulo: string; atencao?: boolean }[] = [
     titulo: 'Leitura incompleta: falta um lado do mercado (confira os prints)',
     atencao: true,
   },
-  { re: /liga principal sem referência/, titulo: 'Sem Pinnacle/Betfair ou 4+ casas' },
+  { re: /liga principal sem referência/, titulo: 'Menos de 4 casas no jogo' },
   { re: /DQ do modelo abaixo/, titulo: 'Sem referência e dados fracos (DQ abaixo de C)' },
   { re: /sem modelo para este mercado/, titulo: 'Sem referência e sem modelo para o mercado' },
   { re: /margem da referência/, titulo: 'Margem acima de 10%' },

@@ -225,17 +225,19 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         <strong>{daCasa.length}</strong> odds da {casa}. Leia o "Ganha se…" de cada uma: se não
         bater com o print, o lado está trocado.
       </p>
-      {ordenadas.map(({ l, i }) => (
-        <CartaoOdd
-          key={`${i}-${JSON.stringify(l)}`}
-          linha={l}
-          nomes={nomes}
-          data={r.jogo.data}
-          problemas={d.problemasOdds.filter((p) => p.indice === i)}
-          onMudar={(m) => mudar(i, m)}
-          onRemover={() => remover(i)}
-        />
-      ))}
+      <div className="cc-odds-grade">
+        {ordenadas.map(({ l, i }) => (
+          <CartaoOdd
+            key={`${i}-${JSON.stringify(l)}`}
+            linha={l}
+            nomes={nomes}
+            data={r.jogo.data}
+            problemas={d.problemasOdds.filter((p) => p.indice === i)}
+            onMudar={(m) => mudar(i, m)}
+            onRemover={() => remover(i)}
+          />
+        ))}
+      </div>
       <button
         onClick={() =>
           setR((x) => ({

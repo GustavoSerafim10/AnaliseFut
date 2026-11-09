@@ -215,7 +215,7 @@ function FormResultado({
         )}
       </div>
       <p className="dica">
-        O fechamento é a odd da Pinnacle/Betfair (ou do consenso) logo antes do jogo. Com os outros
+        O fechamento é a odd de referência (o consenso das casas) logo antes do jogo. Com os outros
         lados, o CLV sai contra o preço justo, sem margem.
       </p>
     </div>

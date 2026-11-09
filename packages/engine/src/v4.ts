@@ -231,8 +231,8 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   if (!afiadasJogo.length)
     avisos.push(
       casasNomes.length >= MIN_CASAS_CONSENSO
-        ? 'sem Pinnacle/Betfair: P_true pelo consenso das casas (R2), gate mais alto'
-        : `sem casa afiada e só ${casasNomes.length} casa(s): mercados principais só com o modelo como apoio (R3); mande a Pinnacle/Betfair ou 4+ casas`,
+        ? 'P_true pelo consenso das casas (R2), gate mais alto'
+        : `sem casa afiada e só ${casasNomes.length} casa(s): mercados principais só com o modelo como apoio (R3); cole 4+ casas`,
     );
   const horasAteJogo = (inicio - agora) / 3_600_000;
   if (afiadasJogo.length && horasAteJogo > 24)
@@ -306,7 +306,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
           ? 'sem referência (afiada ou 4+ casas) e sem modelo para este mercado'
           : !dqOk
             ? 'sem referência e DQ do modelo abaixo de C: só previsão (R4)'
-            : 'liga principal sem referência: o modelo não precifica mercado principal (R4, lição 3); mande Pinnacle/Betfair ou 4+ casas',
+            : 'liga principal sem referência: o modelo não precifica mercado principal (R4, lição 3); cole 4+ casas',
       );
       continue;
     }
