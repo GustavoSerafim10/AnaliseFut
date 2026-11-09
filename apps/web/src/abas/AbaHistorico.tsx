@@ -7,7 +7,9 @@ import { EscolherAposta } from '../componentes/EscolherAposta';
 import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { juntarMultiplas, painelComMultiplas, type Multipla } from '../multiplas';
-import { CartoesPainel, CurvaUnidades, PlacarDeAcerto } from '../componentes/PainelHistorico';
+import { ehMelhorEntrada } from '../camadas';
+import { CentroComando, CurvaNeon, Painel } from '../componentes/CentroComando';
+import { CartoesPainel } from '../componentes/PainelHistorico';
 import {
   apostasDoJogo,
   apurar,
@@ -24,7 +26,6 @@ import {
   marco,
   minhasEntradas,
   painel,
-  placarAcerto,
   registrarAposta,
   registrarResultado,
   situacao,
@@ -369,8 +370,9 @@ export function AbaHistorico({
         ou para o celular.
       </p>
 
-      <PlacarDeAcerto p={placarAcerto(historico)} />
+      <CentroComando historico={historico} />
 
+      <h3>Registro de apostas</h3>
       <div className="abas-mini">
         {(Object.keys(FILTROS) as FiltroPainel[]).map((f) => (
           <button key={f} className={f === filtro ? 'ativo' : ''} onClick={() => setFiltro(f)}>
@@ -381,7 +383,9 @@ export function AbaHistorico({
       </div>
       <p className="miudo">{FILTROS[filtro].dica}</p>
       <CartoesPainel p={pn} rotulo={filtro === 'entradas' ? 'Entradas' : 'Análises'} />
-      <CurvaUnidades p={pn} titulo={`Unidades acumuladas · ${FILTROS[filtro].nome}`} />
+      <Painel titulo={`Unidades acumuladas · ${FILTROS[filtro].nome}`} icone="modelo">
+        <CurvaNeon curva={pn.curva} />
+      </Painel>
 
       <div className="caixa">
         <h3>Banca separada</h3>
@@ -535,6 +539,10 @@ export function AbaHistorico({
                   </span>
                 )}
                 <span className="miudo">
+                  {ehMelhorEntrada(historico, e) && (
+                    <span className="selo-camada">Melhor entrada</span>
+                  )}
+                  <span className="lh-tecnica">Técnica:</span>
                   <span className={`selo ${CLASSE[e.resumo.decisao ?? ''] ?? 'nobet'}`}>
                     {e.resumo.rotulo}
                   </span>

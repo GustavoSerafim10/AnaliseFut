@@ -662,7 +662,7 @@ export interface PlacarAcerto {
   total: FaixaAcerto;
 }
 
-const FAIXAS_ACERTO: [string, number, number][] = [
+export const FAIXAS_ACERTO: [string, number, number][] = [
   ['Abaixo de 60%', 0, 0.6],
   ['De 60% a 70%', 0.6, 0.7],
   ['70% ou mais', 0.7, Infinity],

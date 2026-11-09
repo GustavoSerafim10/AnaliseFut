@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { FUSO, type Leitura, type Rascunho } from '../estado';
+import { familiaMercado } from '../camadas';
 import { aplicarLeitura, oddsDefasadas } from '../oddsDaCasa';
 import type { PropsAba } from './tipos';
 
@@ -30,23 +31,6 @@ const ORDEM_MERCADO: TipoMercado[] = [
   'cartoes_time',
   'cartoes_1x2',
 ];
-
-/** Nome curto de cada família de mercado, na lista de prints. */
-function familia(m: TipoMercado): string {
-  if (m.startsWith('escanteios') || m === 'primeiro_escanteio') return 'Escanteios';
-  if (m.startsWith('cartoes')) return 'Cartões';
-  const nomes: Partial<Record<TipoMercado, string>> = {
-    '1X2': '1X2',
-    DC: 'Dupla chance',
-    DNB: 'Empate anula',
-    AH: 'Handicap',
-    total: 'Gols',
-    total_time: 'Gols por time',
-    ambas: 'Ambas marcam',
-    primeiro_gol: '1º gol',
-  };
-  return nomes[m] ?? 'Outros';
-}
 
 export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const [json, setJson] = useState('');
@@ -87,7 +71,7 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const descrever = (texto: string) => {
     const conta = new Map<string, number>();
     for (const l of lerUm(texto))
-      conta.set(familia(l.mercado), (conta.get(familia(l.mercado)) ?? 0) + 1);
+      conta.set(familiaMercado(l.mercado), (conta.get(familiaMercado(l.mercado)) ?? 0) + 1);
     return conta.size
       ? [...conta].map(([f, n]) => `${f} ${n}`).join(' · ')
       : 'Sem odds com modelo neste print';
