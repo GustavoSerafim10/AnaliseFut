@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AbaAnalise } from './abas/AbaAnalise';
+import { AbaDesfalques } from './abas/AbaDesfalques';
 import { AbaFlashscore } from './abas/AbaFlashscore';
 import { AbaHistorico } from './abas/AbaHistorico';
 import { AbaJogo } from './abas/AbaJogo';
 import { AbaOdds } from './abas/AbaOdds';
 import { AbaPromocoes } from './abas/AbaPromocoes';
 import { AbaStats } from './abas/AbaStats';
-import { AbaTabela } from './abas/AbaTabela';
-import { AbaUltimas } from './abas/AbaUltimas';
 import { Estadio } from './componentes/Estadio';
 import { GaleriaFundo } from './componentes/GaleriaFundo';
 import { MatchCenter } from './componentes/MatchCenter';
@@ -55,8 +54,7 @@ type Aba =
         | 'sofascore'
         | 'superscore'
         | 'flashscore'
-        | 'tabela'
-        | 'ultimas'
+        | 'desfalques'
         | 'analise'
         | 'historico'
         | 'promocoes';
@@ -92,7 +90,9 @@ export function App() {
   const setMultiplas = (l: Multipla[]) => {
     setMultiplasState(l);
     setAvisoHistorico(
-      gravarMultiplas(l) ? null : 'Não consegui gravar a múltipla neste aparelho: exporte o backup.',
+      gravarMultiplas(l)
+        ? null
+        : 'Não consegui gravar a múltipla neste aparelho: exporte o backup.',
     );
   };
   const setMontando = (l: PernaMultipla[]) => {
@@ -186,8 +186,11 @@ export function App() {
           rotulo: 'Flashscore',
           marca: r.flashscoreSemTexto ? '—' : temTextoFlashscore(r) ? '✓' : undefined,
         },
-        { aba: { id: 'tabela' }, rotulo: 'Tabela e escalações' },
-        { aba: { id: 'ultimas' }, rotulo: 'Últimas partidas' },
+        {
+          aba: { id: 'desfalques' },
+          rotulo: 'Desfalques',
+          marca: contagem('desfalques') ? String(contagem('desfalques')) : undefined,
+        },
       ],
     },
     {
@@ -289,7 +292,7 @@ export function App() {
     galeria,
     setGaleria,
     verLance: () => setVerLance(true),
-    abrir: (id: 'sofascore' | 'tabela' | 'odds' | 'analise') => {
+    abrir: (id: 'sofascore' | 'desfalques' | 'odds' | 'analise') => {
       if (id !== 'odds') setAba({ id });
       else if (r.casas[0]) setAba({ id: 'odds', casa: r.casas[0] });
       else novaCasa();
@@ -394,8 +397,7 @@ export function App() {
         {aba.id === 'sofascore' && <AbaStats {...props} fonte="sofascore" />}
         {aba.id === 'superscore' && <AbaStats {...props} fonte="superscore" />}
         {aba.id === 'flashscore' && <AbaFlashscore {...props} />}
-        {aba.id === 'tabela' && <AbaTabela {...props} />}
-        {aba.id === 'ultimas' && <AbaUltimas {...props} />}
+        {aba.id === 'desfalques' && <AbaDesfalques {...props} />}
         {aba.id === 'odds' && r.casas.includes(aba.casa) && (
           <AbaOdds key={aba.casa} {...props} casa={aba.casa} />
         )}

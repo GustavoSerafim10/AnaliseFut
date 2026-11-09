@@ -17,7 +17,7 @@ export interface PropsAba {
   /** abre o modo estádio (animação em tela cheia) */
   verLance?: () => void;
   /** vai para outra aba ("odds" abre a primeira casa, ou pede uma) */
-  abrir?: (id: 'sofascore' | 'tabela' | 'odds' | 'analise') => void;
+  abrir?: (id: 'sofascore' | 'desfalques' | 'odds' | 'analise') => void;
 }
 
 /** Helpers para adicionar/remover textos de prints de um grupo. */

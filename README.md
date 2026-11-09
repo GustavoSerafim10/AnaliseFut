@@ -68,8 +68,8 @@ packages/parsers  texto do OCR → odds: detecção da fonte e da casa, sinônim
                   reconhecimento de times, leitor de odds (1win e demais casas), sanidade,
                   junção de prints; leitores de estatísticas, desfalques, tabela e Flashscore
 apps/web          site React + Vite (mobile-first)
-  src/abas/       Jogo · Estatísticas (SofaScore, SuperScore, Flashscore, Tabela e desfalques,
-                  Últimas partidas) · Odds (uma aba por casa) · Análise · Histórico
+  src/abas/       Jogo · Estatísticas (SofaScore, SuperScore, Flashscore, Desfalques)
+                  · Odds (uma aba por casa) · Análise · Histórico
   src/dados.ts    tudo derivado dos textos lidos: parsers → cruzamento → λ → DQ → motor → análise
   src/historico.ts  histórico no aparelho: resumo congelado, apuração, balanço, backup JSON
   src/claude.ts   botão "Copiar para o Claude" (só copia texto; nenhuma API)

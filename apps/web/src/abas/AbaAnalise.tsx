@@ -211,8 +211,6 @@ export function AbaAnalise({
   const campos = CAMPOS_STATS.filter((c) => d.tabela[c.campo] || ESSENCIAIS.includes(c.campo));
 
   const nCampos = (l: typeof d.sofa) => (l ? Object.keys(l.campos).length : 0);
-  const nUltimas =
-    (r.prints['ultimas:casa'] ?? []).length + (r.prints['ultimas:fora'] ?? []).length;
   const situacao = [
     { nome: 'Jogo', ok: !!(r.jogo.casa && r.jogo.fora && r.jogo.hora), obrigatorio: true },
     {
@@ -234,8 +232,6 @@ export function AbaAnalise({
     },
     { nome: 'Flashscore', ok: !!d.flash, obrigatorio: false },
     { nome: 'Desfalques', ok: d.desfalques.length > 0, obrigatorio: false },
-    { nome: 'Classificação', ok: d.classificacao.length > 0, obrigatorio: false },
-    { nome: 'Últimas partidas', ok: nUltimas > 0, obrigatorio: false },
     {
       nome: 'Odds',
       ok: d.oddsValidas.length > 0,

@@ -17,7 +17,7 @@ const OPCOES: [keyof Rascunho['config'], string, string][] = [
   [
     'escalacaoProvavel',
     'Escalação provável conferida',
-    'Marca sozinho quando a escalação dos dois times é lida em Tabela e escalações. Necessário para DQ A.',
+    'Marque depois de conferir quem joga nos dois times. Necessário para DQ A.',
   ],
   [
     'escalacaoIncerta',
@@ -147,23 +147,13 @@ export function AbaJogo({
       ir: abrir && (() => abrir('odds')),
     },
     {
-      nome: 'Desfalques e escalações',
-      detalhe:
-        [
-          d.escalacao.conferida &&
-            `escalação ${d.escalacao.status === 'confirmada' ? 'confirmada' : 'lida'}`,
-          d.desfalques.length > 0 && `${d.desfalques.length} desfalque(s)`,
-        ]
-          .filter(Boolean)
-          .join(' · ') || 'Confirmar quem joga',
+      nome: 'Desfalques',
+      detalhe: d.desfalques.length
+        ? `${d.desfalques.length} desfalque(s)`
+        : 'Quem está fora do jogo',
       icone: 'pessoas',
-      estado:
-        d.escalacao.conferida || r.config.escalacaoProvavel
-          ? 'ok'
-          : d.desfalques.length
-            ? 'parcial'
-            : 'pendente',
-      ir: abrir && (() => abrir('tabela')),
+      estado: d.desfalques.length ? 'ok' : 'pendente',
+      ir: abrir && (() => abrir('desfalques')),
     },
   ];
   // "Iniciar análise" leva ao primeiro passo que ainda falta
