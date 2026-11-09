@@ -75,7 +75,7 @@ export function similaridadeTime(a: string, b: string, tolerante = false): numbe
 }
 
 /**
- * Com , aceita uma letra errada no nome digitado, só se a comparação exata não achar
+ * No modo tolerante, aceita uma letra errada no nome digitado, só se a comparação exata não achar
  * nenhum dos dois. Só para os prints do próprio jogo: numa tabela, Athletico viraria Atlético.
  */
 export function reconhecerTime(texto: string, jogo: NomesTimes, tolerante = false): Time | null {
