@@ -86,6 +86,17 @@ const ODD_SEM_SEPARADOR = /[A-Za-zÀ-ú)]\s\d{3}$/;
 const ABA_DA_CASA =
   /^(CRIAR APOSTA\s*)?(MERCADOS PRINCIPAIS|ESCANTEIOS|CART(Õ|O)ES|ESPECIAIS|COMBOS|JOGADORES|ESTAT(Í|I)STICAS|N(Ú|U)MERO DE GOLS|RESULTADO|QUEM MARCAR(Á|A) GOLS\??)$/;
 
+/** Quadro "Dicas da partida" da PlayOn: repete odds soltas, fora de qualquer mercado. */
+const DICAS_DA_CASA = /^dicas? da partida|\bindica \d+%/i;
+
+/** Linha de gols sem a vírgula ("05", "15", "275"; escanteios: "95", "105"). */
+function linhaSemPonto(tok: string, mercado: TipoMercado): number {
+  if (tok.includes('.') || tok.length < 2 || !tok.endsWith('5')) return Number(tok);
+  const contagem = /^(escanteios|cartoes)/.test(mercado);
+  const corte = contagem && tok.length === 3 ? 2 : 1;
+  return Number(`${tok.slice(0, corte)}.${tok.slice(corte)}`);
+}
+
 const CONFIANCA_OCR = 0.6;
 const CONFIANCA_CORRIGIDA = 0.45;
 
@@ -222,6 +233,8 @@ function ladoResultado(rotulo: string, jogo: NomesTimes, comEmpate: boolean): st
   if (/^(v1|w1|p1|1)$/.test(r)) return '1';
   if (/^(v2|w2|p2|2)$/.test(r)) return '2';
   if (comEmpate && /^(x|empate|draw)$/.test(r)) return 'X';
+  if (/^(casa|mandante)$/.test(r)) return '1';
+  if (/^(fora|visitante)$/.test(r)) return '2';
   const t = reconhecerTime(r, jogo);
   return t === 'casa' ? '1' : t === 'fora' ? '2' : null;
 }
@@ -276,7 +289,8 @@ function interpretarLado(ctx: MercadoDetectado, rotulo: string, jogo: NomesTimes
       return { lado };
     }
     case 'ambas':
-      return comoLado(ladoSimNao(rotulo));
+      // "Casa e sim" é resultado + ambas, outro mercado
+      return /casa|empate|fora/.test(semAcento(rotulo)) ? null : comoLado(ladoSimNao(rotulo));
     case 'par_impar': {
       const r = semAcento(rotulo);
       return /impar/.test(r) ? { lado: 'impar' } : /\bpar\b/.test(r) ? { lado: 'par' } : null;
@@ -360,6 +374,8 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
   let mercado: MercadoDetectado | null = ctx.mercadoInicial ?? null;
   let colunas: ('over' | 'under')[] | null = null;
   let rotulosPendentes: string | null = null;
+  /** linha que vem no título do mercado ("Total de escanteios 9,5") */
+  let linhaDoTitulo: number | undefined;
   const orfas: string[] = [];
   const lidasPorMercado: ResultadoParser['lidasPorMercado'] = [];
 
@@ -392,10 +408,22 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
   for (const bruta of linhasTexto) {
     if (ehBarraDeAbas(bruta)) continue;
-    if (ABA_DA_CASA.test(bruta)) {
+    if (ABA_DA_CASA.test(bruta) || DICAS_DA_CASA.test(bruta)) {
       mercado = null;
       colunas = null;
       rotulosPendentes = null;
+      linhaDoTitulo = undefined;
+      continue;
+    }
+
+    // PlayOn: o título traz a linha num selo ("Escanteios no 1º tempo (asiático) 4,5")
+    const comSelo = /^(.*[A-Za-zÀ-ú)])\s+(\d+\.\d+)(?:\s+\S{1,2})?$/.exec(bruta);
+    const tituloComSelo = comSelo ? detectarTituloMercado(comSelo[1], ctx.jogo) : null;
+    if (comSelo && tituloComSelo && COM_LINHA.has(tituloComSelo.mercado)) {
+      mercado = tituloComSelo;
+      colunas = null;
+      rotulosPendentes = null;
+      linhaDoTitulo = Number(comSelo[2]);
       continue;
     }
 
@@ -417,12 +445,14 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         mercado = titulo;
         colunas = null;
         rotulosPendentes = null;
+        linhaDoTitulo = undefined;
       } else if (TITULO_COM_SETA.test(bruta) || TITULO_COM_INFO.test(bruta)) {
         // título que o motor não conhece: as odds dele não podem cair no mercado de cima
         // ("Vencer Ambos Os Tempos" depois do primeiro gol: "Atlético Mineiro 8.0" virava 1º gol @ 8)
         mercado = { mercado: 'outro', periodo: 'FT' };
         colunas = null;
         rotulosPendentes = null;
+        linhaDoTitulo = undefined;
       } else {
         rotulosPendentes = bruta;
       }
@@ -465,7 +495,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         bruta,
       );
     if (totalPrefixo && COM_LINHA.has(mercado.mercado) && !HANDICAPS.has(mercado.mercado)) {
-      const L = Number(totalPrefixo[1]);
+      const L = linhaSemPonto(totalPrefixo[1], mercado.mercado);
       for (const [rot, tok] of [
         [totalPrefixo[2], totalPrefixo[3]],
         [totalPrefixo[4], totalPrefixo[5]],
@@ -478,9 +508,16 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
     }
 
     // Jogou: "1 -0.25 1.86 2 +0.25 1.87" (1 = mandante, 2 = visitante)
+    // PlayOn: "-0.25 1-0.25 1.45 2+0.25 2.47", com a linha repetida antes e colada no número
     const ahNumerado =
-      /^([12])\s+([+-]?\d+(?:\.\d+)?)\s+(\S+)\s+([12])\s+([+-]?\d+(?:\.\d+)?)\s+(\S+)$/.exec(bruta);
-    if (ahNumerado && HANDICAPS.has(mercado.mercado)) {
+      /^(?:[+-]?\d+(?:\.\d+)?\s+)?([12])\s*([+-]?\d+(?:\.\d+)?)\s+(\S+)\s+([12])\s*([+-]?\d+(?:\.\d+)?)\s+(\S+)$/.exec(
+        bruta,
+      );
+    if (
+      ahNumerado &&
+      HANDICAPS.has(mercado.mercado) &&
+      Math.abs(Number(ahNumerado[2]) + Number(ahNumerado[5])) < 1e-9
+    ) {
       for (const [n, l, tok] of [ahNumerado.slice(1, 4), ahNumerado.slice(4, 7)]) {
         const o = lerOdd(tok);
         if (o && o.odd > 1) emitir({ lado: n === '1' ? 'casa' : 'fora' }, o, Number(l));
@@ -588,7 +625,8 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
         rotulo.push(tok);
         continue;
       }
-      if (precisaLinha && linha === undefined && rotulo.length > 0) {
+      if (precisaLinha && linha === undefined && linhaDoTitulo !== undefined) linha = linhaDoTitulo;
+      else if (precisaLinha && linha === undefined && rotulo.length > 0) {
         // "AcimaDed.5 1.6": a linha grudou no rótulo e saiu ilegível; nas colunas
         // Menos | Mais a fileira tem uma linha só, a do lado de lá
         // "menosdedb 1.24" (CasaDeApostas): idem, sem nenhum dígito legível

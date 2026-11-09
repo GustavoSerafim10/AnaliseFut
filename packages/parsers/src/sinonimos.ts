@@ -19,13 +19,15 @@ export interface MercadoDetectado {
  * diferente (ex.: "Vitória antecipada 1:0" não é o 1X2) vão para 'outro' antes de tudo.
  */
 export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
+  // PlayOn: o 1X2 de escanteios tem este título
+  [/quem tem mais escanteios/, 'escanteios_1x2'],
   [
     // Futamina/Jogou: "Pagamento antecipado" (paga com 2 gols de vantagem), "Resultado + ambas",
     // "Resultado + total" e o handicap europeu de 3 vias ("Resultado com handicap")
     // 99Play: "Handicap 1×2" (3 vias, "Começa 0:2"), "Botafogo SP devolve aposta" (é dupla chance
     // com devolução, não o empate anula), "Qual equipe vai marcar", "Botafogo SP para marcar"
     // CasaDeApostas: "Handicap 0:1" (3 vias), "<time> para vencer um dos tempos", "<time> sem sofrer gols"
-    /handicap \d ?: ?\d|vencer (em )?(ambos|um)( dos| os)? tempos|(?<!vencer )sem sofrer|handicap 1 ?[x×] ?2|(?<!empate )devolve aposta|qual equipe|para marcar|^\S* ?marcador\b|vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado|total de gols|gols) ?\+ ?(ambas|total)|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
+    /handicap \d ?: ?\d|vencer (em )?(ambos|um)( dos| os)? tempos|(?<!vencer )sem sofrer|handicap 1 ?[x×] ?2|(?<!empate )devolve aposta|qual equipe|para marcar|^\S* ?marcador\b|vitoria antecipada|pagamento antecipado|resultado com handicap|(resultado( final)?|total de gols|gols) ?(\+|e) ?(ambas|total)|nao sofre gol|a partir de desvantagem|qualquer um dos tempos|ambos os tempos vencer|vencer ambos os tempos|red card|penalidade|penalti/,
     'outro',
   ],
   // minuto do 1º gol, tempo com mais gols e par/ímpar dos gols de UM time ("Total de gols -
@@ -61,13 +63,13 @@ export const SINONIMOS_MERCADO: [RegExp, TipoMercado][] = [
   ],
   [/marcar em ambos os tempos/, 'marcar_2_tempos'],
   [/vencer sem sofrer/, 'vencer_sem_sofrer'],
-  [/primeiro gol|proximo gol|marcar o primeiro|marca primeiro/, 'primeiro_gol'],
+  [/primeiro gol|proximo gol|marcar o primeiro|marca primeiro|primeiro a marcar/, 'primeiro_gol'],
   [/ultimo gol|marcar o ultimo/, 'ultimo_gol'],
   [/handicap europeu|handicap 3/, 'AH_europeu'],
   [/handicap( asiatico)?/, 'AH'],
   [/par ?\/ ?impar|impar ?\/ ?par|par ou impar/, 'par_impar'],
   [
-    /resultado do tempo regulamentar|resultado (final|do jogo|da partida)|\b1x2\b|vencedor (da partida|do jogo|do encontro)|money ?line|^resultado$/,
+    /resultado do (1|2|primeiro|segundo).{0,2} tempo|resultado do tempo regulamentar|resultado (final|do jogo|da partida)|\b1x2\b|vencedor (da partida|do jogo|do encontro)|money ?line|^resultado$/,
     '1X2',
   ],
   [
@@ -84,6 +86,8 @@ export function ehBarraDeAbas(linha: string): boolean {
   if (/[a-z]\.\s+[a-z]/.test(t)) return false;
   // 99Play: mercado "Totais chutes" (são duas palavras de aba, mas é título)
   if (/\btotais chutes\b/.test(t)) return false;
+  // PlayOn: "Principais Gols Handicap Tempos Escanteios" e "Escanteios e cartões Jogadores Outros Todos"
+  if (/principais.*(gols|handicap|tempos)|jogadores.*(outros|todos)/.test(t)) return true;
   const abas = [
     'todos',
     'principal',
