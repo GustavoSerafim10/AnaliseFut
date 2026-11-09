@@ -1,5 +1,11 @@
 import { chaveSelecao, type LinhaOdd, type TipoMercado } from '@pe/engine';
-import { checarSanidade, conferirPrintOdds, juntarLinhas, lerOddsCasa } from '@pe/parsers';
+import {
+  checarSanidade,
+  conferirPrintOdds,
+  juntarLinhas,
+  lerOddsCasa,
+  lerOddsCasaConsenso,
+} from '@pe/parsers';
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
@@ -51,16 +57,13 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
   const daCasa = r.odds.map((l, i) => ({ l, i })).filter(({ l }) => l.casa === casa);
   // todos os prints da casa lidos juntos: blocos sem título herdam o mercado pela linha repetida
   const lerTodos = (prints: Leitura[]) =>
-    lerOddsCasa(
-      prints.map((p) => p.texto),
-      {
-        jogo: nomes,
-        data: r.jogo.data,
-        fuso: FUSO,
-        casa,
-        horariosPadrao: prints.map((p) => p.capturadoEm),
-      },
-    );
+    lerOddsCasaConsenso(prints, {
+      jogo: nomes,
+      data: r.jogo.data,
+      fuso: FUSO,
+      casa,
+      horariosPadrao: prints.map((p) => p.capturadoEm),
+    });
   const leitura = lerTodos(r.prints[grupo] ?? []);
   const defasadas = oddsDefasadas(r.odds, casa, leitura.linhas);
   /** Grava os prints e refaz as odds da casa a partir deles (lê do estado mais novo). */
@@ -70,16 +73,13 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
     odds: aplicarLeitura(
       x.odds,
       casa,
-      lerOddsCasa(
-        prints.map((p) => p.texto),
-        {
-          jogo: { casa: x.jogo.casa || 'Mandante', fora: x.jogo.fora || 'Visitante' },
-          data: x.jogo.data,
-          fuso: FUSO,
-          casa,
-          horariosPadrao: prints.map((p) => p.capturadoEm),
-        },
-      ).linhas,
+      lerOddsCasaConsenso(prints, {
+        jogo: { casa: x.jogo.casa || 'Mandante', fora: x.jogo.fora || 'Visitante' },
+        data: x.jogo.data,
+        fuso: FUSO,
+        casa,
+        horariosPadrao: prints.map((p) => p.capturadoEm),
+      }).linhas,
     ),
   });
   const lerUm = (texto: string) =>
@@ -172,6 +172,7 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         dica="Mande todos os mercados, quantos prints forem; repetidos são juntados. O horário de coleta é lido da barra de status. Apagar um print tira as odds dele."
         leituras={r.prints[grupo] ?? []}
         desabilitado={semTimes}
+        releituras={[170]}
         descrever={descrever}
         conferir={conferir}
         onLido={(lido) => setR((x) => comPrints(x, [...(x.prints[grupo] ?? []), lido]))}

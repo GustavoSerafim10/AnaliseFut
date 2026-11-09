@@ -54,6 +54,52 @@ export function lerOddsCasa(textos: string[], ctx: ContextoCasa): ResultadoParse
   return r;
 }
 
+/**
+ * Vários jogos de leitura dos mesmos prints: cada jogo é lido inteiro (um print herda o mercado
+ * de outro) e cada odd vai por votos. Empate fica com a primeira leitura. Odd que a primeira
+ * leitura não viu só entra se mais de uma releitura concordar: uma sozinha pode inventar mercado.
+ */
+export function lerOddsCasaConsenso(
+  prints: { texto: string; releituras?: string[] }[],
+  ctx: ContextoCasa,
+  minVotosSemPrimeira = 2,
+): ResultadoParser {
+  const principal = lerOddsCasa(
+    prints.map((p) => p.texto),
+    ctx,
+  );
+  const jogos = Math.max(0, ...prints.map((p) => p.releituras?.length ?? 0));
+  if (!jogos) return principal;
+  const leituras = [juntarLinhas(principal.linhas).linhas];
+  for (let j = 0; j < jogos; j++) {
+    const comEsta = prints.flatMap((p, i) =>
+      p.releituras?.[j] !== undefined ? [{ texto: p.releituras[j], i }] : [],
+    );
+    const lidas = lerOddsCasa(
+      comEsta.map((p) => p.texto),
+      { ...ctx, horariosPadrao: comEsta.map((p) => ctx.horariosPadrao?.[p.i]) },
+    );
+    leituras.push(juntarLinhas(lidas.linhas).linhas);
+  }
+  const votos = new Map<string, Map<number, OddLine[]>>();
+  leituras.forEach((linhas) => {
+    for (const l of linhas) {
+      const k = chaveSelecao(l as LinhaOdd);
+      const porOdd = votos.get(k) ?? new Map<number, OddLine[]>();
+      porOdd.set(l.odd, [...(porOdd.get(l.odd) ?? []), l]);
+      votos.set(k, porOdd);
+    }
+  });
+  const naPrimeira = new Set(leituras[0].map((l) => chaveSelecao(l as LinhaOdd)));
+  const linhas: OddLine[] = [];
+  for (const [k, porOdd] of votos) {
+    let melhor: OddLine[] = [];
+    for (const v of porOdd.values()) if (v.length > melhor.length) melhor = v;
+    if (naPrimeira.has(k) || melhor.length >= minVotosSemPrimeira) linhas.push(melhor[0]);
+  }
+  return { ...principal, linhas };
+}
+
 /** Texto do OCR → odds. Layout desconhecido = aviso, nunca valor inventado. */
 export function lerPrint(texto: string, ctx: ContextoParser): LeituraPrint {
   const { fonte } = detectarFonte(texto);

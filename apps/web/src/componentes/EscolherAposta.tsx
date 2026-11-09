@@ -2,7 +2,7 @@
  * "Entrei nessa aposta" no Histórico: mostra as apostas lidas daquele jogo, não só a melhor da
  * análise. Relê os prints guardados, então uma leitura já corrigida vale sem abrir a análise.
  */
-import { lerOddsCasa } from '@pe/parsers';
+import { lerOddsCasaConsenso } from '@pe/parsers';
 import type { OddLine } from '@pe/schemas';
 import { useMemo, useState } from 'react';
 import { derivar, type Derivado } from '../dados';
@@ -23,16 +23,13 @@ export function rascunhoRelido(r: Rascunho): Rascunho {
     odds: r.casas.reduce((odds, casa) => {
       const prints = r.prints[`odds:${casa}`] ?? [];
       if (!prints.length) return odds;
-      const lidas = lerOddsCasa(
-        prints.map((p) => p.texto),
-        {
-          jogo,
-          data: r.jogo.data,
-          fuso: FUSO,
-          casa,
-          horariosPadrao: prints.map((p) => p.capturadoEm),
-        },
-      ).linhas;
+      const lidas = lerOddsCasaConsenso(prints, {
+        jogo,
+        data: r.jogo.data,
+        fuso: FUSO,
+        casa,
+        horariosPadrao: prints.map((p) => p.capturadoEm),
+      }).linhas;
       return aplicarLeitura(odds, casa, lidas);
     }, r.odds),
   };

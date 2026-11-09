@@ -9,8 +9,8 @@ interface Props {
   desabilitado?: boolean;
   /** 'lados': nomes com posição no campo (escalação); 'tabela': classificação em colunas */
   modo?: ModoOcr;
-  /** estatísticas: lê o print várias vezes, e os valores vão por votos */
-  releituras?: boolean;
+  /** lê o print várias vezes (estes são os cortes de contraste), e os valores vão por votos */
+  releituras?: number[];
   /** o que este print trouxe ("Escanteios 6 · Gols 4") */
   descrever?: (texto: string) => string;
   /** aviso quando o print parece ser de outro jogo ou da área errada */
@@ -73,7 +73,7 @@ export function UploadPrints({
         const aoProgredir = (p: number) =>
           setFila({ atual: arq.name, feitos: i, total: lista.length, p });
         const lido = releituras
-          ? await lerComReleituras(arq, aoProgredir)
+          ? await lerComReleituras(arq, releituras, aoProgredir)
           : { texto: await lerImagem(arq, aoProgredir, modo) };
         onLido({ arquivo: arq.name, ...lido, capturadoEm: isoLocal(new Date(arq.lastModified)) });
       } catch (e) {

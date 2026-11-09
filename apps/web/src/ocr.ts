@@ -308,33 +308,35 @@ async function preprocessar(
 }
 
 /**
- * Estatísticas: cada leitura erra em campos diferentes. São 5 leituras do mesmo print, e o
- * parser vota campo a campo (lerEstatisticasConsenso). Em prints reais do SofaScore a 100%, 75%
- * e 60% de zoom, de 76 valores: uma leitura = 65 certos e 2 errados; cinco = 75 certos e 0 errados.
+ * Cada leitura erra em lugares diferentes: o mesmo print é lido em outras ampliações e cortes de
+ * contraste, e o parser vota valor a valor. Estatísticas, prints reais do SofaScore a 100%, 75%
+ * e 60% de zoom, 76 valores: uma leitura = 65 certos e 2 errados; cinco = 75 e 0.
+ * Odds, 20 prints reais reduzidos a 75% e 60%, 234 valores: uma = 204 e 12; quatro = 216 e 6.
  */
 export async function lerComReleituras(
   arquivo: File,
+  cortes: number[],
   progresso?: (p: number) => void,
 ): Promise<{ texto: string; releituras: string[] }> {
   const w = await obterWorker();
-  const total = 5;
+  let total = 1;
   const ler = async (n: number, canvas: HTMLCanvasElement) => {
     aoProgredir = (p) => progresso?.((n + p) / total);
     return (await w.recognize(canvas)).data.text;
   };
   try {
     const { cinza, escala } = await preprocessar(arquivo);
-    const texto = await ler(0, cinza);
     const variantes = [
       ...[3, 2].filter((e) => e < escala).map((e) => ({ escala: e })),
-      { escala, corte: 130 },
-      { escala, corte: 90 },
+      ...cortes.map((corte) => ({ escala, corte })),
     ];
+    total += variantes.length;
+    const texto = await ler(0, cinza);
     const releituras: string[] = [];
-    for (const v of variantes) {
-      const n = total - variantes.length + releituras.length;
-      releituras.push(await ler(n, (await preprocessar(arquivo, 'bloco', v)).cinza));
-    }
+    for (const v of variantes)
+      releituras.push(
+        await ler(releituras.length + 1, (await preprocessar(arquivo, 'bloco', v)).cinza),
+      );
     return { texto, releituras };
   } finally {
     aoProgredir = null;
