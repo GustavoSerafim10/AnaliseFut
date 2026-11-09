@@ -195,7 +195,8 @@ export function precificar(
       );
       continue;
     }
-    const margemDC = ls.reduce((s, l) => s + 1 / l.odd, 0) - 2;
+    // as três DC somam 2 (cada resultado aparece em duas): a margem é relativa a 2, como no 1X2
+    const margemDC = ls.reduce((s, l) => s + 1 / l.odd, 0) / 2 - 1;
     for (const l of ls) {
       const p = normalizarLado(l.lado)
         .split('')

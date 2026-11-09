@@ -13,6 +13,8 @@ import {
 import { CentroComando } from '../src/componentes/CentroComando';
 import { CockpitAnalise } from '../src/componentes/CockpitAnalise';
 import { montarRadar } from '../src/componentes/RadarOdds';
+import { precificar } from '@pe/engine';
+import { montarPromptClaude } from '../src/claude';
 import { derivar } from '../src/dados';
 import { rascunhoExemplo } from '../src/exemplo';
 import { CASAS_PADRAO, comCasasPadrao, rascunhoNovo } from '../src/estado';
@@ -243,5 +245,34 @@ describe('casas padrão', () => {
   it('casa removida não volta', () => {
     const r = { ...rascunhoNovo(), casas: ['1win'] };
     expect(comCasasPadrao(r).casas).toEqual(['1win']);
+  });
+});
+
+describe('varredura: texto para o Claude e margem da dupla chance', () => {
+  it('não leva odd reprovada e traz as duas camadas', () => {
+    const r = rascunhoExemplo();
+    const falsa = { ...r.odds[0], mercado: 'total', lado: 'over', linha: 2.15, odd: 7.77 } as never;
+    const comFalsa = { ...r, odds: [...r.odds, falsa] };
+    const texto = montarPromptClaude(comFalsa, derivar(comFalsa));
+    expect(texto).not.toContain('7.77');
+    expect(texto).toContain('ficaram de fora');
+    expect(texto).toContain('# Melhores entradas');
+    expect(texto).toContain('duas camadas');
+    expect(texto).not.toContain('Pinnacle/Betfair sem margem');
+  });
+  it('margem da DC é relativa a 2 (Botosani: 1,29 / 1,25 / 1,62 ≈ 9,6%)', () => {
+    const base = { casa: 'PlayOn', periodo: 'FT', horarioColeta: 'x' };
+    const l = (mercado: string, lado: string, odd: number) =>
+      ({ ...base, mercado, lado, odd }) as never;
+    const { selecoes } = precificar([
+      l('1X2', '1', 2.18),
+      l('1X2', 'X', 3.35),
+      l('1X2', '2', 3.05),
+      l('DC', '1X', 1.29),
+      l('DC', '12', 1.25),
+      l('DC', 'X2', 1.62),
+    ]);
+    const dc = selecoes.find((s) => s.linha.mercado === 'DC')!;
+    expect(dc.margem).toBeCloseTo(0.0962, 3);
   });
 });

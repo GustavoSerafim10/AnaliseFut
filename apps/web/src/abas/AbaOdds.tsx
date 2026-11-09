@@ -246,7 +246,7 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
             <div className="cc-odds-grade">
               {daFamilia.map(({ l, i }) => (
                 <CartaoOdd
-                  key={`${i}-${JSON.stringify(l)}`}
+                  key={i}
                   linha={l}
                   nomes={nomes}
                   data={r.jogo.data}

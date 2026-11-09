@@ -46,7 +46,7 @@ import {
   juntarUltimas,
   lerEscalacao,
   mesmoJogador,
-  lerOddsCasa,
+  lerOddsCasaConsenso,
   lerClassificacao,
   lerDesfalques,
   lerEstatisticasConsenso,
@@ -348,7 +348,8 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
   const versoes = r.casas.flatMap((casa) =>
     (r.prints[`odds:${casa}`] ?? []).flatMap(
       (p) =>
-        lerOddsCasa([p.texto], {
+        // votada entre as leituras: um erro de OCR não pode parecer movimento de preço
+        lerOddsCasaConsenso([p], {
           jogo: nomes,
           data: r.jogo.data,
           fuso: '-03:00',

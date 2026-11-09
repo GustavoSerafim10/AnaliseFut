@@ -12,11 +12,12 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   const l: string[] = [];
   l.push(
     'Você é um analista de apostas esportivas pré-live, rigoroso e construtivo.',
-    'Abaixo estão os dados de um jogo e o resultado de um motor determinístico. A decisão segue o protocolo V4.0: P_true da Pinnacle/Betfair sem margem (ou do consenso de 4+ casas), entrada só quando uma casa de varejo paga acima desse preço, CLV como métrica principal. O motor V3.3 é o apoio (Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado; escanteios e cartões amarelos com binomial negativa por time, nível 3, modelo pesando no máximo 30%).',
+    'Abaixo estão os dados de um jogo e o resultado de um motor determinístico. A decisão segue o protocolo V4.0: P_true do consenso de 4+ casas sem margem (ou de uma casa afiada de referência), entrada só quando uma casa de varejo paga acima desse preço, CLV como métrica principal. O motor V3.3 é o apoio (Poisson + Dixon-Coles, λ do mercado por mínimos quadrados, de-vig, blend modelo × mercado, gates de EV, sensibilidade e Kelly fracionado; escanteios e cartões amarelos com binomial negativa por time, nível 3, modelo pesando no máximo 30%).',
     'Regras:',
     '- Não invente dados, odds, lesões nem probabilidades. Se faltar algo, diga que falta.',
     '- A decisão (BET / WATCHLIST / INVESTIGAR / NO BET) é do motor V4.0. Você pode criticá-la e apontar riscos, mas não a substitua.',
     '- NO BET é um resultado legítimo; não force uma aposta.',
+    '- São duas camadas separadas: "Melhores entradas" (odds de 1,40 a 2,00, ordenadas por chance estimada) e a decisão técnica V4.0 (preço contra a referência). Uma aposta pode estar na primeira com NO BET na segunda: não trate isso como contradição e não some as duas.',
     'Escreva em português: (1) leitura do jogo; (2) o que os números dizem; (3) contexto (desfalques, casa/fora, confronto direto); (4) por que a melhor entrada é ou não é essa; (5) red team com 3 argumentos contra, um deles atacando a premissa do modelo; (6) conclusão em 3 linhas.',
     '',
     `# Jogo: ${r.jogo.casa} × ${r.jogo.fora}`,
@@ -62,11 +63,23 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   }
   if (temTextoFlashscore(r)) l.push('', '# Texto de análise do Flashscore', r.flashscore.trim());
   else if (r.flashscoreSemTexto) l.push('', '# Flashscore: o jogo não tem texto de análise');
-  l.push('', '# Odds coletadas');
-  for (const o of r.odds)
+  l.push('', '# Odds coletadas (só as que passaram na conferência de leitura)');
+  if (d.errosOdds) l.push(`(${d.errosOdds} odd(s) com erro de leitura ficaram de fora)`);
+  for (const o of d.oddsValidas)
     l.push(
       `- ${o.casa}: ${descreverAposta(o as LinhaOdd, nomes).replace('Ganha se: ', '')} @ ${o.odd}`,
     );
+  if (d.entradas) {
+    const { entradas, recusadas, bloqueio } = d.entradas;
+    l.push('', '# Melhores entradas');
+    if (bloqueio) l.push(`Trava da banca: ${bloqueio}`);
+    if (!entradas.length) l.push('Nenhuma entrada neste jogo.');
+    for (const e of entradas)
+      l.push(
+        `- ${e.descricao.replace('Ganha se: ', '')} @ ${e.odd} (${e.casa}): chance de green ${(e.chanceGreen * 100).toFixed(0)}%, a odd pede ${(e.minimo * 100).toFixed(1)}%, estatísticas ${(e.pModelo * 100).toFixed(1)}% × mercado ${(e.pMercado * 100).toFixed(1)}%, ${e.forca === 'forte' ? 'sinal forte' : 'sinal médio'}`,
+      );
+    if (recusadas.length) l.push(`Ficaram de fora pelos filtros: ${recusadas.length} mercado(s).`);
+  }
   if (d.v4) {
     l.push(
       '',
