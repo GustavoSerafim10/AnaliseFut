@@ -50,7 +50,8 @@ export function CartaoOdd({ linha: l, nomes, data, problemas, onMudar, onRemover
   return (
     <div key={chave} className={`cartao-odd ${erro ? 'erro' : problemas.length ? 'alerta' : ''}`}>
       <div className="ganha">
-        {descreverAposta(l as LinhaOdd, nomes)} <span className="odd-grande">@ {l.odd}</span>
+        {descreverAposta(l as LinhaOdd, nomes)}{' '}
+        <span className="odd-grande">@ {String(l.odd).replace('.', ',')}</span>
       </div>
       <details>
         <summary className="miudo">editar</summary>

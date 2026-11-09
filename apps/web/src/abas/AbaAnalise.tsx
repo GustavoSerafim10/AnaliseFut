@@ -563,6 +563,8 @@ export function AbaAnalise({
                 <td>{DEF_CAMPO[c.campo].rotulo}</td>
                 {(['casa', 'fora'] as const).map((t) => {
                   const v = d.tabela[c.campo]?.[t];
+                  const outro = d.tabela[c.campo]?.[t === 'casa' ? 'fora' : 'casa']?.valor;
+                  const oponente = (v?.valor ?? 0) + (outro ?? 0) > 0 ? outro : undefined;
                   // vermelho só para o que pede conferência: sites divergem, ou aviso de leitura
                   // que não seja rotina (ponto decimal reposto); os dois sites concordando, ou
                   // valor corrigido à mão, não é dúvida
@@ -602,6 +604,11 @@ export function AbaAnalise({
                         placeholder={dica}
                         onBlur={(e) => corrigir(c.campo, t, e.target.value)}
                       />
+                      {v?.valor !== undefined && oponente !== undefined && (
+                        <span className="cc-duelo">
+                          <i style={{ width: `${(v.valor / (v.valor + oponente)) * 100}%` }} />
+                        </span>
+                      )}
                       <div className="miudo">
                         {v?.porFonte.sofascore !== undefined && `Sofa ${v.porFonte.sofascore} `}
                         {v?.porFonte.superscore !== undefined && `Super ${v.porFonte.superscore}`}

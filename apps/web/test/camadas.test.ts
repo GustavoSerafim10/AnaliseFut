@@ -11,6 +11,10 @@ import {
   resumirCamada,
 } from '../src/camadas';
 import { CentroComando } from '../src/componentes/CentroComando';
+import { CockpitAnalise } from '../src/componentes/CockpitAnalise';
+import { montarRadar } from '../src/componentes/RadarOdds';
+import { derivar } from '../src/dados';
+import { rascunhoExemplo } from '../src/exemplo';
 import { CASAS_PADRAO, comCasasPadrao, rascunhoNovo } from '../src/estado';
 import { placarAcerto, type EntradaHistorico } from '../src/historico';
 
@@ -189,6 +193,38 @@ describe('números do painel', () => {
     const fora = jogo('2', [3, 1], { entrada: entrada('over', 2.5, 2) });
     expect(ehMelhorEntrada([e, fora], e)).toBe(true);
     expect(ehMelhorEntrada([e, fora], fora)).toBe(false);
+  });
+});
+
+describe('radar de preços e painel da análise', () => {
+  const odd = (casa: string, lado: string, v: number) =>
+    ({
+      casa,
+      mercado: 'total',
+      lado,
+      linha: 2.5,
+      odd: v,
+      periodo: 'FT',
+      horarioColeta: 'x',
+    }) as never;
+  it('marca quem paga mais e ignora seleção de uma casa só', () => {
+    const r = montarRadar([odd('A', 'over', 1.8), odd('B', 'over', 2), odd('A', 'under', 2.1)]);
+    expect(r.linhas).toHaveLength(1);
+    expect(r.linhas[0].melhor).toBe(2);
+    expect(r.linhas[0].vantagem).toBeCloseTo(2 / 1.8 - 1);
+    expect(r.casas).toEqual(['A', 'B']);
+  });
+  it('o painel desenha o jogo de exemplo com o mapa de placares', () => {
+    const d = derivar(rascunhoExemplo());
+    const html = renderToString(
+      createElement(CockpitAnalise, {
+        d,
+        situacao: [{ nome: 'Odds', ok: true, obrigatorio: true }],
+        nomes: { casa: 'A', fora: 'B' },
+      }),
+    );
+    expect(html).toContain('Mapa de placares');
+    expect(html).toContain('Quem vence');
   });
 });
 

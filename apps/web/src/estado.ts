@@ -193,7 +193,9 @@ export function num(s: string): number | undefined {
 export const inicioIso = (r: Rascunho) => `${r.jogo.data}T${r.jogo.hora || '00:00'}:00${FUSO}`;
 
 export const pct = (x: number | null | undefined, casas = 1) =>
-  x === null || x === undefined || !Number.isFinite(x) ? '—' : `${(x * 100).toFixed(casas)}%`;
+  x === null || x === undefined || !Number.isFinite(x)
+    ? '—'
+    : `${(x * 100).toFixed(casas).replace('.', ',')}%`;
 
 export const dec = (x: number | null | undefined, casas = 2) =>
-  x === null || x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(casas);
+  x === null || x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(casas).replace('.', ',');

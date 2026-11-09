@@ -1,6 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import '@fontsource/exo-2/latin-400.css';
+import '@fontsource/exo-2/latin-500.css';
+import '@fontsource/exo-2/latin-600.css';
+import '@fontsource/chakra-petch/latin-500.css';
+import '@fontsource/chakra-petch/latin-600.css';
+import '@fontsource/chakra-petch/latin-700.css';
 import './estilos.css';
 import { iniciarHistorico } from './historico';
 

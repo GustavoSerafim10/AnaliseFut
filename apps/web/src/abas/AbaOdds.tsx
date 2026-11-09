@@ -9,6 +9,7 @@ import {
 import { importarJson, type OddLine } from '@pe/schemas';
 import { useState } from 'react';
 import { CartaoOdd } from '../componentes/CartaoOdd';
+import { RadarOdds } from '../componentes/RadarOdds';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { FUSO, type Leitura, type Rascunho } from '../estado';
 import { familiaMercado } from '../camadas';
@@ -221,23 +222,35 @@ export function AbaOdds({ r, setR, d, casa }: PropsAba & { casa: string }) {
         </details>
       )}
 
+      <RadarOdds linhas={d.oddsValidas} nomes={nomes} />
+
       <p>
         <strong>{daCasa.length}</strong> odds da {casa}. Leia o "Ganha se…" de cada uma: se não
         bater com o print, o lado está trocado.
       </p>
-      <div className="cc-odds-grade">
-        {ordenadas.map(({ l, i }) => (
-          <CartaoOdd
-            key={`${i}-${JSON.stringify(l)}`}
-            linha={l}
-            nomes={nomes}
-            data={r.jogo.data}
-            problemas={d.problemasOdds.filter((p) => p.indice === i)}
-            onMudar={(m) => mudar(i, m)}
-            onRemover={() => remover(i)}
-          />
-        ))}
-      </div>
+      {[...new Set(ordenadas.map(({ l }) => familiaMercado(l.mercado)))].map((f) => {
+        const daFamilia = ordenadas.filter(({ l }) => familiaMercado(l.mercado) === f);
+        return (
+          <div key={f}>
+            <h4 className="cc-familia">
+              {f} <span>{daFamilia.length}</span>
+            </h4>
+            <div className="cc-odds-grade">
+              {daFamilia.map(({ l, i }) => (
+                <CartaoOdd
+                  key={`${i}-${JSON.stringify(l)}`}
+                  linha={l}
+                  nomes={nomes}
+                  data={r.jogo.data}
+                  problemas={d.problemasOdds.filter((p) => p.indice === i)}
+                  onMudar={(m) => mudar(i, m)}
+                  onRemover={() => remover(i)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
       <button
         onClick={() =>
           setR((x) => ({

@@ -8,7 +8,7 @@ import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { juntarMultiplas, painelComMultiplas, type Multipla } from '../multiplas';
 import { ehMelhorEntrada } from '../camadas';
-import { CentroComando, CurvaNeon, Painel } from '../componentes/CentroComando';
+import { CentroComando, CurvaNeon, Kpi, Painel } from '../componentes/CentroComando';
 import { CartoesPainel } from '../componentes/PainelHistorico';
 import {
   apostasDoJogo,
@@ -400,16 +400,31 @@ export function AbaHistorico({
         </label>
         {travas ? (
           <>
-            <dl className="numeros">
-              <dt>Banca atual</dt>
-              <dd>R$ {dec(travas.bancaAtual)}</dd>
-              <dt>Drawdown</dt>
-              <dd className={travas.drawdown >= 0.2 ? 'negativo' : ''}>
-                {pct(travas.drawdown)} (pico R$ {dec(travas.pico)})
-              </dd>
-              <dt>Apostado hoje</dt>
-              <dd>{pct(travas.expostoHoje)} de 6%</dd>
-            </dl>
+            <div className="cc-kpis cc-banca">
+              <Kpi icone="bola" rotulo="Banca atual" valor={`R$ ${dec(travas.bancaAtual)}`} />
+              {bancaInicial !== null && (
+                <Kpi
+                  icone="modelo"
+                  rotulo="Resultado"
+                  valor={`${travas.bancaAtual >= bancaInicial ? '+' : '−'}R$ ${dec(Math.abs(travas.bancaAtual - bancaInicial))}`}
+                  tom={travas.bancaAtual >= bancaInicial ? 'ok' : 'erro'}
+                  sub={`desde R$ ${dec(bancaInicial)}`}
+                />
+              )}
+              <Kpi
+                icone="proibido"
+                rotulo="Drawdown"
+                valor={pct(travas.drawdown)}
+                tom={travas.drawdown >= 0.2 ? 'erro' : undefined}
+                sub={`pico R$ ${dec(travas.pico)}`}
+              />
+              <Kpi
+                icone="relogio"
+                rotulo="Apostado hoje"
+                valor={pct(travas.expostoHoje)}
+                sub="limite de 6%"
+              />
+            </div>
             {travas.motivos.length > 0 && (
               <div className="caixa alerta">
                 <ul>
@@ -554,7 +569,7 @@ export function AbaHistorico({
                   <>
                     {ent.descricao}{' '}
                     <b>
-                      @ {e.aposta?.odd ?? ent.odd}
+                      @ {dec(e.aposta?.odd ?? ent.odd)}
                       {e.aposta && ` · ${e.aposta.casa}`}
                     </b>
                     <span className="miudo">
@@ -570,7 +585,7 @@ export function AbaHistorico({
             </summary>
             {ent ? (
               <p>
-                Entrada: <strong>{ent.descricao}</strong> @ {ent.odd} ({ent.casa}) · EV{' '}
+                Entrada: <strong>{ent.descricao}</strong> @ {dec(ent.odd)} ({ent.casa}) · EV{' '}
                 {pct(ent.ev)}
                 {ent.nivel && ` · ${ent.nivel}`}
                 {ent.estrategia && ` · ${ent.estrategia}`}
@@ -588,7 +603,7 @@ export function AbaHistorico({
             </ul>
             {e.aposta ? (
               <p className="entrou">
-                ✅ Você entrou: @ {e.aposta.odd} na {e.aposta.casa}
+                ✅ Você entrou: @ {dec(e.aposta.odd)} na {e.aposta.casa}
                 {e.aposta.valor !== undefined && ` · R$ ${dec(e.aposta.valor)}`} · em{' '}
                 {e.aposta.feitaEm.slice(0, 16).replace('T', ' ')}{' '}
                 <button

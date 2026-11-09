@@ -26,7 +26,7 @@ import {
   type Situacao,
 } from '../historico';
 import { PlacarDeAcerto } from './PainelHistorico';
-import { Icone, type NomeIcone } from './ui';
+import { Icone, Numero, type NomeIcone } from './ui';
 
 const n2 = (x: number) => x.toFixed(2).replace('.', ',');
 const p1 = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
@@ -109,35 +109,57 @@ export function Arco({
   marcas = [],
 }: {
   fracao: number | null;
-  numero: string;
+  numero: ReactNode;
   linhas: string[];
   rotuloAria: string;
   marcas?: { p: number; classe: string }[];
 }) {
+  const id = useId().replace(/:/g, '');
   const C = 110;
-  const R = 86;
+  const R = 82;
   const ponto = (graus: number, raio: number) => {
     const a = (graus * Math.PI) / 180;
     return [C + raio * Math.cos(a), C + raio * Math.sin(a)];
   };
-  const [x0, y0] = ponto(150, R);
-  const [x1, y1] = ponto(390, R);
-  const arco = `M${x0},${y0} A${R},${R} 0 1 1 ${x1},${y1}`;
+  const curva = (raio: number) => {
+    const [x0, y0] = ponto(150, raio);
+    const [x1, y1] = ponto(390, raio);
+    return `M${x0},${y0} A${raio},${raio} 0 1 1 ${x1},${y1}`;
+  };
+  const [px, py] = fracao === null ? [0, 0] : ponto(150 + 240 * fracao, R);
   return (
     <svg className="cc-arco" viewBox="0 0 220 190" role="img" aria-label={rotuloAria}>
-      <path className="cc-medidor-trilho" d={arco} pathLength={100} />
-      {fracao !== null && (
-        <path
-          className="cc-medidor-valor"
-          d={arco}
-          pathLength={100}
-          strokeDasharray={`${fracao * 100} 100`}
-        />
+      <defs>
+        <linearGradient id={`arco-${id}`} x1="0" x2="1" y1="1" y2="0">
+          <stop offset="0" stopColor="#8b5cf6" />
+          <stop offset="0.55" stopColor="#00d4ff" />
+          <stop offset="1" stopColor="#22d3ee" />
+        </linearGradient>
+      </defs>
+      <circle className="cc-arco-orbita" cx={C} cy={C} r={R - 20} />
+      <path
+        className="cc-arco-ticks"
+        d={curva(R + 17)}
+        pathLength={100}
+        strokeDasharray="0.4 2.1"
+      />
+      <path className="cc-medidor-trilho" d={curva(R)} pathLength={100} />
+      {fracao !== null && fracao > 0 && (
+        <>
+          <path
+            className="cc-medidor-valor"
+            d={curva(R)}
+            pathLength={100}
+            strokeDasharray={`${fracao * 100} 100`}
+            style={{ stroke: `url(#arco-${id})` }}
+          />
+          <circle className="cc-arco-ponta" cx={px} cy={py} r={4} />
+        </>
       )}
       {marcas.map(({ p, classe }) => {
         const g = 150 + 240 * p;
-        const [a, b] = ponto(g, R - 15);
-        const [e, f] = ponto(g, R + 15);
+        const [a, b] = ponto(g, R - 14);
+        const [e, f] = ponto(g, R + 14);
         return <line key={classe} className={classe} x1={a} y1={b} x2={e} y2={f} />;
       })}
       <text className="cc-medidor-numero" x={C} y={112} textAnchor="middle">
@@ -161,7 +183,7 @@ function Medidor({ r }: { r: ResumoCamada }) {
     <div className="cc-medidor">
       <Arco
         fracao={r.acerto}
-        numero={r.acerto === null ? '—' : p1(r.acerto)}
+        numero={<Numero valor={r.acerto} formato={p1} />}
         linhas={['ACERTO REAL', `${r.green} green · ${r.red} red`]}
         rotuloAria={
           r.acerto === null
@@ -186,7 +208,7 @@ function Medidor({ r }: { r: ResumoCamada }) {
   );
 }
 
-function Kpi({
+export function Kpi({
   icone,
   rotulo,
   valor,
@@ -213,9 +235,9 @@ function Kpi({
 const tom = (x: number | null) => (x === null || x === 0 ? undefined : x > 0 ? 'ok' : 'erro');
 
 function Kpis({ r, camada }: { r: ResumoCamada; camada: Camada }) {
-  const unidades = r.apuradas ? sinal(r.unidades, n2) : '—';
-  const roi = r.roi === null ? '—' : sinal(r.roi, p1);
-  const odd = r.oddMedia === null ? '—' : n2(r.oddMedia);
+  const unidades = <Numero valor={r.apuradas ? r.unidades : null} formato={(x) => sinal(x, n2)} />;
+  const roi = <Numero valor={r.roi} formato={(x) => sinal(x, p1)} />;
+  const odd = <Numero valor={r.oddMedia} formato={n2} />;
   const comuns = (
     <>
       <Kpi
