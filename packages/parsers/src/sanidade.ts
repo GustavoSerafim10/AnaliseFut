@@ -53,6 +53,9 @@ const LINHA_MAXIMA: Partial<Record<TipoMercado, number>> = {
   AH_europeu: 4,
 };
 
+/** folga para inversões pequenas de arredondamento; passou disso, a odd contradiz a escada */
+const FOLGA_ORDEM = 1.15;
+
 const HANDICAPS: ReadonlySet<TipoMercado> = new Set<TipoMercado>([
   'AH',
   'escanteios_ah',
@@ -77,6 +80,13 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
     if (PRECISA_LINHA.has(l.mercado) && (l.linha === undefined || !Number.isFinite(l.linha)))
       add(i, 'erro', 'linha obrigatória neste mercado');
     if (POR_TIME.has(l.mercado) && !l.time) add(i, 'erro', 'informar de qual time é o total');
+    // linhas andam de 0,25 em 0,25: "2,15" ou "+1,71" é outro número lido como linha
+    if (
+      PRECISA_LINHA.has(l.mercado) &&
+      l.linha !== undefined &&
+      Math.abs(l.linha * 4 - Math.round(l.linha * 4)) > 1e-6
+    )
+      add(i, 'erro', `linha ${l.linha} não existe (as linhas andam de 0,25 em 0,25): lida errado?`);
     if (!l.horarioColeta) add(i, 'alerta', 'sem horário de coleta: não serve para o price gate');
     // linha de gols impossível: "1,5" lido como "13,5"
     const max = LINHA_MAXIMA[l.mercado];
@@ -172,10 +182,35 @@ export function checarSanidade(linhas: LinhaOdd[]): ProblemaLinha[] {
   for (const idx of series.values()) {
     const ord = [...idx].sort((a, b) => (linhas[a].linha as number) - (linhas[b].linha as number));
     const over = normalizarLado(linhas[ord[0]].lado) === 'over';
+    // "menos de 5" a 4,41 com "menos de 2,5" a 1,22 é impossível: fica a maior sequência coerente
+    const coerente = (menor: number, maior: number) =>
+      over ? maior * FOLGA_ORDEM >= menor : maior <= menor * FOLGA_ORDEM;
+    const cadeia = ord.map((_, i) => [i]);
+    let melhor = cadeia[0];
+    ord.forEach((_, i) => {
+      for (let a = 0; a < i; a++)
+        if (
+          coerente(linhas[ord[a]].odd, linhas[ord[i]].odd) &&
+          cadeia[a].length + 1 > cadeia[i].length
+        )
+          cadeia[i] = [...cadeia[a], i];
+      if (cadeia[i].length > melhor.length) melhor = cadeia[i];
+    });
+    // com duas linhas só, não dá para saber qual está errada: as duas saem
+    const contraditas =
+      melhor.length === ord.length
+        ? []
+        : ord.filter((_, i) => ord.length === 2 || !melhor.includes(i));
+    for (const i of contraditas)
+      add(
+        i,
+        'erro',
+        `${over ? 'mais' : 'menos'} de ${linhas[i].linha} @ ${linhas[i].odd} contradiz as outras linhas deste mercado: lida errado?`,
+      );
     for (let j = 1; j < ord.length; j++) {
       const ant = linhas[ord[j - 1]].odd;
       const atual = linhas[ord[j]].odd;
-      if (over ? atual < ant : atual > ant)
+      if ((over ? atual < ant : atual > ant) && !contraditas.includes(ord[j]))
         add(
           ord[j],
           'alerta',
