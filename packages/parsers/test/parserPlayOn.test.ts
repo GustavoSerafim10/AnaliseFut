@@ -133,3 +133,24 @@ describe('PlayOn: OCR real, Kristiansund × Valerenga (4 leituras de cada print)
     );
   });
 });
+
+describe('PlayOn: erros vistos em FC Botosani × Otelul Galati (OCR real)', () => {
+  const ctx = {
+    jogo: { casa: 'FC Botosani', fora: 'Otelul Galati' },
+    casa: 'PlayOn',
+    data: '2026-11-09',
+  };
+  const ler = (texto: string) => lerOddsCasa([texto], ctx).linhas;
+  it('o selo da linha separado por uma barra', () => {
+    const [over, under] = ler('Total de escanteios | 9,5 A\nMais 1,70 — Menos 1,98');
+    expect([over.mercado, over.linha, over.odd]).toEqual(['escanteios_total', 9.5, 1.7]);
+    expect([under.lado, under.odd]).toEqual(['under', 1.98]);
+  });
+  it('"Mails" é "Mais"', () => {
+    const ls = ler('Total de gols A\n3,5 Mails 315 Menos 1,29');
+    expect(ls.map((l) => [l.lado, l.linha, l.odd])).toEqual([
+      ['over', 3.5, 3.15],
+      ['under', 3.5, 1.29],
+    ]);
+  });
+});

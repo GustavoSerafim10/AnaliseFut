@@ -120,7 +120,7 @@ export function normalizar1win(texto: string): string {
       )
       // CasaDeApostas: "{-1.5)" é "(-1.5)"; "mals de 9.5" é "mais de 9.5"
       .replace(/\{(?=[+-]\d)/g, '(')
-      .replace(/\bmals\b/gi, 'mais')
+      .replace(/\bma[il]l?s\b/gi, 'mais')
       // PlayOn: erros do OCR nas palavras dos botões e nos títulos
       .replace(/\bmenor\b/gi, 'Menos')
       .replace(/\bnan\b/gi, 'Não')
@@ -431,7 +431,7 @@ export function parse1win(texto: string, ctx: ContextoParser): ResultadoParser {
 
     // PlayOn: o título traz a linha num selo ("Escanteios no 1º tempo (asiático) 4,5")
     // sem a vírgula só vale se terminar em 5 ("45", "65") e o quadro não estiver recolhido ("9 Vv")
-    const comSelo = /^(.*[A-Za-zÀ-ú)])\s+(\d+(?:\.\d+)?)(?:\s+(\S{1,2}))?$/.exec(bruta);
+    const comSelo = /^(.*[A-Za-zÀ-ú)])\s+(?:[|!]\s+)?(\d+(?:\.\d+)?)(?:\s+(\S{1,2}))?$/.exec(bruta);
     const seloValido =
       !!comSelo &&
       (comSelo[2].includes('.') || (/^\d+5$/.test(comSelo[2]) && !/^v/i.test(comSelo[3] ?? '')));
