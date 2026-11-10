@@ -27,6 +27,14 @@ const MENSAGEM: Record<Exclude<StatusEntradas, 'ok'>, string> = {
   sem_mercados: `Nenhum mercado com os dois lados lidos e odd de ${faixa}. Cole mais prints da casa.`,
 };
 
+/** Diz por que os dados não bastam: na maioria das vezes, poucos jogos na amostra. */
+function dadosFracos(d: Derivado): string {
+  const m = /só (\d+) jogos/.exec(d.dq.motivos[0] ?? '');
+  if (m)
+    return `Só ${m[1]} jogos de um dos times na amostra: a lista pede pelo menos 4 (escanteios e cartões, ${JOGOS_MIN_NICHO}). Começo de competição costuma dar isso; se a fonte tiver os jogos da liga nacional dos times, cole essas estatísticas.`;
+  return MENSAGEM.dados_fracos;
+}
+
 /** O que é preciso para registrar uma aposta, venha da lista ou do seletor. */
 export type EscolhaEntrada = Pick<
   EntradaSugerida,
@@ -165,7 +173,12 @@ export function MelhoresEntradas({
           </button>
         </div>
       ) : (
-        r && r.status !== 'ok' && <p className="entradas-vazio">{MENSAGEM[r.status]}</p>
+        r &&
+        r.status !== 'ok' && (
+          <p className="entradas-vazio">
+            {r.status === 'dados_fracos' ? dadosFracos(d) : MENSAGEM[r.status]}
+          </p>
+        )
       )}
       {r?.bloqueio && r.entradas.length > 0 && (
         <div className="caixa alerta">
