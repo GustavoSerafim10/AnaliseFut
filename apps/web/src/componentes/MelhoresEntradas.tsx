@@ -31,7 +31,7 @@ const MENSAGEM: Record<Exclude<StatusEntradas, 'ok'>, string> = {
 function dadosFracos(d: Derivado): string {
   const m = /só (\d+) jogos/.exec(d.dq.motivos[0] ?? '');
   if (m)
-    return `Só ${m[1]} jogos de um dos times na amostra: a lista pede pelo menos 4 (escanteios e cartões, ${JOGOS_MIN_NICHO}). Começo de competição costuma dar isso; se a fonte tiver os jogos da liga nacional dos times, cole essas estatísticas.`;
+    return `Só ${m[1]} jogos de um dos times na amostra: a lista pede pelo menos 4 (escanteios e cartões, ${JOGOS_MIN_NICHO}). Começo de competição costuma dar isso. Estatísticas da liga só ajudam se os dois times jogam a mesma liga; em jogo europeu, com ligas diferentes, os números não se comparam e o melhor é passar o jogo.`;
   return MENSAGEM.dados_fracos;
 }
 
