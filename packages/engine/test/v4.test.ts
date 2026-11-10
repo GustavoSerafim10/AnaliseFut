@@ -179,7 +179,8 @@ describe('travas da banca (seção 6)', () => {
     expect(t20.fatorKelly).toBe(0.5);
     expect(t20.pausadoAte).toBeNull();
     const t30 = calcularTravas(1000, [aposta('2026-10-01', -1, 310)], '2026-10-03T10:00:00-03:00');
-    expect(t30.pausadoAte).not.toBeNull();
+    // apurada às 22h de Brasília: a pausa vai até o dia 8 no fuso dela (em UTC já seria dia 9)
+    expect(t30.pausadoAte).toBe('2026-10-08T22:00:00-03:00');
     const depois = calcularTravas(
       1000,
       [aposta('2026-10-01', -1, 310)],

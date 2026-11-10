@@ -38,6 +38,15 @@ export interface TravasBanca {
 
 const dia = (iso: string) => iso.slice(0, 10);
 
+/** Soma dias mantendo o fuso do ISO de origem: em UTC, uma pausa que acaba às 22h viraria o dia seguinte. */
+function somarDias(iso: string, dias: number): string {
+  const fuso = /([+-])(\d{2}):(\d{2})$/.exec(iso);
+  const ms = Date.parse(iso) + dias * 86_400_000;
+  if (!fuso) return new Date(ms).toISOString();
+  const desvio = (fuso[1] === '-' ? -1 : 1) * (Number(fuso[2]) * 60 + Number(fuso[3])) * 60_000;
+  return new Date(ms + desvio).toISOString().slice(0, 19) + fuso[0];
+}
+
 export function calcularTravas(
   bancaInicial: number,
   apostas: ApostaBanca[],
@@ -55,8 +64,7 @@ export function calcularTravas(
     banca += a.stake * (a.lucro as number);
     pico = Math.max(pico, banca);
     if (pico > 0 && (pico - banca) / pico >= DRAWDOWN_PAUSA) {
-      const t = new Date(Date.parse(a.apuradaEm ?? a.feitaEm) + DIAS_PAUSA * 86_400_000);
-      pausadoAte = t.toISOString();
+      pausadoAte = somarDias(a.apuradaEm ?? a.feitaEm, DIAS_PAUSA);
     }
   }
   const drawdown = pico > 0 ? Math.max(0, (pico - banca) / pico) : 0;

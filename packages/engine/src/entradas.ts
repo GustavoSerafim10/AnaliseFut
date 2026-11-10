@@ -152,8 +152,11 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     selecoes.find(
       (s) => s.linha.mercado === '1X2' && s.linha.periodo === 'FT' && s.chave.endsWith(`|${lado}`),
     )?.pMercado;
-  const pCasa = p1x2('1') ?? ap.lambdas.casa;
-  const pFora = p1x2('2') ?? ap.lambdas.fora;
+  // as duas forças na mesma régua: odds do 1X2 se as duas existem; senão, os gols esperados
+  const m1 = p1x2('1');
+  const m2 = p1x2('2');
+  const [pCasa, pFora] =
+    m1 !== undefined && m2 !== undefined ? [m1, m2] : [ap.lambdas.casa, ap.lambdas.fora];
   const azarao = pCasa < pFora ? 'casa' : pFora < pCasa ? 'fora' : null;
 
   for (const s of selecoes) {
