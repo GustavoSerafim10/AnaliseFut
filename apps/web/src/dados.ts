@@ -43,7 +43,6 @@ import {
   estatisticasParaModelo,
   juntarEscalacoes,
   juntarLeiturasStats,
-  juntarUltimas,
   lerEscalacao,
   mesmoJogador,
   lerOddsCasaConsenso,
@@ -51,7 +50,6 @@ import {
   lerDesfalques,
   lerEstatisticasConsenso,
   lerTextoFlashscore,
-  lerUltimas,
   type Desfalque,
   type EstatisticasModelo,
   type ImpactoSugerido,
@@ -59,7 +57,6 @@ import {
   type LeituraStats,
   type LinhaClassificacao,
   type ProblemaLinha,
-  type ResumoUltimas,
   type StatusEscalacao,
   type TabelaConsolidada,
 } from '@pe/parsers';
@@ -102,16 +99,12 @@ export interface Derivado {
   desfalques: Desfalque[];
   avisosDesfalques: string[];
   escalacao: EscalacaoDerivada;
-  /** últimas partidas de cada time: sequência, casa/fora e gols */
-  ultimas: Record<'casa' | 'fora', ResumoUltimas | null>;
   impacto: Record<'casa' | 'fora', ImpactoSugerido>;
   classificacao: LinhaClassificacao[];
-  avisosClassificacao: string[];
   flash: LeituraFlashscore | null;
   dq: { dq: DQ; motivos: string[] };
   /** DQ final, a mesma do motor e do relatório: a das estatísticas limitada pelas odds (1 casa só → C) */
   dqFinal: { dq: DQ; motivos: string[] };
-  destaques: string[];
   problemasOdds: ProblemaLinha[];
   errosOdds: number;
   /** odds que entram no motor: as lidas menos as com erro (as com erro ficam de fora, não travam) */
@@ -371,17 +364,11 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
     desfalques,
     avisosDesfalques: desf.flatMap((d) => d.avisos),
     escalacao,
-    ultimas: {
-      casa: juntarUltimas(textos(r, 'ultimas:casa').map((t) => lerUltimas(t, nomes, 'casa'))),
-      fora: juntarUltimas(textos(r, 'ultimas:fora').map((t) => lerUltimas(t, nomes, 'fora'))),
-    },
     impacto,
     classificacao: clas.flatMap((c) => c.linhas),
-    avisosClassificacao: clas.flatMap((c) => c.avisos),
     flash,
     dq,
     dqFinal: ajustarDQ(dq.dq, oddsValidas),
-    destaques: destaquesComparativos(tabela, nomes),
     problemasOdds,
     errosOdds,
     oddsValidas,
