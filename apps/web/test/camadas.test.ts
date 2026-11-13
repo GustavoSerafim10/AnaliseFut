@@ -239,8 +239,19 @@ describe('casas padrão', () => {
       ...rascunhoNovo(),
       casas: ['1WIN', 'Outra'],
       casasPadrao: undefined,
+      casasOferecidas: undefined,
     });
     expect(r.casas).toEqual(['1WIN', 'Outra', ...CASAS_PADRAO.slice(1)]);
+  });
+  it('análise salva antes da BetSuper ganha só a BetSuper', () => {
+    const antigas = CASAS_PADRAO.filter((c) => c !== 'BetSuper');
+    const r = comCasasPadrao({
+      ...rascunhoNovo(),
+      casas: antigas.slice(0, 3),
+      casasPadrao: true,
+      casasOferecidas: undefined,
+    });
+    expect(r.casas).toEqual([...antigas.slice(0, 3), 'BetSuper']);
   });
   it('casa removida não volta', () => {
     const r = { ...rascunhoNovo(), casas: ['1win'] };

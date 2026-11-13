@@ -140,14 +140,22 @@ export function rascunhoNovo(): Rascunho {
   };
 }
 
-/** Análise aberta de antes das casas padrão ganha as que faltam, uma vez: casa removida não volta. */
+/** Casas padrão que existiam quando só havia a marca casasPadrao (sem a lista de oferecidas). */
+const CASAS_DA_MARCA_ANTIGA = CASAS_PADRAO.filter((c) => c !== 'BetSuper');
+
+/** Cada casa padrão entra na análise aberta uma vez só: casa removida não volta. */
 export function comCasasPadrao(r: Rascunho): Rascunho {
-  if (r.casasPadrao) return r;
+  const oferecidas = new Set(
+    (r.casasOferecidas ?? (r.casasPadrao ? CASAS_DA_MARCA_ANTIGA : [])).map((c) => c.toLowerCase()),
+  );
   const tem = new Set(r.casas.map((c) => c.trim().toLowerCase()));
   return {
     ...r,
-    casas: [...r.casas, ...CASAS_PADRAO.filter((c) => !tem.has(c.toLowerCase()))],
-    casasPadrao: true,
+    casas: [
+      ...r.casas,
+      ...CASAS_PADRAO.filter((c) => !oferecidas.has(c.toLowerCase()) && !tem.has(c.toLowerCase())),
+    ],
+    casasOferecidas: [...CASAS_PADRAO],
   };
 }
 
