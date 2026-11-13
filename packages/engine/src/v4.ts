@@ -29,7 +29,14 @@ import {
   type ModeloPlacar,
 } from './mercados';
 import { RHO_PADRAO } from './poisson';
-import { chaveGrupo, mediana, precificar, type PrecoCasa } from './precificacao';
+import {
+  chaveGrupo,
+  mediana,
+  precificar,
+  rastroDeLinha,
+  type PrecoCasa,
+  type RastroLinha,
+} from './precificacao';
 import { analisarSensibilidade, type ResultadoSensibilidade } from './sensibilidade';
 import type { DQ, Lambdas, LinhaOdd } from './tipos';
 import { NOMES_TESE, teseDe, type IdTese } from './varredura';
@@ -190,6 +197,8 @@ export interface ResultadoV4 {
   descartados: DescarteV4[];
   melhor: (AvaliacaoV4 & { stake: StakeV4 | null }) | null;
   sensibilidade: ResultadoSensibilidade | null;
+  /** destino de cada linha recebida (avaliada, descartada, inválida ou substituída), na ordem */
+  rastro: RastroLinha[];
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -247,6 +256,8 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     descartados,
     melhor: null,
     sensibilidade: null,
+    // nada foi precificado: todas as linhas ficam com o motivo da saída
+    rastro: e.linhas.map((l, i) => rastroDeLinha(l, i, 'descartada', motivo)),
   });
   if (agora >= inicio) return vazio('EXCLUIDO', 'jogo iniciado ou encerrado: somente pré-live');
   if (!afiadasJogo.length)
@@ -269,6 +280,8 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
       descricao: descreverAposta(d.linha, nomes),
       motivo: d.motivo,
     });
+  // descartes da precificação vêm antes; os da seleção (V4) entram depois desta marca
+  const nDescartesPreco = descartados.length;
 
   const ap = e.apoio;
   const modelo: ModeloPlacar | null = ap
@@ -443,6 +456,27 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   // ranking pela folga sobre o próprio gate (R1 a 2% e R3 a 5% não competem pelo EV cru)
   const folga = (a: AvaliacaoV4) => a.ev - (a.evMinimo ?? Infinity);
   avaliadas.sort((a, b) => folga(b) - folga(a) || b.ev - a.ev);
+  // rastro final: a linha precificada vira avaliada (melhor odd ou preço de apoio) ou descartada
+  // com o motivo da SUA seleção. Só registra: nada aqui entra em cálculo ou decisão.
+  const avaliadaPorChave = new Map(avaliadas.map((a) => [a.chave, a]));
+  const motivoDaSelecao = new Map<string, string>();
+  for (const d of descartados.slice(nDescartesPreco))
+    if (!motivoDaSelecao.has(d.chave)) motivoDaSelecao.set(d.chave, d.motivo);
+  const rastro: RastroLinha[] = precos.rastro.map((r) => {
+    if (r.destino !== 'precificada') return r;
+    const a = avaliadaPorChave.get(r.chave);
+    if (a)
+      return {
+        ...r,
+        destino: 'avaliada',
+        papel: r.linha === a.linha ? 'melhor odd' : 'preço de apoio',
+      };
+    return {
+      ...r,
+      destino: 'descartada',
+      motivo: motivoDaSelecao.get(r.chave) ?? 'sem avaliação registrada',
+    };
+  });
   const base: Omit<ResultadoV4, 'decisao' | 'rotulo' | 'gatilho' | 'melhor' | 'sensibilidade'> = {
     motivos,
     avisos,
@@ -450,6 +484,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     avaliadas,
     top5: avaliadas.slice(0, 5),
     descartados,
+    rastro,
   };
   const fim = (
     decisao: Decisao,

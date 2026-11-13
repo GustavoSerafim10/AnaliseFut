@@ -38,10 +38,59 @@ export interface DescartePreco {
   motivo: string;
 }
 
+/**
+ * Destino de cada linha recebida (rastreabilidade; não entra em nenhum cálculo):
+ * precificada → entrou na precificação (a V4 a troca por avaliada/descartada);
+ * avaliada → a seleção dela foi avaliada pela V4; descartada → saiu com motivo;
+ * invalida → odd inválida; substituida → trocada por uma coleta da mesma casa.
+ */
+export type DestinoLinha = 'precificada' | 'avaliada' | 'descartada' | 'invalida' | 'substituida';
+
+export interface RastroLinha {
+  /** posição da linha na lista recebida */
+  indice: number;
+  /** a linha como veio (nome original da casa, odd e horário de coleta) */
+  linha: LinhaOdd;
+  casa: string;
+  operatorId: string;
+  brandId: string;
+  productType: string;
+  /** a seleção (mercado, período, time, linha e lado) */
+  chave: string;
+  destino: DestinoLinha;
+  motivo?: string;
+  /** só em 'avaliada': a linha foi a melhor odd ou serviu de preço de apoio */
+  papel?: 'melhor odd' | 'preço de apoio';
+  /** só em 'substituida': a coleta que ficou no lugar */
+  substituidaPor?: { indice: number; odd: number; horarioColeta?: string };
+}
+
+export function rastroDeLinha(
+  l: LinhaOdd,
+  indice: number,
+  destino: DestinoLinha,
+  motivo?: string,
+): RastroLinha {
+  const c = resolverCasa(l.casa);
+  return {
+    indice,
+    linha: l,
+    casa: l.casa,
+    operatorId: c.operatorId,
+    brandId: c.brandId,
+    productType: c.productType,
+    chave: chaveSelecao(l),
+    destino,
+    motivo,
+  };
+}
+
 export interface ResultadoPrecificacao {
   selecoes: SelecaoPrecificada[];
   descartes: DescartePreco[];
   casas: string[];
+  /** um registro por linha recebida, na mesma ordem */
+  rastro: RastroLinha[];
 }
 
 /** Quantos lados um mercado completo tem. Sem valor = número variável. */
@@ -118,24 +167,56 @@ export function precificar(
 ): ResultadoPrecificacao {
   const descartes: DescartePreco[] = [];
   const grupos = new Map<string, Map<string, LinhaOdd>>();
+  // rastreabilidade (só registra, não decide): posição da linha que ficou em cada lado do grupo
+  const posicoes = new Map<string, Map<string, number>>();
+  const rastro: RastroLinha[] = linhas.map((l, i) =>
+    rastroDeLinha(l, i, 'descartada', 'sem destino registrado'),
+  );
+  const marcar = (i: number, destino: DestinoLinha, motivo?: string) => {
+    rastro[i] = rastroDeLinha(linhas[i], i, destino, motivo);
+  };
+  const substituir = (iVelha: number, iNova: number, motivo: string) => {
+    const nova = linhas[iNova];
+    rastro[iVelha] = {
+      ...rastroDeLinha(linhas[iVelha], iVelha, 'substituida', motivo),
+      substituidaPor: { indice: iNova, odd: nova.odd, horarioColeta: nova.horarioColeta },
+    };
+  };
 
-  for (const l of linhas) {
+  for (let i = 0; i < linhas.length; i++) {
+    const l = linhas[i];
     if (!Number.isFinite(l.odd) || l.odd <= 1) {
-      descartes.push({
-        chave: chaveSelecao(l),
-        casa: l.casa,
-        linha: l,
-        motivo: `odd inválida: ${l.odd}`,
-      });
+      const motivo = `odd inválida: ${l.odd}`;
+      descartes.push({ chave: chaveSelecao(l), casa: l.casa, linha: l, motivo });
+      marcar(i, 'invalida', motivo);
       continue;
     }
     const g = `${nomeCasa(l.casa)}#${chaveGrupo(l)}`;
     const lados = grupos.get(g) ?? new Map<string, LinhaOdd>();
+    const pos = posicoes.get(g) ?? new Map<string, number>();
     const lado = normalizarLado(l.lado);
     const atual = lados.get(lado);
     // prints sobrepostos: fica a coleta mais recente
-    if (!atual || (l.horarioColeta ?? '') > (atual.horarioColeta ?? '')) lados.set(lado, l);
+    if (!atual || (l.horarioColeta ?? '') > (atual.horarioColeta ?? '')) {
+      if (atual)
+        substituir(
+          pos.get(lado)!,
+          i,
+          `coleta mais recente da mesma casa, mercado e seleção (${l.horarioColeta ?? 'sem horário'} no lugar de ${atual.horarioColeta ?? 'sem horário'})`,
+        );
+      lados.set(lado, l);
+      pos.set(lado, i);
+    } else {
+      substituir(
+        i,
+        pos.get(lado)!,
+        (l.horarioColeta ?? '') === (atual.horarioColeta ?? '')
+          ? 'mesmo horário (ou ambos sem horário): fica a primeira lida'
+          : `coleta mais antiga (${l.horarioColeta}) que a já lida (${atual.horarioColeta})`,
+      );
+    }
     grupos.set(g, lados);
+    posicoes.set(g, pos);
   }
 
   const precos = new Map<string, PrecoCasa[]>();
@@ -149,13 +230,18 @@ export function precificar(
   // 1X2 justo por casa e período (base do DC)
   const justo1x2 = new Map<string, Record<string, number>>();
   const pendentesDC: LinhaOdd[][] = [];
+  const pendentesDCIdx: number[][] = [];
 
-  for (const [, lados] of grupos) {
+  for (const [g, lados] of grupos) {
     const ls = [...lados.values()];
+    const is = [...posicoes.get(g)!.values()];
     const m = ls[0].mercado;
     const esperado = LADOS_ESPERADOS[m];
     const descartarTodos = (motivo: string) =>
-      ls.forEach((l) => descartes.push({ chave: chaveSelecao(l), casa: l.casa, linha: l, motivo }));
+      ls.forEach((l, k) => {
+        descartes.push({ chave: chaveSelecao(l), casa: l.casa, linha: l, motivo });
+        marcar(is[k], 'descartada', motivo);
+      });
 
     if (ls.length < 2 || (esperado !== undefined && ls.length < esperado)) {
       descartarTodos('mercado incompleto: faltam lados para tirar a margem');
@@ -167,6 +253,7 @@ export function precificar(
     }
     if (m === 'DC') {
       pendentesDC.push(ls);
+      pendentesDCIdx.push(is);
       continue;
     }
     const odds = ls.map((l) => l.odd);
@@ -176,6 +263,7 @@ export function precificar(
     }
     const r = removerMargem(odds, odds.length === 3 ? opcoes.devig3 : undefined);
     ls.forEach((l, i) => add(l, { pJusta: r.probs[i], margem: r.margem, metodo: r.metodo }));
+    is.forEach((i) => marcar(i, 'precificada'));
     if (m === '1X2') {
       const mapa: Record<string, number> = {};
       ls.forEach((l, i) => (mapa[normalizarLado(l.lado)] = r.probs[i]));
@@ -184,17 +272,15 @@ export function precificar(
   }
 
   // DC: nunca tirar a margem somando as 3 odds de DC → P(1X) = P(1) + P(X) do 1X2 da mesma casa
-  for (const ls of pendentesDC) {
+  for (const [k, ls] of pendentesDC.entries()) {
+    const is = pendentesDCIdx[k];
     const base = justo1x2.get(`${nomeCasa(ls[0].casa)}#${ls[0].periodo}`);
     if (!base) {
-      ls.forEach((l) =>
-        descartes.push({
-          chave: chaveSelecao(l),
-          casa: l.casa,
-          linha: l,
-          motivo: 'DC sem 1X2 da mesma casa para tirar a margem',
-        }),
-      );
+      ls.forEach((l, j) => {
+        const motivo = 'DC sem 1X2 da mesma casa para tirar a margem';
+        descartes.push({ chave: chaveSelecao(l), casa: l.casa, linha: l, motivo });
+        marcar(is[j], 'descartada', motivo);
+      });
       continue;
     }
     // as três DC somam 2 (cada resultado aparece em duas): a margem é relativa a 2, como no 1X2
@@ -205,6 +291,7 @@ export function precificar(
         .reduce((s, r) => s + (base[r] ?? 0), 0);
       add(l, { pJusta: p, margem: margemDC, metodo: 'via_1x2' });
     }
+    is.forEach((i) => marcar(i, 'precificada'));
   }
 
   const selecoes: SelecaoPrecificada[] = [];
@@ -228,5 +315,5 @@ export function precificar(
   }
 
   const casas = [...new Set(linhas.map((l) => nomeCasa(l.casa)))];
-  return { selecoes, descartes, casas };
+  return { selecoes, descartes, casas, rastro };
 }
