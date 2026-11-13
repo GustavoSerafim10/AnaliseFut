@@ -17,6 +17,7 @@ export const CASAS_PADRAO = [
   'Betano',
   'Betfair',
   'PlayOn',
+  'BetSuper',
 ];
 
 export interface Leitura {

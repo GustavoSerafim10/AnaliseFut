@@ -202,7 +202,9 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   if (!Number.isFinite(inicio)) throw new Error('jogo.inicio inválido (use data/hora ISO 8601)');
   const agora = e.agora ? Date.parse(e.agora) : Date.now();
 
-  const casasNomes = [...new Set(e.linhas.map((l) => l.casa.trim()))];
+  const casasNomes = [
+    ...new Map(e.linhas.map((l) => [l.casa.trim().toLowerCase(), l.casa.trim()])).values(),
+  ];
   const afiadasJogo = casasNomes.filter(ehAfiada);
   const referencia = {
     nivel: (afiadasJogo.length

@@ -53,7 +53,7 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
         partes.push(
           `${c.jogos} jogos (${c.vitorias ?? '?'}V ${c.empates ?? '?'}E ${c.derrotas ?? '?'}D)`,
         );
-      if (c.golsPro !== undefined) partes.push(`gols ${c.golsPro}:${c.golsContra}`);
+      if (c.golsPro !== undefined) partes.push(`gols ${c.golsPro}:${c.golsContra ?? '?'}`);
       if (c.saldo !== undefined) partes.push(`saldo ${c.saldo > 0 ? '+' : ''}${c.saldo}`);
       if (c.forma)
         partes.push(`últimos ${c.forma.length} no print (esq. → dir.): ${c.forma.join(' ')}`);

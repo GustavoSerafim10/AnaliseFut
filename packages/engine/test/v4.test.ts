@@ -267,3 +267,17 @@ describe('CLV justo e Brier (seção 8)', () => {
     expect(brier([0.5, 0.3, 0.2], 0)).toBeCloseTo(0.25 + 0.09 + 0.04, 12);
   });
 });
+
+describe('contagem de casas ignora maiúsculas', () => {
+  it('"Bet365" e "bet365" são uma casa só: 2 casas não viram consenso R2', () => {
+    const linhas = [
+      ...ou('Bet365', 1.9, 1.9),
+      ...ou('bet365 ', 1.9, 1.9),
+      ...ou('Betano', 1.9, 1.9),
+      ...ou('BETANO', 1.9, 1.9),
+    ];
+    const r = analisarV4(entrada(linhas));
+    expect(r.referencia.moles).toHaveLength(2);
+    expect(r.referencia.nivel).not.toBe('R2');
+  });
+});
