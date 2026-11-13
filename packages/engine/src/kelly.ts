@@ -8,10 +8,44 @@ import type { DQ } from './tipos';
 export const MAX_POR_APOSTA = 0.02;
 export const MAX_POR_LOTE = 0.05;
 
-/** f* = (b×p − q) / b, com b = odd − 1 */
+/**
+ * Tolerância do EV por unidade apostada (p × odd − 1). O ponto flutuante deixa ruído de ~1e-16
+ * quando o EV é exatamente zero (ex.: p = 0,4 e odd = 2,5 dá 7e-17); abaixo de 1e-12 não é
+ * vantagem, é erro de arredondamento, e a stake é zero. É 10 000 vezes menor que o menor EV
+ * que o motor sabe distinguir (1e-8 = 0,000001%), então não elimina vantagem real.
+ */
+export const EV_TOLERANCIA = 1e-12;
+
+/** Por que (p, odd) não podem dimensionar uma aposta; null se estão válidos. */
+export function motivoEntradaInvalida(p: number, odd: number): string | null {
+  if (typeof odd !== 'number' || !Number.isFinite(odd))
+    return `odd inválida (${odd}): não é um número finito`;
+  if (odd <= 1) return `odd inválida (${odd}): precisa ser maior que 1`;
+  if (typeof p !== 'number' || !Number.isFinite(p))
+    return `probabilidade inválida (${p}): não é um número finito`;
+  if (p <= 0 || p >= 1) return `probabilidade fora do intervalo (0, 1): ${p}`;
+  return null;
+}
+
+/**
+ * f* = (b×p − q) / b, com b = odd − 1. Entrada inválida ou EV dentro da tolerância dá 0
+ * (a stake nunca nasce de NaN, Infinity ou odd ≤ 1); EV negativo continua negativo.
+ */
 export function kellyCheio(p: number, odd: number): number {
+  if (motivoEntradaInvalida(p, odd) !== null) return 0;
+  if (Math.abs(p * odd - 1) <= EV_TOLERANCIA) return 0;
   const b = odd - 1;
   return (b * p - (1 - p)) / b;
+}
+
+/**
+ * Valor em R$ autorizado: arredondado para BAIXO ao centavo, para nunca passar do teto
+ * financeiro. Abaixo de R$ 0,01 vira 0,00 (a fração continua exata em `fracaoBanca`).
+ */
+export function valorEmReais(banca: number, fracaoBanca: number): number {
+  if (!Number.isFinite(banca) || banca <= 0 || !Number.isFinite(fracaoBanca) || fracaoBanca <= 0)
+    return 0;
+  return Math.floor(banca * fracaoBanca * 100) / 100;
 }
 
 /** 1/4 com DQ A/B e ROBUSTA; 1/8 com DQ C, MODERADA ou escalação incerta. */
@@ -66,17 +100,29 @@ export interface StakeAutorizada {
 export function autorizarStake(p: PedidoStake): StakeAutorizada {
   const k = kellyCheio(p.p, p.odd);
   let fracao = p.fracaoKelly;
-  for (const r of p.reducoes ?? []) fracao *= Math.min(1, Math.max(0, r));
+  for (const r of p.reducoes ?? []) fracao *= Number.isFinite(r) ? Math.min(1, Math.max(0, r)) : 0;
   const zero = (motivo: string): StakeAutorizada => ({
     autorizada: false,
     motivo,
     kellyCheio: k,
-    fracaoKelly: fracao,
+    fracaoKelly: Number.isFinite(fracao) ? fracao : 0,
     fracaoBanca: 0,
     limites: [],
     valor: p.banca !== undefined ? 0 : undefined,
   });
+  // entradas inválidas nunca viram stake positiva, NaN ou valor inconsistente: viram zero com motivo
+  const invalida = motivoEntradaInvalida(p.p, p.odd);
+  if (invalida) return zero(invalida);
+  if (!Number.isFinite(p.fracaoKelly) || p.fracaoKelly < 0)
+    return zero(`fração de Kelly inválida (${p.fracaoKelly})`);
+  if (p.teto !== undefined && !(Number.isFinite(p.teto) && p.teto >= 0))
+    return zero(`teto inválido (${p.teto})`);
+  if (p.folgaDia !== undefined && !Number.isFinite(p.folgaDia))
+    return zero(`folga do dia inválida (${p.folgaDia})`);
+  if (p.banca !== undefined && !(Number.isFinite(p.banca) && p.banca > 0))
+    return zero(`banca inválida (${p.banca})`);
   if (p.dq === 'D' || p.dq === 'E') return zero(`DQ ${p.dq}: sem exposição autorizada`);
+  if (k <= 0) return zero('sem vantagem: EV nulo ou negativo');
 
   let f = Math.max(0, k) * fracao;
   const limites: StakeAutorizada['limites'] = [];
@@ -95,7 +141,7 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     fracaoKelly: fracao,
     fracaoBanca: f,
     limites,
-    valor: p.banca !== undefined ? Math.round(p.banca * f * 100) / 100 : undefined,
+    valor: p.banca !== undefined ? valorEmReais(p.banca, f) : undefined,
   };
 }
 

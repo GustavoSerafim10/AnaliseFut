@@ -16,7 +16,7 @@ import {
 import { ROTULO_DECISAO, type Decisao, type RedTeam } from './decisao';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
-import { kellyCheio } from './kelly';
+import { kellyCheio, valorEmReais } from './kelly';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
@@ -638,7 +638,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     kellyCheio: k,
     fracaoKelly,
     fracaoBanca,
-    valor: banca !== undefined ? Math.round(banca * fracaoBanca * 100) / 100 : undefined,
+    valor: banca !== undefined ? valorEmReais(banca, fracaoBanca) : undefined,
     ajustes: ajustesStake,
   };
   motivos.push(

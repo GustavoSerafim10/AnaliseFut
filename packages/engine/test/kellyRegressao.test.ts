@@ -259,55 +259,60 @@ describe('APROVADO · stake da V4 (caminho que decide BET)', () => {
 
 // ───────────────────────── DIVERGÊNCIAS (caracterização do comportamento ATUAL)
 
-describe('DIVERGÊNCIA · EV exatamente zero pode virar stake ~1e-17 (não zero exato)', () => {
-  it('p = 0,4 e odd = 2,5: o ponto flutuante dá Kelly de 7e-17', () => {
-    const k = kellyCheio(0.4, 2.5);
-    expect(k).toBeGreaterThan(0);
-    expect(k).toBeLessThan(1e-15);
+describe('APROVADO · EV exatamente zero dá stake zero (Etapa 3B, tolerância 1e-12)', () => {
+  it('p = 0,4 e odd = 2,5: o ruído de 7e-17 do ponto flutuante não vira stake', () => {
+    expect(kellyCheio(0.4, 2.5)).toBe(0);
     const s = calcularStake({ p: 0.4, odd: 2.5, dq: 'A', classe: 'ROBUSTA', banca: 1000 });
-    expect(s.fracaoBanca).toBeGreaterThan(0); // "obrigatoriamente zero" não vale na fronteira
-    expect(s.fracaoBanca).toBeLessThan(1e-15);
-    expect(s.valor).toBe(0); // o arredondamento a centavos esconde isso no valor em R$
+    expect(s.fracaoBanca).toBe(0);
+    expect(s.valor).toBe(0);
   });
 });
 
-describe('DIVERGÊNCIA · entradas inválidas não são recusadas por kelly.ts', () => {
+describe('APROVADO · entradas inválidas nunca geram stake positiva nem NaN (Etapa 3B)', () => {
   const stake = (p: number, odd: number) =>
     calcularStake({ p, odd, dq: 'A', classe: 'ROBUSTA', banca: 1000 });
 
-  it('odd ≤ 1 com b negativo ou nulo: pode gerar stake POSITIVA (2%) ou NaN', () => {
-    expect(stake(0.5, 0.5).fracaoBanca).toBe(0.02); // odd < 1
-    expect(stake(0.5, 0).fracaoBanca).toBe(0.02);
-    expect(stake(0.5, -2).fracaoBanca).toBe(0.02);
-    expect(stake(1, 1).fracaoBanca).toBeNaN(); // 0/0
-    expect(stake(0.5, 1).fracaoBanca).toBe(0); // −∞ vira zero por acaso
+  it('odd ≤ 1: stake zero (antes dava 2% com odd < 1 e NaN com p = 1 e odd = 1)', () => {
+    for (const odd of [0.5, 0, -2, 1])
+      for (const p of [0.5, 1]) {
+        expect(stake(p, odd).fracaoBanca).toBe(0);
+        expect(stake(p, odd).valor).toBe(0);
+      }
   });
 
-  it('NaN e Infinity propagam para a stake (Math.max(0, NaN) = NaN)', () => {
-    expect(stake(NaN, 2).fracaoBanca).toBeNaN();
-    expect(stake(0.5, NaN).fracaoBanca).toBeNaN();
-    expect(stake(0.5, Infinity).fracaoBanca).toBeNaN();
-    expect(stake(0.5, NaN).valor).toBeNaN();
+  it('NaN e Infinity: stake zero, nunca NaN', () => {
+    for (const [p, odd] of [
+      [NaN, 2],
+      [0.5, NaN],
+      [0.5, Infinity],
+      [Infinity, 2],
+      [-Infinity, 2],
+    ] as [number, number][]) {
+      const s = stake(p, odd);
+      expect(s.fracaoBanca).toBe(0);
+      expect(s.valor).toBe(0);
+      expect(Number.isNaN(s.kellyCheio)).toBe(false);
+    }
   });
 
-  it('probabilidade fora de [0,1] não é validada: p ≥ 1 dá o teto de 2%', () => {
-    expect(stake(1.2, 2).fracaoBanca).toBe(0.02);
-    expect(stake(1, 2).fracaoBanca).toBe(0.02);
-    expect(stake(-0.1, 2).fracaoBanca).toBe(0);
+  it('probabilidade fora do intervalo (0, 1): stake zero', () => {
+    for (const p of [1.2, 1, 0, -0.1]) expect(stake(p, 2).fracaoBanca).toBe(0);
   });
 });
 
-describe('DIVERGÊNCIA · valor em R$ pode passar do teto em até meio centavo', () => {
-  it('o valor é arredondado ao centavo MAIS PRÓXIMO, não para baixo', () => {
+describe('APROVADO · valor em R$ arredondado para baixo, nunca acima do teto (Etapa 3B)', () => {
+  it('banca 100,25 no teto de 2%: R$ 2,00 (o teto exato é 2,005)', () => {
     const s = calcularStake({ p: 0.9, odd: 2, dq: 'A', classe: 'ROBUSTA', banca: 100.25 });
     expect(s.fracaoBanca).toBe(0.02);
-    expect(s.valor).toBe(2.01);
-    expect(s.valor!).toBeGreaterThan(100.25 * 0.02); // teto exato = 2,005
+    expect(s.valor).toBe(2);
+    expect(s.valor!).toBeLessThanOrEqual(100.25 * 0.02);
   });
-  it('o excesso nunca passa de meio centavo', () => {
-    for (const banca of [12.345, 50.25, 77.77, 100.25, 333.33, 999.99]) {
+  it('em 20 000 bancas, o valor nunca passa de banca × fração e fica a menos de 1 centavo dela', () => {
+    for (let i = 0; i < 20000; i++) {
+      const banca = Math.round((10 + i * 0.2531) * 100) / 100;
       const s = calcularStake({ p: 0.9, odd: 2, dq: 'A', classe: 'ROBUSTA', banca });
-      expect(s.valor! - banca * 0.02).toBeLessThanOrEqual(0.005 + 1e-9);
+      expect(s.valor!).toBeLessThanOrEqual(banca * s.fracaoBanca);
+      expect(banca * s.fracaoBanca - s.valor!).toBeLessThan(0.0100001);
     }
   });
 });

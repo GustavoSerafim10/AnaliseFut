@@ -135,6 +135,7 @@ describe('lista de entradas: stake = min(1%, Kelly fracionado)', () => {
 
   it('valor em R$ acompanha a banca', () => {
     const e = melhoresEntradas(pedido({ banca: 2000 })).entradas[0];
-    expect(e.stakeValor).toBe(Math.round(2000 * e.stake * 100) / 100);
+    expect(e.stakeValor).toBe(Math.floor(2000 * e.stake * 100) / 100);
+    expect(e.stakeValor!).toBeLessThanOrEqual(2000 * e.stake);
   });
 });

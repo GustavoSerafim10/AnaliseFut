@@ -201,7 +201,8 @@ describe('melhores entradas', () => {
     const r = melhoresEntradas(pedido(ou('1win', 1.5, 1.4, 3.0), { travas }));
     // drawdown: o teto da lista cai a 0,5% e o Kelly também é reduzido pela metade
     expect(r.entradas[0].stake).toBeLessThanOrEqual(0.005);
-    expect(r.entradas[0].stakeValor).toBe(Math.round(100 * r.entradas[0].stake * 100) / 100);
+    // valor em R$ arredondado para baixo: nunca acima de banca × stake
+    expect(r.entradas[0].stakeValor).toBe(Math.floor(100 * r.entradas[0].stake * 100) / 100);
     expect(r.bloqueio).toMatch(/dia encerrado/);
   });
 
