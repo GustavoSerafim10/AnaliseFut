@@ -5,6 +5,7 @@ import { devigProporcional, devigShin } from '../src/devig';
 import { detectarMovimentos } from '../src/movimento';
 import { evApostaGratis, evBonusRollover, evOddTurbinada, evSemRisco } from '../src/promocoes';
 import type { LinhaOdd, TipoMercado } from '../src/tipos';
+import { chaveSelecao } from '../src/precificacao';
 import { analisarV4, gateV4, oddEfetiva, type EntradaV4 } from '../src/v4';
 
 const JOGO = { casa: 'Flamengo', fora: 'Atlético-MG', inicio: '2026-10-26T20:00:00-03:00' };
@@ -286,5 +287,90 @@ describe('contagem de casas ignora maiúsculas', () => {
     const r = analisarV4(entrada(linhas));
     expect(r.referencia.moles).toHaveLength(2);
     expect(r.referencia.nivel).not.toBe('R2');
+  });
+});
+
+describe('endurecimento da camada de decisão (auditoria)', () => {
+  const comHora = (ls: LinhaOdd[], horarioColeta: string) =>
+    ls.map((l) => ({ ...l, horarioColeta }));
+
+  it('horário ilegível não passa na trava de 10 min do R1', () => {
+    const r = analisarV4(
+      entrada([...ou('Pinnacle', 1.95, 1.95), ...comHora(ou('1win', 2.1, 1.72), 'ontem à noite')]),
+    );
+    expect(r.decisao).not.toBe('BET');
+    expect(r.descartados.some((d) => d.motivo.includes('ilegível'))).toBe(true);
+  });
+
+  it('"agora" inválido não é tratado como pré-live: erro explícito', () => {
+    expect(() => analisarV4(entrada(ou('1win', 2, 2), { agora: 'quando der' }))).toThrow(/agora/);
+  });
+
+  it('R2: a casa avaliada sai do próprio consenso (leave-one-out)', () => {
+    const r = analisarV4(
+      entrada([
+        ...ou('Bet365', 1.9, 1.9),
+        ...ou('Superbet', 1.9, 1.9),
+        ...ou('1win', 1.9, 1.9),
+        ...ou('Betano', 2.12, 1.8),
+      ]),
+    );
+    const m = r.melhor!;
+    expect(m.casaMelhorOdd).toBe('Betano');
+    expect(m.fonteP).toContain('sem a Betano');
+    expect(m.pTrue).toBeCloseTo(0.5, 10);
+  });
+
+  it('R2: só 2 das outras casas na janela de 10 min → sem consenso independente', () => {
+    const r = analisarV4(
+      entrada([
+        ...ou('Bet365', 1.9, 1.9, '15:00'),
+        ...ou('Superbet', 1.9, 1.9, '15:05'),
+        ...ou('1win', 1.9, 1.9, '16:00'),
+        ...ou('Betano', 2.12, 1.8, '16:00'),
+      ]),
+    );
+    expect(r.decisao).not.toBe('BET');
+    expect(r.descartados.some((d) => d.motivo.includes('consenso independente'))).toBe(true);
+  });
+
+  it('modelo MUITO acima da referência: stake pela metade (lado que o filtro ignorava)', () => {
+    const apoio = { lambdas: { casa: 2.6, fora: 2.1 }, dq: 'B' as const, w: 0.4, jogosMin: 10 };
+    const r = analisarV4(
+      entrada([...ou('Pinnacle', 1.95, 1.95), ...ou('1win', 2.1, 1.72)], { apoio }),
+    );
+    expect(r.decisao).toBe('BET');
+    expect(r.melhor!.stake!.fracaoKelly).toBeCloseTo(0.125, 12);
+    expect(r.melhor!.stake!.ajustes.join(' ')).toContain('ponto cego');
+  });
+
+  it('nenhum mercado some em silêncio: toda odd válida é avaliada ou descartada com motivo', () => {
+    const linhas: LinhaOdd[] = [
+      ...ou('Pinnacle', 1.95, 1.95),
+      ...ou('1win', 2.1, 1.72),
+      ...ou('1win', 3.4, 1.3, '16:00', 3.5),
+      {
+        casa: '1win',
+        mercado: '1X2' as TipoMercado,
+        lado: '1',
+        odd: 2.4,
+        periodo: 'FT',
+        horarioColeta: H('16:00'),
+      },
+      {
+        casa: '1win',
+        mercado: 'ambas' as TipoMercado,
+        lado: 'sim',
+        odd: 1.9,
+        periodo: 'FT',
+        horarioColeta: H('16:00'),
+      },
+    ];
+    const r = analisarV4(entrada(linhas));
+    const chaves = new Set([
+      ...r.avaliadas.map((a) => a.chave),
+      ...r.descartados.map((d) => d.chave),
+    ]);
+    for (const l of linhas) expect(chaves.has(chaveSelecao(l))).toBe(true);
   });
 });

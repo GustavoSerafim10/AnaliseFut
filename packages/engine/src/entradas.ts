@@ -130,7 +130,9 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     bloqueio,
   });
   const inicio = Date.parse(e.jogo.inicio);
-  const agora = e.agora ? Date.parse(e.agora) : Date.now();
+  const agoraLido = e.agora ? Date.parse(e.agora) : Date.now();
+  // relógio ilegível: usa o do aparelho (NaN fazia "jogo ainda não começou" passar sempre)
+  const agora = Number.isFinite(agoraLido) ? agoraLido : Date.now();
   if (Number.isFinite(inicio) && agora >= inicio) return vazio('jogo_iniciado');
   const ap = e.apoio;
   if (!ap) return vazio('sem_estatisticas');

@@ -51,6 +51,11 @@ export const MIN_CASAS_CONSENSO = 4;
 export const EV_INVESTIGAR_V4 = 0.15;
 /** EV acima disso é odd lida errada ou linha suspensa: descartada, nem chega a ser INVESTIGAR */
 export const EV_EXPLODIDO_V4 = 0.3;
+/** modelo acima da referência por mais que isso: stake pela metade (lado que o filtro antigo ignorava) */
+export const DIVERGENCIA_ALTA_V4 = 0.15;
+/** erro relativo suposto no P_true do mercado, para testar se o EV sobrevive (R1 afiada, R2 consenso) */
+export const ERRO_REFERENCIA_R1 = 0.02;
+export const ERRO_REFERENCIA_R2 = 0.03;
 export const DISCORDANCIA_FORTE = 0.1;
 export const MARGEM_MAXIMA_REF = 0.1;
 export const JANELA_COMPARAVEL_MIN = 10;
@@ -186,8 +191,17 @@ export interface ResultadoV4 {
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-const minutos = (a?: string, b?: string) =>
-  a && b ? Math.abs(Date.parse(a) - Date.parse(b)) / 60_000 : null;
+/**
+ * Diferença em minutos entre dois horários de coleta. null = falta um dos dois;
+ * Infinity = existe mas é ilegível: nunca "comparável" (antes virava NaN e passava na trava).
+ */
+export const minutos = (a?: string, b?: string): number | null => {
+  if (!a || !b) return null;
+  const d = Math.abs(Date.parse(a) - Date.parse(b)) / 60_000;
+  return Number.isFinite(d) ? d : Number.POSITIVE_INFINITY;
+};
+const textoGap = (gap: number) =>
+  Number.isFinite(gap) ? `${gap.toFixed(0)} min de diferença` : 'horário de coleta ilegível';
 const maisRecente = (ps: PrecoCasa[]) =>
   ps
     .map((p) => p.horarioColeta)
@@ -203,6 +217,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   const inicio = Date.parse(e.jogo.inicio);
   if (!Number.isFinite(inicio)) throw new Error('jogo.inicio inválido (use data/hora ISO 8601)');
   const agora = e.agora ? Date.parse(e.agora) : Date.now();
+  if (!Number.isFinite(agora)) throw new Error('agora inválido (use data/hora ISO 8601)');
 
   const casasNomes = [
     ...new Map(e.linhas.map((l) => [l.casa.trim().toLowerCase(), l.casa.trim()])).values(),
@@ -329,9 +344,33 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     const gap = minutos(melhor.horarioColeta, horarioReferencia);
     if (nivel === 'R1' && gap !== null && gap > JANELA_COMPARAVEL_MIN) {
       descartar(
-        `odds com ${gap.toFixed(0)} min de diferença entre a referência e a ${melhor.casa}: não comparáveis (máx. ${JANELA_COMPARAVEL_MIN})`,
+        `${textoGap(gap)} entre a referência e a ${melhor.casa}: não comparáveis (máx. ${JANELA_COMPARAVEL_MIN})`,
       );
       continue;
+    }
+    if (nivel === 'R2') {
+      // consenso independente: a casa avaliada NÃO entra na própria referência (leave-one-out)
+      // e só valem as casas coletadas na mesma janela de tempo dela. Sem horário na melhor odd,
+      // a janela não se aplica (a decisão vira WATCHLIST mais adiante).
+      const outros = s.precos.filter(
+        (p) =>
+          p !== melhor &&
+          (!melhor.horarioColeta ||
+            (minutos(p.horarioColeta, melhor.horarioColeta) ?? Infinity) <= JANELA_COMPARAVEL_MIN),
+      );
+      if (outros.length < MIN_CASAS_CONSENSO - 1) {
+        descartar(
+          `consenso independente pede ${MIN_CASAS_CONSENSO - 1} outras casas coletadas em até ${JANELA_COMPARAVEL_MIN} min da ${melhor.casa}: só ${outros.length}`,
+        );
+        continue;
+      }
+      pTrue = mediana(outros.map((p) => p.pJusta));
+      margemRef = mediana(outros.map((p) => p.margem));
+      fonteP = `mediana de ${outros.length} outras casas sem margem (sem a ${melhor.casa}, janela de ${JANELA_COMPARAVEL_MIN} min)`;
+      if (margemRef > MARGEM_MAXIMA_REF) {
+        descartar(`margem da referência ${pct(margemRef)} > 10%: só informação`);
+        continue;
+      }
     }
 
     const efetiva = oddEfetiva(melhor.casa, melhor.odd);
@@ -459,6 +498,27 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     } else {
       fatorFiltro = 0.5;
       ajustesStake.push(`modelo discorda em ${pct(c.pTrue - c.pModelo!)}: stake pela metade`);
+    }
+  }
+
+  // divergência nos dois sentidos: modelo MUITO acima da referência também é suspeito (ponto
+  // cego do modelo, o mesmo que a lista de entradas já recusa acima de 15 pp)
+  if (c.nivel !== 'R3' && c.pModelo !== null && c.pModelo - c.pTrue > DIVERGENCIA_ALTA_V4) {
+    fatorFiltro *= 0.5;
+    ajustesStake.push(
+      `modelo ${pct(c.pModelo)} muito acima da referência ${pct(c.pTrue)}: possível ponto cego, stake pela metade`,
+    );
+  }
+  // robustez do preço de mercado (R1/R2): se a referência erra para baixo na proporção do gate,
+  // o EV some? Relativo, porque o erro de uma probabilidade pesa mais em odd alta.
+  if (c.nivel !== 'R3') {
+    const erro = c.nivel === 'R1' ? ERRO_REFERENCIA_R1 : ERRO_REFERENCIA_R2;
+    const evPior = c.emRisco * (c.pTrue * (1 - erro) * c.oddEfetiva - 1);
+    if (evPior < 0) {
+      fatorFiltro *= 0.5;
+      ajustesStake.push(
+        `preço frágil: com P_true ${pct(erro)} menor (relativo) o EV vira ${pct(evPior)}: stake pela metade`,
+      );
     }
   }
 
