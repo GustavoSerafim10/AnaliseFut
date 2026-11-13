@@ -521,6 +521,14 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     );
     return comC('NO_BET');
   }
+  // a referência de preço (R1/R2) não substitui a qualidade dos dados que sustentam o P_true:
+  // com DQ D ou E o modelo não autoriza BET nem stake (mesmo NO_BET que o R3 já recebe)
+  if (ap && POLITICA_EXPOSICAO.dqSemExposicao.includes(ap.dq)) {
+    motivos.push(
+      `DQ ${ap.dq} dos dados do modelo: a referência ${c.nivel} não substitui a qualidade dos dados. Sem BET e sem stake`,
+    );
+    return comC('NO_BET');
+  }
   if (!c.horarioColeta || (c.nivel === 'R1' && !c.horarioReferencia)) {
     motivos.push(
       'odd sem horário de coleta: não dá para garantir que referência e casa mole são do mesmo momento',
@@ -618,7 +626,8 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
 
   const nivelStake = c.nivel as 'R1' | 'R2' | 'R3';
   // a stake sai da MESMA função que autoriza toda a exposição (kelly.ts); a política está em
-  // politicaExposicao.ts. A V4 não passa a DQ do modelo: o preço dela vem da referência.
+  // politicaExposicao.ts. A DQ do modelo também chega aqui (DQ D/E já saiu como NO_BET acima;
+  // passar `dq` garante que nenhuma stake positiva nasça com DQ D/E mesmo por outro caminho).
   const reducoes = [fatorFiltro];
   if (t && t.fatorKelly < 1) {
     reducoes.push(t.fatorKelly);
@@ -627,6 +636,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   const aut = autorizarStake({
     p: c.pTrue,
     odd: c.oddEfetiva,
+    dq: ap?.dq,
     fracaoKelly: POLITICA_EXPOSICAO.kellyPorNivel[nivelStake],
     reducoes,
     teto: tetoDaAposta(nivelStake),
