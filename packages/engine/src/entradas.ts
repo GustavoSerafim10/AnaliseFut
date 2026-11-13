@@ -20,6 +20,7 @@ import {
   type Liquidador,
 } from './mercados';
 import { RHO_PADRAO } from './poisson';
+import { POLITICA_EXPOSICAO } from './politicaExposicao';
 import { chaveSelecao, mediana, precificar } from './precificacao';
 import { analisarSensibilidade, type ClasseSensibilidade } from './sensibilidade';
 import type { LinhaOdd } from './tipos';
@@ -41,7 +42,7 @@ export const DIVERGENCIA_SINAL_FORTE = 0.1;
 /** sinal forte pede chance alta de fato e alguma folga sobre o acerto mínimo da odd */
 export const CHANCE_SINAL_FORTE = 0.6;
 export const FOLGA_SINAL_FORTE = 0.005;
-export const STAKE_ENTRADA = 0.01;
+export const STAKE_ENTRADA = POLITICA_EXPOSICAO.tetoListaEntradas;
 export const MAX_ENTRADAS = 5;
 
 export type ForcaSinal = 'forte' | 'media';

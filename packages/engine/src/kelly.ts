@@ -2,11 +2,13 @@
  * Seção 21 — stake por Kelly fracionado, com os limites de banca embutidos.
  * Nunca aumenta a stake para recuperar perdas: a função nem recebe histórico de resultado.
  */
+import { POLITICA_EXPOSICAO } from './politicaExposicao';
 import type { ClasseSensibilidade } from './sensibilidade';
 import type { DQ } from './tipos';
 
-export const MAX_POR_APOSTA = 0.02;
-export const MAX_POR_LOTE = 0.05;
+/** os limites vivem em politicaExposicao.ts: aqui só os nomes de sempre */
+export const MAX_POR_APOSTA = POLITICA_EXPOSICAO.tetoGeralPorAposta;
+export const MAX_POR_LOTE = POLITICA_EXPOSICAO.tetoPorLote;
 
 /**
  * Tolerância do EV por unidade apostada (p × odd − 1). O ponto flutuante deixa ruído de ~1e-16
@@ -50,7 +52,9 @@ export function valorEmReais(banca: number, fracaoBanca: number): number {
 
 /** 1/4 com DQ A/B e ROBUSTA; 1/8 com DQ C, MODERADA ou escalação incerta. */
 export function fracaoKelly(dq: DQ, classe: ClasseSensibilidade, escalacaoIncerta = false): number {
-  return (dq === 'A' || dq === 'B') && classe === 'ROBUSTA' && !escalacaoIncerta ? 0.25 : 0.125;
+  return (dq === 'A' || dq === 'B') && classe === 'ROBUSTA' && !escalacaoIncerta
+    ? POLITICA_EXPOSICAO.kellyForte
+    : POLITICA_EXPOSICAO.kellyPadrao;
 }
 
 export interface Stake {
@@ -90,6 +94,8 @@ export interface StakeAutorizada {
   fracaoBanca: number;
   /** o que cortou a stake, na ordem em que cortou */
   limites: ('teto' | 'dia')[];
+  /** teto por aposta efetivamente aplicado (o mais restritivo entre o geral e o específico) */
+  teto: number;
   valor?: number;
 }
 
@@ -101,6 +107,10 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
   const k = kellyCheio(p.p, p.odd);
   let fracao = p.fracaoKelly;
   for (const r of p.reducoes ?? []) fracao *= Number.isFinite(r) ? Math.min(1, Math.max(0, r)) : 0;
+  // teto efetivo: o mais restritivo entre o geral e o específico (inválido conta como zero)
+  const tetoEf = Number.isFinite(p.teto ?? MAX_POR_APOSTA)
+    ? Math.min(MAX_POR_APOSTA, p.teto ?? MAX_POR_APOSTA)
+    : 0;
   const zero = (motivo: string): StakeAutorizada => ({
     autorizada: false,
     motivo,
@@ -108,6 +118,7 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     fracaoKelly: Number.isFinite(fracao) ? fracao : 0,
     fracaoBanca: 0,
     limites: [],
+    teto: tetoEf,
     valor: p.banca !== undefined ? 0 : undefined,
   });
   // entradas inválidas nunca viram stake positiva, NaN ou valor inconsistente: viram zero com motivo
@@ -121,14 +132,14 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     return zero(`folga do dia inválida (${p.folgaDia})`);
   if (p.banca !== undefined && !(Number.isFinite(p.banca) && p.banca > 0))
     return zero(`banca inválida (${p.banca})`);
-  if (p.dq === 'D' || p.dq === 'E') return zero(`DQ ${p.dq}: sem exposição autorizada`);
+  if (p.dq !== undefined && POLITICA_EXPOSICAO.dqSemExposicao.includes(p.dq))
+    return zero(`DQ ${p.dq}: sem exposição autorizada`);
   if (k <= 0) return zero('sem vantagem: EV nulo ou negativo');
 
   let f = Math.max(0, k) * fracao;
   const limites: StakeAutorizada['limites'] = [];
-  const teto = Math.min(MAX_POR_APOSTA, p.teto ?? MAX_POR_APOSTA);
-  if (f > teto) {
-    f = teto;
+  if (f > tetoEf) {
+    f = tetoEf;
     limites.push('teto');
   }
   if (p.folgaDia !== undefined && f > Math.max(0, p.folgaDia)) {
@@ -141,6 +152,7 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     fracaoKelly: fracao,
     fracaoBanca: f,
     limites,
+    teto: tetoEf,
     valor: p.banca !== undefined ? valorEmReais(p.banca, f) : undefined,
   };
 }

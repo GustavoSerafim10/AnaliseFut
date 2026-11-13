@@ -16,7 +16,8 @@ import {
 import { ROTULO_DECISAO, type Decisao, type RedTeam } from './decisao';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
-import { kellyCheio, valorEmReais } from './kelly';
+import { autorizarStake, valorEmReais } from './kelly';
+import { POLITICA_EXPOSICAO, tetoDaAposta } from './politicaExposicao';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
@@ -73,11 +74,10 @@ export const JANELA_COMPARAVEL_MIN = 10;
 export const JOGOS_MIN_NICHO = 6;
 
 export const GATE_V4 = { R1: 0.02, R1_menor: 0.03, R2: 0.035, R3: 0.05 } as const;
-export const KELLY_V4: Record<'R1' | 'R2' | 'R3', number> = { R1: 1 / 4, R2: 1 / 6, R3: 1 / 8 };
+/** frações e tetos por nível: definidos em politicaExposicao.ts, aqui só os nomes de sempre */
+export const KELLY_V4: Record<'R1' | 'R2' | 'R3', number> = { ...POLITICA_EXPOSICAO.kellyPorNivel };
 export const TETO_APOSTA_V4: Record<'R1' | 'R2' | 'R3', number> = {
-  R1: 0.02,
-  R2: 0.02,
-  R3: 0.01,
+  ...POLITICA_EXPOSICAO.tetoPorNivel,
 };
 
 /** referência afiada pela IDENTIDADE da casa (Pinnacle, Betfair Exchange), não pelo texto do nome */
@@ -617,28 +617,31 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   }
 
   const nivelStake = c.nivel as 'R1' | 'R2' | 'R3';
-  const k = kellyCheio(c.pTrue, c.oddEfetiva);
-  let fracaoKelly = KELLY_V4[nivelStake] * fatorFiltro;
+  // a stake sai da MESMA função que autoriza toda a exposição (kelly.ts); a política está em
+  // politicaExposicao.ts. A V4 não passa a DQ do modelo: o preço dela vem da referência.
+  const reducoes = [fatorFiltro];
   if (t && t.fatorKelly < 1) {
-    fracaoKelly *= t.fatorKelly;
+    reducoes.push(t.fatorKelly);
     ajustesStake.push('drawdown ≥ 20%: fração de Kelly pela metade');
   }
-  let fracaoBanca = Math.max(0, k) * fracaoKelly;
-  const teto = TETO_APOSTA_V4[nivelStake];
-  if (fracaoBanca > teto) {
-    fracaoBanca = teto;
-    ajustesStake.push(`teto de ${pct(teto)} por aposta`);
-  }
-  if (fracaoBanca > folgaDia) {
-    fracaoBanca = folgaDia;
+  const aut = autorizarStake({
+    p: c.pTrue,
+    odd: c.oddEfetiva,
+    fracaoKelly: POLITICA_EXPOSICAO.kellyPorNivel[nivelStake],
+    reducoes,
+    teto: tetoDaAposta(nivelStake),
+    folgaDia,
+  });
+  if (aut.limites.includes('teto')) ajustesStake.push(`teto de ${pct(aut.teto)} por aposta`);
+  if (aut.limites.includes('dia'))
     ajustesStake.push('limitada pelo que resta do teto de 6% no dia');
-  }
+  if (!aut.autorizada && aut.motivo) ajustesStake.push(`stake zero: ${aut.motivo}`);
   const banca = t?.bancaAtual ?? e.banca;
   const stake: StakeV4 = {
-    kellyCheio: k,
-    fracaoKelly,
-    fracaoBanca,
-    valor: banca !== undefined ? valorEmReais(banca, fracaoBanca) : undefined,
+    kellyCheio: aut.kellyCheio,
+    fracaoKelly: aut.fracaoKelly,
+    fracaoBanca: aut.fracaoBanca,
+    valor: banca !== undefined ? valorEmReais(banca, aut.fracaoBanca) : undefined,
     ajustes: ajustesStake,
   };
   motivos.push(
