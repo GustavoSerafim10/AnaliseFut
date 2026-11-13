@@ -38,7 +38,10 @@ describe('melhores entradas', () => {
     expect(e.chance).toBeGreaterThan(e.minimo);
     expect(e.minimo).toBeCloseTo(1 / 1.4);
     expect(e.forca).toBe('forte');
-    expect(e.stake).toBe(0.01);
+    // stake = min(1% da lista, Kelly fracionado): aqui o Kelly fracionado é o menor
+    expect(e.stake).toBeLessThanOrEqual(0.01);
+    expect(e.stake).toBeCloseTo(e.stakeKelly, 12);
+    expect(e.limiteStake).toBe('kelly');
   });
 
   it('funciona com uma casa só, onde a V4 descartaria o mercado principal', () => {
@@ -196,8 +199,9 @@ describe('melhores entradas', () => {
       motivos: [],
     };
     const r = melhoresEntradas(pedido(ou('1win', 1.5, 1.4, 3.0), { travas }));
-    expect(r.entradas[0].stake).toBe(0.005);
-    expect(r.entradas[0].stakeValor).toBe(0.5);
+    // drawdown: o teto da lista cai a 0,5% e o Kelly também é reduzido pela metade
+    expect(r.entradas[0].stake).toBeLessThanOrEqual(0.005);
+    expect(r.entradas[0].stakeValor).toBe(Math.round(100 * r.entradas[0].stake * 100) / 100);
     expect(r.bloqueio).toMatch(/dia encerrado/);
   });
 

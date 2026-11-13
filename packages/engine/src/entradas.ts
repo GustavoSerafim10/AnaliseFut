@@ -9,6 +9,7 @@ import { TETO_DIA } from './banca';
 import { agruparPorOperador } from './casas';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
+import { autorizarStake, fracaoKelly } from './kelly';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
@@ -20,6 +21,7 @@ import {
 } from './mercados';
 import { RHO_PADRAO } from './poisson';
 import { chaveSelecao, mediana, precificar } from './precificacao';
+import { analisarSensibilidade, type ClasseSensibilidade } from './sensibilidade';
 import type { LinhaOdd } from './tipos';
 import {
   ehAfiada,
@@ -68,6 +70,10 @@ export interface EntradaSugerida {
   /** fração da banca sugerida, já com as travas */
   stake: number;
   stakeValor?: number;
+  /** Kelly fracionado puro, antes dos tetos (auditoria da stake) */
+  stakeKelly: number;
+  /** o que decidiu a stake: o Kelly fracionado, o teto da lista (1%) ou o que resta do dia */
+  limiteStake: 'kelly' | 'teto' | 'dia';
 }
 
 export interface EntradaRecusada {
@@ -94,17 +100,14 @@ export interface PedidoEntradas {
   apoio?: ApoioModelo;
   /** liga bem coberta: aposta no azarão só com referência confiável */
   ligaPrincipal?: boolean;
+  /** escalação incerta: o Kelly cai para 1/8 */
+  escalacaoIncerta?: boolean;
   agora?: string;
   banca?: number;
   travas?: TravasBanca;
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
-
-function stakeDa(t?: TravasBanca): number {
-  const folgaDia = TETO_DIA - (t?.expostoHoje ?? 0);
-  return Math.max(0, Math.min(STAKE_ENTRADA * (t?.fatorKelly ?? 1), folgaDia));
-}
 
 function bloqueioDa(t?: TravasBanca): string | undefined {
   if (t?.pausadoAte) return `Banca em pausa até ${t.pausadoAte.slice(0, 10)}`;
@@ -145,7 +148,8 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     ap.fracao1T ?? FRACAO_1T,
     ap.contagens,
   );
-  const stake = stakeDa(e.travas);
+  const fatorKelly = e.travas?.fatorKelly ?? 1;
+  const folgaDia = TETO_DIA - (e.travas?.expostoHoje ?? 0);
   const banca = e.travas?.bancaAtual ?? e.banca;
   const entradas: EntradaSugerida[] = [];
   const recusadas: EntradaRecusada[] = [];
@@ -220,6 +224,33 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     const w = r.nivel === 3 ? Math.min(ap.w, W_MAX_NIVEL3) : ap.w;
     const chance = blend(pModelo, pMercado, w);
     const emRisco = fracaoEmRisco(dist);
+    // stake = min(1% da lista, Kelly fracionado), pela MESMA função que autoriza toda a exposição
+    let classe: ClasseSensibilidade = 'MODERADA';
+    try {
+      classe = analisarSensibilidade({
+        liq: r.liq,
+        lambdas: ap.lambdas,
+        lambdaMercado: null,
+        rho: ap.rho ?? RHO_PADRAO,
+        fracao1T: ap.fracao1T ?? FRACAO_1T,
+        pMercado,
+        w,
+        odd: efetiva,
+        contagens: ap.contagens,
+      }).classe;
+    } catch {
+      /* sem λ para testar: fica no mais conservador */
+    }
+    const sa = autorizarStake({
+      p: chance,
+      odd: efetiva,
+      dq: ap.dq,
+      fracaoKelly: fracaoKelly(ap.dq, classe, e.escalacaoIncerta),
+      reducoes: [fatorKelly],
+      teto: STAKE_ENTRADA * fatorKelly,
+      folgaDia,
+      banca,
+    });
     const chanceGreen = chance * emRisco;
     const ev = emRisco * (chance * efetiva - 1);
     if (ev <= 0) {
@@ -254,8 +285,14 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
         Math.abs(pModelo - pMercado) <= DIVERGENCIA_SINAL_FORTE
           ? 'forte'
           : 'media',
-      stake,
-      stakeValor: banca !== undefined ? Math.round(banca * stake * 100) / 100 : undefined,
+      stake: sa.fracaoBanca,
+      stakeValor: sa.valor,
+      stakeKelly: Math.max(0, sa.kellyCheio) * sa.fracaoKelly,
+      limiteStake: sa.limites.includes('dia')
+        ? 'dia'
+        : sa.limites.includes('teto')
+          ? 'teto'
+          : 'kelly',
     });
   }
 

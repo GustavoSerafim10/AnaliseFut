@@ -323,12 +323,14 @@ describe('DIVERGÊNCIA · limitarLote não valida os valores', () => {
   });
 });
 
-describe('DIVERGÊNCIA · a fração só depende de DQ/robustez, não bloqueia DQ D e E', () => {
-  it('DQ D e E recebem 1/8 e stake positiva se o chamador pedir (o bloqueio é do chamador)', () => {
+describe('APROVADO · DQ D e E não autorizam exposição (Etapa 3A)', () => {
+  it('a camada que autoriza zera a stake, mesmo com vantagem grande', () => {
     expect(fracaoKelly('D', 'ROBUSTA')).toBe(0.125);
-    expect(fracaoKelly('E', 'ROBUSTA')).toBe(0.125);
-    const s = calcularStake({ p: 0.6, odd: 2, dq: 'E', classe: 'ROBUSTA', banca: 1000 });
-    expect(s.fracaoBanca).toBeGreaterThan(0);
+    for (const dq of ['D', 'E'] as const) {
+      const s = calcularStake({ p: 0.6, odd: 2, dq, classe: 'ROBUSTA', banca: 1000 });
+      expect(s.fracaoBanca).toBe(0);
+      expect(s.valor).toBe(0);
+    }
   });
 });
 

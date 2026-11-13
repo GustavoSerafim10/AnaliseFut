@@ -331,6 +331,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       linhas: oddsValidas,
       apoio,
       ligaPrincipal: r.config.ligaTop,
+      escalacaoIncerta,
       banca: num(r.banca),
       travas,
     });
