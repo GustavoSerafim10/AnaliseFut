@@ -35,6 +35,7 @@ import {
   salvarNoHistorico,
   type ApostaFeita,
   travasDoHistorico,
+  chavesRegistradasNoJogo,
   type EntradaHistorico,
 } from './historico';
 import {
@@ -115,7 +116,17 @@ export function App() {
       valorDeMultiplasNoJogo(multiplas, jogo),
     );
   }, [historico, bancaInicial, r.jogo.casa, r.jogo.fora, r.jogo.data, multiplas]);
-  const d = useMemo(() => derivar(r, travas), [r, travas]);
+  // o que já foi registrado neste jogo não consome saldo da lista de entradas de novo
+  const registradasNoJogo = useMemo(
+    () =>
+      chavesRegistradasNoJogo(historico, {
+        casa: r.jogo.casa,
+        fora: r.jogo.fora,
+        data: r.jogo.data,
+      }),
+    [historico, r.jogo.casa, r.jogo.fora, r.jogo.data],
+  );
+  const d = useMemo(() => derivar(r, travas, registradasNoJogo), [r, travas, registradasNoJogo]);
   useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);

@@ -9,7 +9,7 @@ import { TETO_DIA } from './banca';
 import { agruparPorOperador } from './casas';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
-import { autorizarStake, fracaoKelly } from './kelly';
+import { autorizarStake, fracaoKelly, valorEmReais } from './kelly';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
@@ -73,8 +73,12 @@ export interface EntradaSugerida {
   stakeValor?: number;
   /** Kelly fracionado puro, antes dos tetos (auditoria da stake) */
   stakeKelly: number;
-  /** o que decidiu a stake: o Kelly fracionado, o teto da lista (1%) ou o que resta do dia */
+  /** o que decidiu a stake: o Kelly fracionado, o teto da lista (1%) ou o que resta do jogo ou do dia */
   limiteStake: 'kelly' | 'teto' | 'jogo' | 'dia';
+  /** a stake foi reduzida porque as entradas anteriores da lista já usaram parte do saldo */
+  reduzidaPorAcumulo?: boolean;
+  /** já registrada com "Entrei": a exposição dela está nas travas e não consome saldo de novo */
+  jaRegistrada?: boolean;
 }
 
 export interface EntradaRecusada {
@@ -101,6 +105,11 @@ export interface PedidoEntradas {
   apoio?: ApoioModelo;
   /** liga bem coberta: aposta no azarão só com referência confiável */
   ligaPrincipal?: boolean;
+  /**
+   * apostas já registradas neste jogo, como `casa#seleção` (casa em minúsculas). A exposição delas
+   * já vem nas travas; aqui elas só deixam de consumir o saldo da lista uma segunda vez.
+   */
+  registradas?: string[];
   /** escalação incerta: o Kelly cai para 1/8 */
   escalacaoIncerta?: boolean;
   agora?: string;
@@ -305,7 +314,46 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
 
   entradas.sort((a, b) => b.chanceGreen - a.chanceGreen || b.ev - a.ev);
   if (!entradas.length && !recusadas.length) return vazio('sem_mercados');
-  return { status: 'ok', entradas: entradas.slice(0, MAX_ENTRADAS), recusadas, bloqueio };
+  const lista = entradas.slice(0, MAX_ENTRADAS);
+  alocarSaldoAcumulado(lista, folgaDia, folgaJogo, banca, new Set(e.registradas ?? []));
+  return { status: 'ok', entradas: lista, recusadas, bloqueio };
+}
+
+/**
+ * Exposição ACUMULADA da lista: cada entrada já foi dimensionada sozinha (Kelly, teto da lista,
+ * teto geral, saldo do jogo e do dia). Aqui o saldo do dia e o do jogo são repartidos NA ORDEM da
+ * lista: cada entrada leva no máximo o que sobrou das anteriores, e a soma das stakes mostradas
+ * nunca passa de nenhum dos dois saldos. Só reduz (nunca aumenta uma stake) e não reserva nada:
+ * quem compromete exposição é o registro da aposta ("Entrei"), não a exibição da lista.
+ */
+function alocarSaldoAcumulado(
+  lista: EntradaSugerida[],
+  folgaDia: number,
+  folgaJogo: number,
+  banca: number | undefined,
+  registradas: Set<string>,
+): void {
+  const seguro = (x: number) => (Number.isFinite(x) ? Math.max(0, x) : 0);
+  let restaDia = seguro(folgaDia);
+  let restaJogo = seguro(folgaJogo);
+  for (const e of lista) {
+    // já registrada: a exposição está nas travas (dia e jogo). Contá-la aqui seria contar em dobro.
+    if (registradas.has(`${e.casa.trim().toLowerCase()}#${e.chave}`)) {
+      e.jaRegistrada = true;
+      e.stake = 0;
+      e.stakeValor = banca !== undefined ? 0 : undefined;
+      continue;
+    }
+    const cabe = Math.min(restaDia, restaJogo);
+    if (e.stake > cabe) {
+      e.stake = cabe;
+      e.stakeValor = banca !== undefined ? valorEmReais(banca, cabe) : undefined;
+      e.limiteStake = restaJogo <= restaDia ? 'jogo' : 'dia';
+      e.reduzidaPorAcumulo = true;
+    }
+    restaDia = seguro(restaDia - e.stake);
+    restaJogo = seguro(restaJogo - e.stake);
+  }
 }
 
 /** Uma aposta lida que o usuário pode registrar por conta própria, esteja ou não na lista. */

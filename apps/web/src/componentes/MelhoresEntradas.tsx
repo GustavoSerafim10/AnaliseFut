@@ -90,7 +90,9 @@ function Cartao({
           Estatísticas {pct(e.pModelo)} · {e.referenciaAfiada ? 'referência afiada' : 'mercado'}{' '}
           {pct(e.pMercado)} · {e.casas} casa{e.casas > 1 ? 's' : ''}
           {' · '}
-          {e.stake > 0 ? (
+          {e.jaRegistrada ? (
+            <>já registrada: a exposição dela já está na banca</>
+          ) : e.stake > 0 ? (
             <>
               aposta sugerida {pct(e.stake).replace(',0%', '%')} da banca
               {e.stakeValor !== undefined && ` = R$ ${dec(e.stakeValor)}`}
@@ -103,8 +105,15 @@ function Cartao({
               ] ?? 'limite da banca'}
             </>
           )}
-          {e.stake > 0 && e.limiteStake === 'jogo' && ' (limitada pelo saldo do jogo)'}
-          {e.stake > 0 && e.limiteStake === 'dia' && ' (limitada pelo saldo do dia)'}
+          {!e.jaRegistrada &&
+            e.stake > 0 &&
+            e.limiteStake === 'jogo' &&
+            ' (limitada pelo saldo do jogo)'}
+          {!e.jaRegistrada &&
+            e.stake > 0 &&
+            e.limiteStake === 'dia' &&
+            ' (limitada pelo saldo do dia)'}
+          {e.reduzidaPorAcumulo && ' · saldo já usado pelas entradas acima'}
         </p>
       </div>
       <div className="entrada-acoes">

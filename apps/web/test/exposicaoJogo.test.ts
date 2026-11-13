@@ -7,6 +7,7 @@ import { derivar } from '../src/dados';
 import { rascunhoNovo, type Rascunho } from '../src/estado';
 import {
   apostasFeitas,
+  chavesRegistradasNoJogo,
   exposicaoNoJogo,
   registrarAposta,
   salvarNoHistorico,
@@ -261,5 +262,27 @@ describe('exposicaoNoJogo (banca zerada ou inválida)', () => {
     expect(exposicaoNoJogo([], { casa: 'Flamengo', fora: 'Vasco', data: '2099-10-26' }, 0, 0)).toBe(
       0,
     );
+  });
+});
+
+describe('chaves já registradas no jogo (a lista não as conta de novo)', () => {
+  it('traz casa#seleção das apostas do evento, em qualquer análise dele, e só dele', () => {
+    const a = registrar([], base, aposta(0), 'analise-1');
+    const b = registrar(a.lista, jogoDe('Flamengo FC', 'vasco'), aposta(3), 'analise-2');
+    const c = registrar(b.lista, jogoDe('Palmeiras', 'Santos'), aposta(2), 'outro');
+    const chaves = chavesRegistradasNoJogo(c.lista, {
+      casa: 'Flamengo',
+      fora: 'Vasco',
+      data: '2099-10-26',
+    });
+    expect(chaves).toHaveLength(2);
+    expect(chaves.every((k) => k.startsWith('1win#'))).toBe(true);
+  });
+
+  it('análise salva sem "Entrei" não gera chave', () => {
+    const { lista } = salvarNoHistorico([], { ...base, idHistorico: 'a' }, d);
+    expect(
+      chavesRegistradasNoJogo(lista, { casa: 'Flamengo', fora: 'Vasco', data: '2099-10-26' }),
+    ).toEqual([]);
   });
 });

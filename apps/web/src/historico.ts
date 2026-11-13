@@ -400,6 +400,22 @@ export function registrarAposta(
 export const apostasDoJogo = (lista: EntradaHistorico[], id?: string) =>
   id ? lista.filter((e) => e.aposta && (e.id === id || e.irmaDe === id)) : [];
 
+/**
+ * As apostas já registradas num jogo (qualquer análise dele), como `casa#seleção`: é o que impede
+ * a lista de entradas de contar de novo uma exposição que as travas já contam.
+ */
+export function chavesRegistradasNoJogo(lista: EntradaHistorico[], jogo: RefEvento): string[] {
+  return apostasFeitas(lista)
+    .filter((e) =>
+      mesmoEvento(
+        { casa: e.rascunho.jogo.casa, fora: e.rascunho.jogo.fora, data: e.rascunho.jogo.data },
+        jogo,
+      ),
+    )
+    .map(chaveDaAposta)
+    .filter(Boolean);
+}
+
 /** Identifica a aposta na casa: o mesmo mercado não é registrado duas vezes por engano. */
 export const chaveDaAposta = (e: EntradaHistorico) =>
   e.resumo.entrada

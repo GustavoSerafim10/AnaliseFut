@@ -141,7 +141,12 @@ export function temTextoFlashscore(r: Rascunho): boolean {
 
 const textos = (r: Rascunho, grupo: string) => (r.prints[grupo] ?? []).map((l) => l.texto);
 
-export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
+export function derivar(
+  r: Rascunho,
+  travas?: TravasBanca,
+  /** apostas já registradas neste jogo (`casa#seleção`): não consomem saldo da lista de novo */
+  registradas?: string[],
+): Derivado {
   const nomes = { casa: r.jogo.casa || 'Mandante', fora: r.jogo.fora || 'Visitante' };
   const temTimes = !!(r.jogo.casa && r.jogo.fora);
 
@@ -332,6 +337,7 @@ export function derivar(r: Rascunho, travas?: TravasBanca): Derivado {
       apoio,
       ligaPrincipal: r.config.ligaTop,
       escalacaoIncerta,
+      registradas,
       banca: num(r.banca),
       travas,
     });
