@@ -4,6 +4,7 @@
  * uma perna perdida já encerra o bilhete, mesmo com os outros jogos pendentes.
  */
 import { apurarAposta, chaveSelecao, type ApostaBanca, type LinhaOdd } from '@pe/engine';
+import { eventoDoTexto, mesmoEvento, type RefEvento } from '@pe/parsers';
 import type { OddLine } from '@pe/schemas';
 import type { EntradaHistorico, Painel, PontoCurva } from './historico';
 
@@ -196,6 +197,22 @@ export function balancoMultiplas(
     b.unidades += a.lucro ?? 0;
   }
   return b;
+}
+
+/**
+ * R$ apostados em múltiplas que incluem o jogo. Cada perna perdida perde o bilhete inteiro, então o
+ * valor todo conta como exposição deste jogo (limite superior, conservador).
+ */
+export function valorDeMultiplasNoJogo(lista: Multipla[], jogo: RefEvento): number {
+  return lista
+    .filter((m) => (m.valor ?? 0) > 0)
+    .filter((m) =>
+      m.pernas.some((p) => {
+        const ev = eventoDoTexto(p.jogo, p.inicio);
+        return !!ev && mesmoEvento(ev, jogo);
+      }),
+    )
+    .reduce((s, m) => s + m.valor!, 0);
 }
 
 /** As múltiplas com valor em R$ também mexem na banca e nas travas. */

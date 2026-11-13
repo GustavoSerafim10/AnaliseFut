@@ -17,7 +17,7 @@ import { ROTULO_DECISAO, type Decisao, type RedTeam } from './decisao';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
 import { autorizarStake, valorEmReais } from './kelly';
-import { POLITICA_EXPOSICAO, tetoDaAposta } from './politicaExposicao';
+import { folgaDoJogo, POLITICA_EXPOSICAO, tetoDaAposta } from './politicaExposicao';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
   criarLiquidador,
@@ -624,6 +624,14 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     return comC('WATCHLIST', 'só amanhã', sens);
   }
 
+  // teto agregado por jogo: o que já está comprometido neste evento (qualquer mercado) sai do saldo
+  const folgaJogo = folgaDoJogo(t?.expostoJogo);
+  if (folgaJogo <= 0) {
+    motivos.push(
+      `teto de ${pct(POLITICA_EXPOSICAO.tetoPorJogo)} da banca neste jogo já comprometido (${pct(t?.expostoJogo ?? 0)} em apostas registradas): sem saldo para outra aposta`,
+    );
+    return comC('NO_BET', undefined, sens);
+  }
   const nivelStake = c.nivel as 'R1' | 'R2' | 'R3';
   // a stake sai da MESMA função que autoriza toda a exposição (kelly.ts); a política está em
   // politicaExposicao.ts. A DQ do modelo também chega aqui (DQ D/E já saiu como NO_BET acima;
@@ -640,9 +648,14 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     fracaoKelly: POLITICA_EXPOSICAO.kellyPorNivel[nivelStake],
     reducoes,
     teto: tetoDaAposta(nivelStake),
+    folgaJogo,
     folgaDia,
   });
   if (aut.limites.includes('teto')) ajustesStake.push(`teto de ${pct(aut.teto)} por aposta`);
+  if (aut.limites.includes('jogo'))
+    ajustesStake.push(
+      `limitada pelo saldo do jogo: ${pct(POLITICA_EXPOSICAO.tetoPorJogo)} por jogo, ${pct(t?.expostoJogo ?? 0)} já comprometido`,
+    );
   if (aut.limites.includes('dia'))
     ajustesStake.push('limitada pelo que resta do teto de 6% no dia');
   if (!aut.autorizada && aut.motivo) ajustesStake.push(`stake zero: ${aut.motivo}`);

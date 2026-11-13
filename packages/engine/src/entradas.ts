@@ -20,7 +20,7 @@ import {
   type Liquidador,
 } from './mercados';
 import { RHO_PADRAO } from './poisson';
-import { POLITICA_EXPOSICAO } from './politicaExposicao';
+import { folgaDoJogo, POLITICA_EXPOSICAO } from './politicaExposicao';
 import { chaveSelecao, mediana, precificar } from './precificacao';
 import { analisarSensibilidade, type ClasseSensibilidade } from './sensibilidade';
 import type { LinhaOdd } from './tipos';
@@ -74,7 +74,7 @@ export interface EntradaSugerida {
   /** Kelly fracionado puro, antes dos tetos (auditoria da stake) */
   stakeKelly: number;
   /** o que decidiu a stake: o Kelly fracionado, o teto da lista (1%) ou o que resta do dia */
-  limiteStake: 'kelly' | 'teto' | 'dia';
+  limiteStake: 'kelly' | 'teto' | 'jogo' | 'dia';
 }
 
 export interface EntradaRecusada {
@@ -114,6 +114,8 @@ function bloqueioDa(t?: TravasBanca): string | undefined {
   if (t?.pausadoAte) return `Banca em pausa até ${t.pausadoAte.slice(0, 10)}`;
   if (t?.diaEncerrado) return `${t.perdasHoje} perdas hoje: dia encerrado`;
   if (t && TETO_DIA - t.expostoHoje <= 0) return 'Teto de 6% da banca no dia já atingido';
+  if (t && folgaDoJogo(t.expostoJogo) <= 0)
+    return `Teto de ${POLITICA_EXPOSICAO.tetoPorJogo * 100}% da banca neste jogo já atingido`;
   return undefined;
 }
 
@@ -151,6 +153,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
   );
   const fatorKelly = e.travas?.fatorKelly ?? 1;
   const folgaDia = TETO_DIA - (e.travas?.expostoHoje ?? 0);
+  const folgaJogo = folgaDoJogo(e.travas?.expostoJogo);
   const banca = e.travas?.bancaAtual ?? e.banca;
   const entradas: EntradaSugerida[] = [];
   const recusadas: EntradaRecusada[] = [];
@@ -249,6 +252,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
       fracaoKelly: fracaoKelly(ap.dq, classe, e.escalacaoIncerta),
       reducoes: [fatorKelly],
       teto: STAKE_ENTRADA * fatorKelly,
+      folgaJogo,
       folgaDia,
       banca,
     });
@@ -291,9 +295,11 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
       stakeKelly: Math.max(0, sa.kellyCheio) * sa.fracaoKelly,
       limiteStake: sa.limites.includes('dia')
         ? 'dia'
-        : sa.limites.includes('teto')
-          ? 'teto'
-          : 'kelly',
+        : sa.limites.includes('jogo')
+          ? 'jogo'
+          : sa.limites.includes('teto')
+            ? 'teto'
+            : 'kelly',
     });
   }
 

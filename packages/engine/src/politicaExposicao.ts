@@ -15,6 +15,8 @@ export type NivelStake = 'R1' | 'R2' | 'R3';
 export const POLITICA_EXPOSICAO = {
   /** teto geral por aposta, fração da banca: vale sempre, para qualquer origem de stake */
   tetoGeralPorAposta: 0.02,
+  /** teto agregado por jogo: soma de TODAS as apostas registradas no mesmo evento, em qualquer mercado */
+  tetoPorJogo: 0.02,
   /** teto específico por nível de referência da V4 (o R3 é preço do modelo: mais apertado) */
   tetoPorNivel: { R1: 0.02, R2: 0.02, R3: 0.01 } as Record<NivelStake, number>,
   /** teto de cada entrada da lista "Melhores entradas" */
@@ -29,6 +31,16 @@ export const POLITICA_EXPOSICAO = {
   /** qualidade dos dados que nunca autoriza exposição */
   dqSemExposicao: ['D', 'E'] as readonly string[],
 };
+
+/**
+ * O que ainda cabe neste jogo (fração da banca): teto por jogo menos o já comprometido. Valor
+ * ausente conta como zero comprometido; valor inválido (NaN, negativo) conta como jogo cheio.
+ */
+export function folgaDoJogo(expostoJogo?: number): number {
+  if (expostoJogo === undefined) return POLITICA_EXPOSICAO.tetoPorJogo;
+  if (!Number.isFinite(expostoJogo) || expostoJogo < 0) return 0;
+  return Math.max(0, POLITICA_EXPOSICAO.tetoPorJogo - expostoJogo);
+}
 
 /** Teto da aposta: o do nível (se houver) ou o geral; nunca acima do geral. */
 export function tetoDaAposta(nivel?: NivelStake): number {

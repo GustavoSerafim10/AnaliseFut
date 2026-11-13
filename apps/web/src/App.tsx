@@ -39,6 +39,7 @@ import {
 } from './historico';
 import {
   apostasDeMultiplas,
+  valorDeMultiplasNoJogo,
   carregarMontando,
   carregarMultiplas,
   gravarMontando,
@@ -99,19 +100,21 @@ export function App() {
     setMontandoState(l);
     gravarMontando(l);
   };
-  // travas da banca (V4.0 seção 6) pelas apostas registradas, sem contar a análise aberta
-  const travas = useMemo(
-    () =>
-      bancaInicial
-        ? travasDoHistorico(
-            historico.filter((e) => e.id !== r.idHistorico),
-            bancaInicial,
-            undefined,
-            apostasDeMultiplas(multiplas, historico),
-          )
-        : undefined,
-    [historico, bancaInicial, r.idHistorico, multiplas],
-  );
+  // travas da banca (V4.0 seção 6) por TODAS as apostas registradas, inclusive as do jogo aberto:
+  // elas já estão comprometidas (teto diário de 6% e teto de 2% por jogo). Só o botão "Entrei"
+  // cria exposição; análises salvas e entradas exibidas não reservam nada.
+  const travas = useMemo(() => {
+    if (!bancaInicial) return undefined;
+    const jogo = { casa: r.jogo.casa, fora: r.jogo.fora, data: r.jogo.data };
+    return travasDoHistorico(
+      historico,
+      bancaInicial,
+      undefined,
+      apostasDeMultiplas(multiplas, historico),
+      jogo,
+      valorDeMultiplasNoJogo(multiplas, jogo),
+    );
+  }, [historico, bancaInicial, r.jogo.casa, r.jogo.fora, r.jogo.data, multiplas]);
   const d = useMemo(() => derivar(r, travas), [r, travas]);
   useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {

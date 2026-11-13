@@ -79,6 +79,8 @@ export interface PedidoStake {
   dq?: DQ;
   /** teto específico desta aposta; o teto geral de 2% vale sempre também */
   teto?: number;
+  /** o que resta do teto por jogo (fração da banca) */
+  folgaJogo?: number;
   /** o que resta do teto diário (fração da banca) */
   folgaDia?: number;
   banca?: number;
@@ -93,7 +95,7 @@ export interface StakeAutorizada {
   fracaoKelly: number;
   fracaoBanca: number;
   /** o que cortou a stake, na ordem em que cortou */
-  limites: ('teto' | 'dia')[];
+  limites: ('teto' | 'jogo' | 'dia')[];
   /** teto por aposta efetivamente aplicado (o mais restritivo entre o geral e o específico) */
   teto: number;
   valor?: number;
@@ -130,6 +132,8 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     return zero(`teto inválido (${p.teto})`);
   if (p.folgaDia !== undefined && !Number.isFinite(p.folgaDia))
     return zero(`folga do dia inválida (${p.folgaDia})`);
+  if (p.folgaJogo !== undefined && !Number.isFinite(p.folgaJogo))
+    return zero(`folga do jogo inválida (${p.folgaJogo})`);
   if (p.banca !== undefined && !(Number.isFinite(p.banca) && p.banca > 0))
     return zero(`banca inválida (${p.banca})`);
   if (p.dq !== undefined && POLITICA_EXPOSICAO.dqSemExposicao.includes(p.dq))
@@ -141,6 +145,10 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
   if (f > tetoEf) {
     f = tetoEf;
     limites.push('teto');
+  }
+  if (p.folgaJogo !== undefined && f > Math.max(0, p.folgaJogo)) {
+    f = Math.max(0, p.folgaJogo);
+    limites.push('jogo');
   }
   if (p.folgaDia !== undefined && f > Math.max(0, p.folgaDia)) {
     f = Math.max(0, p.folgaDia);

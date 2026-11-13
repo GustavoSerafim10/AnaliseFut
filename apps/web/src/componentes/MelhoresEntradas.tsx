@@ -90,8 +90,21 @@ function Cartao({
           Estatísticas {pct(e.pModelo)} · {e.referenciaAfiada ? 'referência afiada' : 'mercado'}{' '}
           {pct(e.pMercado)} · {e.casas} casa{e.casas > 1 ? 's' : ''}
           {' · '}
-          aposta sugerida {pct(e.stake).replace(',0%', '%')} da banca
-          {e.stakeValor !== undefined && ` = R$ ${dec(e.stakeValor)}`}
+          {e.stake > 0 ? (
+            <>
+              aposta sugerida {pct(e.stake).replace(',0%', '%')} da banca
+              {e.stakeValor !== undefined && ` = R$ ${dec(e.stakeValor)}`}
+            </>
+          ) : (
+            <>
+              sem saldo para apostar:{' '}
+              {{ dia: 'teto de 6% do dia', jogo: 'teto de 2% neste jogo' }[
+                e.limiteStake as 'dia' | 'jogo'
+              ] ?? 'limite da banca'}
+            </>
+          )}
+          {e.stake > 0 && e.limiteStake === 'jogo' && ' (limitada pelo saldo do jogo)'}
+          {e.stake > 0 && e.limiteStake === 'dia' && ' (limitada pelo saldo do dia)'}
         </p>
       </div>
       <div className="entrada-acoes">

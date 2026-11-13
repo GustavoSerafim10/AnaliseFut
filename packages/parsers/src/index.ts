@@ -11,6 +11,7 @@ import {
 
 export * from './texto';
 export * from './times';
+export * from './evento';
 export * from './fonte';
 export * from './sinonimos';
 export * from './parser1win';

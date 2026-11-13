@@ -33,6 +33,11 @@ export interface TravasBanca {
   diaEncerrado: boolean;
   /** fração da banca atual já apostada hoje */
   expostoHoje: number;
+  /**
+   * fração da banca atual já comprometida NO JOGO analisado (todas as apostas registradas nele,
+   * em qualquer mercado, e as múltiplas que o incluem). Quem monta as travas preenche; ausente = 0.
+   */
+  expostoJogo?: number;
   motivos: string[];
 }
 

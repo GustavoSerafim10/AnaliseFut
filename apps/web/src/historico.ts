@@ -22,6 +22,7 @@ import {
   type PlacarFinal,
   type TravasBanca,
 } from '@pe/engine';
+import { mesmoEvento, type RefEvento } from '@pe/parsers';
 import type { OddLine } from '@pe/schemas';
 import { abrirDeposito, migrarHistorico, type Deposito } from './armazem';
 import type { Derivado } from './dados';
@@ -375,6 +376,13 @@ export function registrarAposta(
   agora = Date.now(),
 ): { lista: EntradaHistorico[]; id: string } {
   const raiz = lista.find((e) => e.id === r.idHistorico);
+  // registro repetido: a mesma aposta (casa + mercado + seleção) do mesmo jogo não entra duas vezes,
+  // senão a exposição do jogo e do dia seria contada em dobro
+  if (raiz && aposta.entrada) {
+    const nova = `${aposta.casa.trim().toLowerCase()}#${chaveSelecao(aposta.entrada.linha as LinhaOdd)}`;
+    if (apostasDoJogo(lista, raiz.id).some((e) => chaveDaAposta(e) === nova))
+      return { lista, id: raiz.id };
+  }
   if (!raiz?.aposta || !aposta.entrada) return salvarNoHistorico(lista, r, d, aposta, agora);
   const irma: EntradaHistorico = {
     id: novoId(),
@@ -533,6 +541,10 @@ export function travasDoHistorico(
   agora = isoLocal(new Date()),
   /** apostas de fora da lista, como as múltiplas */
   extras: ApostaBanca[] = [],
+  /** o jogo analisado: com ele, as travas trazem o que já está comprometido NESTE jogo */
+  jogo?: RefEvento,
+  /** R$ de múltiplas que incluem este jogo (a perna perdida perde o bilhete inteiro) */
+  valorMultiplasNoJogo = 0,
 ): TravasBanca {
   const apostas: ApostaBanca[] = apostasFeitas(lista).map((e) => {
     const a = apurar(e);
@@ -543,7 +555,36 @@ export function travasDoHistorico(
       apuradaEm: e.resultado?.registradoEm,
     };
   });
-  return calcularTravas(bancaInicial, [...apostas, ...extras], agora);
+  const travas = calcularTravas(bancaInicial, [...apostas, ...extras], agora);
+  if (!jogo) return travas;
+  return {
+    ...travas,
+    expostoJogo: exposicaoNoJogo(lista, jogo, valorMultiplasNoJogo, travas.bancaAtual),
+  };
+}
+
+/**
+ * Fração da banca já comprometida num jogo: TODAS as apostas registradas nele (a primeira, as
+ * irmãs e as de análises repetidas do mesmo jogo, em qualquer mercado) mais as múltiplas que o
+ * incluem. O jogo é identificado por data + os dois times (mesmoEvento), não pelo id da análise.
+ * Só conta o que foi registrado com "Entrei"; entradas apenas exibidas não reservam nada.
+ */
+export function exposicaoNoJogo(
+  lista: EntradaHistorico[],
+  jogo: RefEvento,
+  valorMultiplasNoJogo: number,
+  bancaAtual: number,
+): number {
+  const nele = apostasFeitas(lista)
+    .filter((e) =>
+      mesmoEvento(
+        { casa: e.rascunho.jogo.casa, fora: e.rascunho.jogo.fora, data: e.rascunho.jogo.data },
+        jogo,
+      ),
+    )
+    .reduce((s, e) => s + e.aposta!.valor!, 0);
+  const total = nele + Math.max(0, valorMultiplasNoJogo);
+  return bancaAtual > 0 ? total / bancaAtual : total > 0 ? 1 : 0;
 }
 
 /** as entradas de verdade (botão "Entrei"), base do painel */
