@@ -83,6 +83,8 @@ export interface Rascunho {
   casas: string[];
   /** as casas padrão já foram acrescentadas a esta análise */
   casasPadrao?: boolean;
+  /** casas padrão já oferecidas a esta análise: as novas entram uma vez, a removida não volta */
+  casasOferecidas?: string[];
   odds: OddLine[];
   explicacaoDivergencia: string;
   redTeam: { argumentos: string[]; atacaPremissa: boolean; sobreviveu: boolean };
@@ -129,7 +131,7 @@ export function rascunhoNovo(): Rascunho {
     desfalqueAtaque: { casa: 'auto', fora: 'auto' },
     desfalqueDefesa: { casa: 'nenhum', fora: 'nenhum' },
     casas: [...CASAS_PADRAO],
-    casasPadrao: true,
+    casasOferecidas: [...CASAS_PADRAO],
     odds: [],
     explicacaoDivergencia: '',
     redTeam: { argumentos: ['', '', ''], atacaPremissa: false, sobreviveu: false },
@@ -169,6 +171,7 @@ export function carregarRascunho(): Rascunho {
         ...novo,
         ...salvo,
         casasPadrao: salvo.casasPadrao,
+        casasOferecidas: salvo.casasOferecidas,
         config: { ...novo.config, ...salvo.config },
       });
       // rascunho vazio de ontem: sem isto, o jogo de hoje nasce com a data de ontem e parece iniciado
