@@ -3,7 +3,9 @@
  * Nunca aumenta stake para recuperar perda: as travas só reduzem ou bloqueiam.
  */
 
-export const TETO_DIA = 0.06;
+import { POLITICA_EXPOSICAO } from './politicaExposicao';
+
+export const TETO_DIA = POLITICA_EXPOSICAO.tetoPorDia;
 export const DRAWDOWN_REDUZ = 0.2;
 export const DRAWDOWN_PAUSA = 0.3;
 export const DIAS_PAUSA = 7;

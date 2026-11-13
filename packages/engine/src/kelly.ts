@@ -8,7 +8,6 @@ import type { DQ } from './tipos';
 
 /** os limites vivem em politicaExposicao.ts: aqui só os nomes de sempre */
 export const MAX_POR_APOSTA = POLITICA_EXPOSICAO.tetoGeralPorAposta;
-export const MAX_POR_LOTE = POLITICA_EXPOSICAO.tetoPorLote;
 
 /**
  * Tolerância do EV por unidade apostada (p × odd − 1). O ponto flutuante deixa ruído de ~1e-16
@@ -187,11 +186,4 @@ export function calcularStake(p: {
     limitadaPeloTeto: a.limites.includes('teto'),
     valor: a.valor,
   };
-}
-
-/** Reduz proporcionalmente as stakes de um lote para não passar de 5% da banca. */
-export function limitarLote(fracoes: number[], max = MAX_POR_LOTE): number[] {
-  const total = fracoes.reduce((s, f) => s + f, 0);
-  if (total <= max) return [...fracoes];
-  return fracoes.map((f) => (f * max) / total);
 }

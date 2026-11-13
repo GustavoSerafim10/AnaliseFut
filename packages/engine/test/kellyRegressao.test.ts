@@ -11,17 +11,14 @@
  * Blackjack, Sports Betting and the Stock Market" (resultados com vários desfechos e Kelly
  * fracionado); MacLean, Thorp & Ziemba (2011), "The Kelly Capital Growth Investment Criterion".
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STAKE_ENTRADA } from '../src/entradas';
 import {
+  autorizarStake,
   calcularStake,
   fracaoKelly,
   kellyCheio,
-  limitarLote,
   MAX_POR_APOSTA,
-  MAX_POR_LOTE,
 } from '../src/kelly';
 import type { DQ, LinhaOdd, TipoMercado } from '../src/tipos';
 import { analisarV4, KELLY_V4, TETO_APOSTA_V4 } from '../src/v4';
@@ -157,19 +154,10 @@ describe('APROVADO · limites de exposição', () => {
     expect(s.limitadaPeloTeto).toBe(s.kellyCheio * 0.25 > MAX_POR_APOSTA);
   });
 
-  it('lote: até 5% passa inalterado; acima disso reduz proporcionalmente para exatamente 5%', () => {
-    expect(MAX_POR_LOTE).toBe(0.05);
-    expect(limitarLote([0.02, 0.02, 0.01])).toEqual([0.02, 0.02, 0.01]);
-    const r = limitarLote([0.04, 0.03, 0.03]);
-    expect(r.reduce((s, x) => s + x, 0)).toBeCloseTo(0.05, 12);
-    expect(r[0] / r[1]).toBeCloseTo(0.04 / 0.03, 12); // mantém as proporções
-    expect(limitarLote([])).toEqual([]);
-    expect(limitarLote([0.02, 0.03], 0)).toEqual([0, 0]);
-  });
-
-  it('não devolve a mesma lista (sem alias) quando está dentro do limite', () => {
-    const entrada = [0.01, 0.02];
-    expect(limitarLote(entrada)).not.toBe(entrada);
+  it('o limite por lote foi removido: não há mais limitarLote nem MAX_POR_LOTE', async () => {
+    const kelly = await import('../src/kelly');
+    expect('limitarLote' in kelly).toBe(false);
+    expect('MAX_POR_LOTE' in kelly).toBe(false);
   });
 });
 
@@ -317,17 +305,6 @@ describe('APROVADO · valor em R$ arredondado para baixo, nunca acima do teto (E
   });
 });
 
-describe('DIVERGÊNCIA · limitarLote não valida os valores', () => {
-  it('NaN contamina o lote inteiro', () => {
-    expect(limitarLote([0.03, NaN, 0.04]).every(Number.isNaN)).toBe(true);
-  });
-  it('fração negativa é aceita e entra na soma', () => {
-    const r = limitarLote([0.06, -0.02, 0.04]);
-    expect(r[1]).toBeLessThan(0);
-    expect(r.reduce((s, x) => s + x, 0)).toBeCloseTo(0.05, 12);
-  });
-});
-
 describe('APROVADO · DQ D e E não autorizam exposição (Etapa 3A)', () => {
   it('a camada que autoriza zera a stake, mesmo com vantagem grande', () => {
     expect(fracaoKelly('D', 'ROBUSTA')).toBe(0.125);
@@ -339,38 +316,24 @@ describe('APROVADO · DQ D e E não autorizam exposição (Etapa 3A)', () => {
   });
 });
 
-describe('DIVERGÊNCIA · há duas políticas de teto e a lista de entradas não usa Kelly', () => {
+describe('APROVADO · a política de tetos é única e a lista usa min(1%, Kelly)', () => {
   it('V4 em R3 limita a 1% por aposta; kelly.ts limita a 2%', () => {
     expect(TETO_APOSTA_V4.R3).toBe(0.01);
     expect(MAX_POR_APOSTA).toBe(0.02);
     expect(TETO_APOSTA_V4.R1).toBe(MAX_POR_APOSTA);
   });
 
-  it('"Melhores entradas" aposta 1% fixo, sem Kelly: acima do 1/4 Kelly quando a vantagem é pequena', () => {
+  it('"Melhores entradas" usa o 1% só como TETO: com vantagem pequena a stake é a do Kelly', () => {
     expect(STAKE_ENTRADA).toBe(0.01);
-    // o caso real da tela: chance efetiva 51,2% na odd 2,00 (EV de cerca de +1,9% já com a devolução)
+    // o caso real da tela: chance efetiva 51,2% na odd 2,00 pede ~0,6% de 1/4 Kelly, abaixo do teto
     const quartoKelly = kellyCheio(0.512, 2) * 0.25;
     expect(quartoKelly).toBeCloseTo(0.006, 3);
-    expect(STAKE_ENTRADA).toBeGreaterThan(quartoKelly);
-    // com vantagem de 0,5% o Kelly pede ~0,1% e a lista continua em 1%
-    expect(STAKE_ENTRADA / (kellyCheio(0.5025, 2) * 0.25)).toBeGreaterThan(5);
-  });
-
-  it('o limite de 5% por lote existe em kelly.ts mas nenhum outro código o chama', () => {
-    const achados: string[] = [];
-    const varrer = (dir: string) => {
-      for (const nome of readdirSync(dir)) {
-        const p = join(dir, nome);
-        if (statSync(p).isDirectory()) {
-          if (nome !== 'node_modules' && nome !== 'dist') varrer(p);
-        } else if (/\.(ts|tsx)$/.test(nome) && !p.includes('test') && !p.endsWith('kelly.ts')) {
-          if (readFileSync(p, 'utf8').includes('limitarLote(')) achados.push(p);
-        }
-      }
-    };
-    varrer(join(__dirname, '..', '..'));
-    varrer(join(__dirname, '..', '..', '..', 'apps', 'web', 'src'));
-    expect(achados).toEqual([]);
+    const s = autorizarStake({ p: 0.512, odd: 2, fracaoKelly: 0.25, teto: STAKE_ENTRADA });
+    expect(s.fracaoBanca).toBeCloseTo(quartoKelly, 12);
+    expect(s.fracaoBanca).toBeLessThan(STAKE_ENTRADA);
+    // com vantagem de 0,5% o Kelly pede ~0,1%: a lista não aposta mais 1% como antes
+    const pequeno = autorizarStake({ p: 0.5025, odd: 2, fracaoKelly: 0.25, teto: STAKE_ENTRADA });
+    expect(pequeno.fracaoBanca).toBeLessThan(STAKE_ENTRADA / 5);
   });
 });
 

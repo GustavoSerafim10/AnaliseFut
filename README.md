@@ -51,7 +51,9 @@ packages/engine   motor V3.3 em TypeScript puro (sem UI, sem rede), testado com 
   src/ajustesLambda.ts  checagem λ_modelo × λ_market (9.4) e viés conhecido (16.3)
   src/gates.ts          blend, edge gate, price gate (12, 14, 20)
   src/sensibilidade.ts  cenários ROBUSTA / MODERADA / FRÁGIL (15)
-  src/kelly.ts          Kelly fracionado, teto 2%/aposta e 5%/lote (21)
+  src/kelly.ts          Kelly fracionado e autorização de stake (autorizarStake), com validação (21)
+  src/politicaExposicao.ts  política única de exposição: 2%/aposta, 2%/jogo, 6%/dia, frações de Kelly
+  src/casas.ts          identidade das casas (operador, marca, produto); consenso por operador
   src/varredura.ts      todos os mercados: top 5, descartados com motivo, 1 instrumento por tese (19)
   src/decisao.ts        pipeline V3.3 completo e decisão (22–23) — hoje motor de apoio
   src/v4.ts             protocolo V4.0: níveis R1–R4, EV contra a referência, gates, filtro, stake
@@ -145,10 +147,16 @@ Convenções de `lado` por mercado: ver o comentário de `LinhaOdd` em `packages
 - **Betfair:** as odds back entram como referência com de-vig normal (o preço médio entre back e
   lay ainda não é lido); quando a melhor odd é da Betfair, 6,5% de comissão sai do lucro.
 - **Red team e sensibilidade** só são exigidos no R3 (preço do modelo). No R1/R2 o preço é do
-  mercado; a DQ das estatísticas não entra no gate.
+  mercado, mas DQ D ou E das estatísticas bloqueia BET e stake (NO_BET): a referência não
+  substitui a qualidade dos dados. A DQ não altera o gate.
 - **Odd > 8** soma +3 pp no lugar do +1 pp de odd > 4 (não acumulam).
-- **Não implementado ainda:** teto de 3% em apostas correlacionadas (precisa do lote), lucro e
-  limites por casa (seção 9), checagem de horário entre casas no R2.
+- **Exposição:** no máximo 2% da banca por aposta (1% no R3 e em cada entrada da lista), 2% por
+  jogo (soma de todas as apostas registradas no mesmo evento, em qualquer mercado, inclusive
+  múltiplas) e 6% por dia; vale sempre o limite mais restritivo. Só o botão "Entrei" compromete
+  exposição; entradas apenas exibidas não reservam nada. O antigo limite de 5% por "lote" foi
+  removido.
+- **Não implementado ainda:** Kelly conjunto para apostas correlacionadas (hoje o teto de 2% por
+  jogo as trata como uma exposição só), lucro e limites por casa (seção 9).
 
 ### V3.3 (motor de apoio)
 

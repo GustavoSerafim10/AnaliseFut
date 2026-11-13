@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { STAKE_ENTRADA } from '../src/entradas';
-import { autorizarStake, fracaoKelly, MAX_POR_APOSTA, MAX_POR_LOTE } from '../src/kelly';
+import { TETO_DIA } from '../src/banca';
+import { autorizarStake, fracaoKelly, MAX_POR_APOSTA } from '../src/kelly';
 import { POLITICA_EXPOSICAO, tetoDaAposta } from '../src/politicaExposicao';
 import { KELLY_V4, TETO_APOSTA_V4 } from '../src/v4';
 
@@ -13,7 +14,9 @@ describe('valores da política (travados)', () => {
     expect(POLITICA_EXPOSICAO.tetoGeralPorAposta).toBe(0.02);
     expect(POLITICA_EXPOSICAO.tetoPorNivel).toEqual({ R1: 0.02, R2: 0.02, R3: 0.01 });
     expect(POLITICA_EXPOSICAO.tetoListaEntradas).toBe(0.01);
-    expect(POLITICA_EXPOSICAO.tetoPorLote).toBe(0.05);
+    expect(POLITICA_EXPOSICAO.tetoPorJogo).toBe(0.02);
+    expect(POLITICA_EXPOSICAO.tetoPorDia).toBe(0.06);
+    expect('tetoPorLote' in POLITICA_EXPOSICAO).toBe(false);
     expect(POLITICA_EXPOSICAO.kellyPorNivel).toEqual({ R1: 1 / 4, R2: 1 / 6, R3: 1 / 8 });
     expect(POLITICA_EXPOSICAO.kellyForte).toBe(0.25);
     expect(POLITICA_EXPOSICAO.kellyPadrao).toBe(0.125);
@@ -22,7 +25,7 @@ describe('valores da política (travados)', () => {
 
   it('os nomes antigos apontam para a política única (nenhuma segunda fonte)', () => {
     expect(MAX_POR_APOSTA).toBe(POLITICA_EXPOSICAO.tetoGeralPorAposta);
-    expect(MAX_POR_LOTE).toBe(POLITICA_EXPOSICAO.tetoPorLote);
+    expect(TETO_DIA).toBe(POLITICA_EXPOSICAO.tetoPorDia);
     expect(STAKE_ENTRADA).toBe(POLITICA_EXPOSICAO.tetoListaEntradas);
     expect(KELLY_V4).toEqual(POLITICA_EXPOSICAO.kellyPorNivel);
     expect(TETO_APOSTA_V4).toEqual(POLITICA_EXPOSICAO.tetoPorNivel);

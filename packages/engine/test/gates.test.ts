@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ajustarLambdaModelo } from '../src/ajustesLambda';
 import { blend, evMinimo, pesoModelo, priceGate } from '../src/gates';
-import { calcularStake, fracaoKelly, kellyCheio, limitarLote } from '../src/kelly';
+import { calcularStake, fracaoKelly, kellyCheio } from '../src/kelly';
 import {
   calcularLambdaModelo,
   classificarDesfalque,
@@ -68,11 +68,6 @@ describe('Kelly (seção 21)', () => {
     expect(s.limitadaPeloTeto).toBe(true);
     expect(s.valor).toBe(20);
     expect(calcularStake({ p: 0.4, odd: 2, dq: 'A', classe: 'ROBUSTA' }).fracaoBanca).toBe(0);
-  });
-  it('lote limitado a 5% da banca', () => {
-    const r = limitarLote([0.02, 0.02, 0.02]);
-    expect(r.reduce((s, x) => s + x, 0)).toBeCloseTo(0.05, 12);
-    expect(limitarLote([0.01, 0.02])).toEqual([0.01, 0.02]);
   });
 });
 
