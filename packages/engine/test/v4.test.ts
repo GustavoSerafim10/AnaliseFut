@@ -317,7 +317,7 @@ describe('endurecimento da camada de decisão (auditoria)', () => {
     );
     const m = r.melhor!;
     expect(m.casaMelhorOdd).toBe('Betano');
-    expect(m.fonteP).toContain('sem a Betano');
+    expect(m.fonteP).toContain('sem Betano');
     expect(m.pTrue).toBeCloseTo(0.5, 10);
   });
 

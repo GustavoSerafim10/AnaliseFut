@@ -6,6 +6,7 @@
  */
 import type { TravasBanca } from './banca';
 import { TETO_DIA } from './banca';
+import { agruparPorOperador } from './casas';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
@@ -187,7 +188,7 @@ export function melhoresEntradas(e: PedidoEntradas): ResultadoEntradas {
     if (
       e.ligaPrincipal &&
       !afiadas.length &&
-      s.precos.length < MIN_CASAS_CONSENSO &&
+      agruparPorOperador(s.precos).size < MIN_CASAS_CONSENSO &&
       azarao &&
       timeFavorecido(r.liq) === azarao
     ) {

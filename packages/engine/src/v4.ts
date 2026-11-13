@@ -6,6 +6,13 @@
  */
 import type { TravasBanca } from './banca';
 import { TETO_DIA } from './banca';
+import {
+  agruparPorOperador,
+  avisosDeCasas,
+  comissaoDaCasa,
+  operadoresDistintos,
+  resolverCasa,
+} from './casas';
 import { ROTULO_DECISAO, type Decisao, type RedTeam } from './decisao';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
@@ -44,9 +51,6 @@ export const NOMES_REFERENCIA: Record<NivelReferencia, string> = {
   R4: 'R4 · só modelo (nunca BET)',
 };
 
-export const CASAS_AFIADAS = ['pinnacle', 'betfair'];
-/** comissão da Betfair Exchange sobre o lucro, descontada quando a melhor odd é dela */
-export const COMISSAO_BETFAIR = 0.065;
 export const MIN_CASAS_CONSENSO = 4;
 export const EV_INVESTIGAR_V4 = 0.15;
 /** EV acima disso é odd lida errada ou linha suspensa: descartada, nem chega a ser INVESTIGAR */
@@ -69,8 +73,8 @@ export const TETO_APOSTA_V4: Record<'R1' | 'R2' | 'R3', number> = {
   R3: 0.01,
 };
 
-export const ehAfiada = (casa: string) =>
-  CASAS_AFIADAS.some((c) => casa.trim().toLowerCase().includes(c));
+/** referência afiada pela IDENTIDADE da casa (Pinnacle, Betfair Exchange), não pelo texto do nome */
+export const ehAfiada = (casa: string) => resolverCasa(casa).afiada;
 
 /** EV mínimo da seção 5. null = R4 (sem BET). */
 export function gateV4(
@@ -91,9 +95,7 @@ export function gateV4(
 
 /** Odd que entra no EV: na Betfair Exchange a comissão sai do lucro. */
 export function oddEfetiva(casa: string, odd: number): number {
-  return casa.trim().toLowerCase().includes('betfair')
-    ? 1 + (odd - 1) * (1 - COMISSAO_BETFAIR)
-    : odd;
+  return 1 + (odd - 1) * (1 - comissaoDaCasa(casa));
 }
 
 /** Motor V3.3 como apoio: filtro, preço dos nichos (R3) e previsão. */
@@ -219,10 +221,10 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   const agora = e.agora ? Date.parse(e.agora) : Date.now();
   if (!Number.isFinite(agora)) throw new Error('agora inválido (use data/hora ISO 8601)');
 
-  const casasNomes = [
-    ...new Map(e.linhas.map((l) => [l.casa.trim().toLowerCase(), l.casa.trim()])).values(),
-  ];
-  const afiadasJogo = casasNomes.filter(ehAfiada);
+  // identidade por OPERADOR: marcas do mesmo operador e produtos da mesma casa são uma fonte só
+  const nomesLidos = e.linhas.map((l) => l.casa.trim());
+  const casasNomes = operadoresDistintos(nomesLidos).map((o) => o.original);
+  const afiadasJogo = operadoresDistintos(nomesLidos.filter(ehAfiada)).map((o) => o.original);
   const referencia = {
     nivel: (afiadasJogo.length
       ? 'R1'
@@ -232,7 +234,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
           ? 'R3'
           : 'R4') as NivelReferencia,
     afiadas: afiadasJogo,
-    moles: casasNomes.filter((c) => !ehAfiada(c)),
+    moles: operadoresDistintos(nomesLidos.filter((n) => !ehAfiada(n))).map((o) => o.original),
   };
   const vazio = (decisao: Decisao, motivo: string): ResultadoV4 => ({
     decisao,
@@ -253,6 +255,7 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
         ? 'P_true pelo consenso das casas (R2), gate mais alto'
         : `sem casa afiada e só ${casasNomes.length} casa(s): mercados principais só com o modelo como apoio (R3); cole 4+ casas`,
     );
+  avisos.push(...avisosDeCasas(nomesLidos));
   const horasAteJogo = (inicio - agora) / 3_600_000;
   if (afiadasJogo.length && horasAteJogo > 24)
     avisos.push(
@@ -299,11 +302,12 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
       fonteP = `${afiadas.map((p) => p.casa).join('/')} sem margem (${afiadas[0].metodo})`;
       candidatos = s.precos.filter((p) => !ehAfiada(p.casa));
       horarioReferencia = maisRecente(afiadas);
-    } else if (s.precos.length >= MIN_CASAS_CONSENSO) {
+    } else if (agruparPorOperador(s.precos).size >= MIN_CASAS_CONSENSO) {
+      // 4+ OPERADORES independentes (Betsul + CasaDeApostas, por exemplo, contam como um)
       nivel = 'R2';
       pTrue = s.pMercado;
       margemRef = s.margem;
-      fonteP = `mediana de ${s.precos.length} casas sem margem`;
+      fonteP = `mediana de ${agruparPorOperador(s.precos).size} operadores sem margem`;
       candidatos = s.precos;
       // R3 só em nichos e ligas pequenas: em liga principal o modelo encolhe o favorito (16.3)
       // e o "valor" no azarão contra uma casa só é falso (lição 3) → R4
@@ -352,21 +356,28 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
       // consenso independente: a casa avaliada NÃO entra na própria referência (leave-one-out)
       // e só valem as casas coletadas na mesma janela de tempo dela. Sem horário na melhor odd,
       // a janela não se aplica (a decisão vira WATCHLIST mais adiante).
-      const outros = s.precos.filter(
-        (p) =>
-          p !== melhor &&
-          (!melhor.horarioColeta ||
-            (minutos(p.horarioColeta, melhor.horarioColeta) ?? Infinity) <= JANELA_COMPARAVEL_MIN),
+      // leave-one-out por OPERADOR: sai todo o operador da melhor odd (qualquer marca ou produto)
+      const opMelhor = resolverCasa(melhor.casa).operatorId;
+      const outros = agruparPorOperador(
+        s.precos.filter(
+          (p) =>
+            resolverCasa(p.casa).operatorId !== opMelhor &&
+            (!melhor.horarioColeta ||
+              (minutos(p.horarioColeta, melhor.horarioColeta) ?? Infinity) <=
+                JANELA_COMPARAVEL_MIN),
+        ),
       );
-      if (outros.length < MIN_CASAS_CONSENSO - 1) {
+      if (outros.size < MIN_CASAS_CONSENSO - 1) {
         descartar(
-          `consenso independente pede ${MIN_CASAS_CONSENSO - 1} outras casas coletadas em até ${JANELA_COMPARAVEL_MIN} min da ${melhor.casa}: só ${outros.length}`,
+          `consenso independente pede ${MIN_CASAS_CONSENSO - 1} outros operadores coletados em até ${JANELA_COMPARAVEL_MIN} min da ${melhor.casa}: só ${outros.size}`,
         );
         continue;
       }
-      pTrue = mediana(outros.map((p) => p.pJusta));
-      margemRef = mediana(outros.map((p) => p.margem));
-      fonteP = `mediana de ${outros.length} outras casas sem margem (sem a ${melhor.casa}, janela de ${JANELA_COMPARAVEL_MIN} min)`;
+      // um voto por operador (mediana das marcas dele), depois a mediana entre operadores
+      const porOp = [...outros.values()];
+      pTrue = mediana(porOp.map((ps) => mediana(ps.map((p) => p.pJusta))));
+      margemRef = mediana(porOp.map((ps) => mediana(ps.map((p) => p.margem))));
+      fonteP = `mediana de ${outros.size} outros operadores sem margem (sem ${resolverCasa(melhor.casa).displayName}, janela de ${JANELA_COMPARAVEL_MIN} min)`;
       if (margemRef > MARGEM_MAXIMA_REF) {
         descartar(`margem da referência ${pct(margemRef)} > 10%: só informação`);
         continue;

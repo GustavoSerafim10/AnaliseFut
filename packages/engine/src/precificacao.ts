@@ -2,6 +2,7 @@
  * Seção 11 + "Várias casas": margem e de-vig por casa e por mercado, depois consenso
  * (mediana das probabilidades justas), melhor odd e outliers.
  */
+import { resolverCasa } from './casas';
 import { margem as calcMargem, removerMargem, type MetodoDevig } from './devig';
 import { normalizarLado } from './mercados';
 import type { LinhaOdd, TipoMercado } from './tipos';
@@ -103,7 +104,8 @@ export function mediana(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-const nomeCasa = (c: string) => c.trim().toLowerCase();
+/** fonte de preço: marca + produto ("Bet 365" e "bet365" são a mesma; Exchange ≠ Sportsbook) */
+const nomeCasa = (c: string) => resolverCasa(c).chaveFonte;
 
 export interface OpcoesPrecificacao {
   /** de-vig dos mercados de 3 resultados (V4.0: 'shin'); padrão = regra da seção 11 */

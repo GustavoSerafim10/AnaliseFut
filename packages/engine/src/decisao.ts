@@ -12,6 +12,7 @@ import {
   priceGate,
   type PriceGate,
 } from './gates';
+import { resolverCasa } from './casas';
 import { calcularStake, type Stake } from './kelly';
 import { ajustarLambdaMercado, observacoesParaLambda, type LambdaMercado } from './lambdaMarket';
 import { criarModelo, FRACAO_1T, type LambdasContagem } from './mercados';
@@ -114,7 +115,8 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 export function ajustarDQ(dq: DQ, linhas: LinhaOdd[]): { dq: DQ; motivos: string[] } {
   const motivos: string[] = [];
-  const casas = new Set(linhas.map((l) => l.casa.trim().toLowerCase()));
+  // casas = OPERADORES independentes (Betsul + CasaDeApostas contam uma vez)
+  const casas = new Set(linhas.map((l) => resolverCasa(l.casa).operatorId));
   let r = dq;
   if (casas.size === 0) {
     motivos.push('sem odds → DQ E');
@@ -124,7 +126,7 @@ export function ajustarDQ(dq: DQ, linhas: LinhaOdd[]): { dq: DQ; motivos: string
     r = 'C';
     motivos.push('odds de uma casa só limitam a DQ em C');
   }
-  if (r === 'A' && ![...casas].some((c) => CASAS_REFERENCIA.some((ref) => c.includes(ref)))) {
+  if (r === 'A' && !linhas.some((l) => resolverCasa(l.casa).afiada)) {
     r = 'B';
     motivos.push('DQ A exige casa referência (Pinnacle/Betfair)');
   }
