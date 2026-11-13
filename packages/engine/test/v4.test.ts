@@ -99,6 +99,13 @@ describe('referência afiada × casa mole', () => {
     expect(r.decisao).toBe('INVESTIGAR');
   });
 
+  it('EV explodido (> 30%) é descartado, não vira INVESTIGAR', () => {
+    const r = analisarV4(entrada([...ou('Pinnacle', 1.95, 1.95), ...ou('1win', 3.5, 1.55)]));
+    expect(r.decisao).not.toBe('INVESTIGAR');
+    expect(r.avaliadas.every((a) => a.ev <= 0.3)).toBe(true);
+    expect(r.descartados.some((d) => d.motivo.includes('explodido'))).toBe(true);
+  });
+
   it('R2: consenso de 4 casas, gate 3,5% e 1/6 Kelly', () => {
     const casas = [
       ...ou('Bet365', 1.9, 1.9),

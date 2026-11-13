@@ -49,6 +49,8 @@ export const CASAS_AFIADAS = ['pinnacle', 'betfair'];
 export const COMISSAO_BETFAIR = 0.065;
 export const MIN_CASAS_CONSENSO = 4;
 export const EV_INVESTIGAR_V4 = 0.15;
+/** EV acima disso é odd lida errada ou linha suspensa: descartada, nem chega a ser INVESTIGAR */
+export const EV_EXPLODIDO_V4 = 0.3;
 export const DISCORDANCIA_FORTE = 0.1;
 export const MARGEM_MAXIMA_REF = 0.1;
 export const JANELA_COMPARAVEL_MIN = 10;
@@ -335,6 +337,12 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     const efetiva = oddEfetiva(melhor.casa, melhor.odd);
     const emRisco = dist ? fracaoEmRisco(dist) : 1;
     const ev = emRisco * (pTrue * efetiva - 1);
+    if (ev > EV_EXPLODIDO_V4) {
+      descartar(
+        `EV explodido de ${pct(ev)} (${melhor.casa} @ ${melhor.odd} contra preço justo ${(1 / pTrue).toFixed(2)}): odd lida errada ou linha suspensa, ignorada`,
+      );
+      continue;
+    }
     const evMinimo = gateV4(nivel, {
       ligaPrincipal: e.ligaPrincipal,
       horasAteJogo,
