@@ -5,4 +5,5 @@ export * from './versao';
 export * from './blobs';
 export * from './validacao';
 export * from './cadeia';
+export * from './armazem';
 export * from './reproducao';

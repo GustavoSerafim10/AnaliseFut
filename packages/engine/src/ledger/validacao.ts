@@ -106,10 +106,18 @@ const finito = (x: unknown): x is number => typeof x === 'number' && Number.isFi
 const naoNegativo = (x: unknown): boolean => finito(x) && x >= 0;
 const inteiroNaoNegativo = (x: unknown): boolean => Number.isInteger(x) && (x as number) >= 0;
 const textoNaoVazio = (x: unknown): boolean => typeof x === 'string' && x.trim().length > 0;
+/**
+ * Lista DENSA em que todo elemento é válido. `Array.prototype.every` PULA as posições vazias
+ * (`new Array(3)`, `[1, , 2]`), então ele aceitaria uma lista esparsa e uma lista vazia de buracos;
+ * aqui cada índice de 0 a length−1 tem de existir e passar no predicado.
+ */
 const listaDe =
   (p: (x: unknown) => boolean) =>
-  (x: unknown): boolean =>
-    Array.isArray(x) && x.every(p);
+  (x: unknown): boolean => {
+    if (!Array.isArray(x)) return false;
+    for (let i = 0; i < x.length; i++) if (!(i in x) || !p(x[i])) return false;
+    return true;
+  };
 
 const R = {
   finito: { esperado: 'um número finito', ok: finito } satisfies Regra,
@@ -259,7 +267,9 @@ function validarDecisao(c: Obj): string | null {
   );
   if (sn) return sn;
   const snapshot = c.snapshot as Obj;
-  if (!Array.isArray(snapshot.odds)) return 'decisao.snapshot.odds deve ser uma lista';
+  // lista densa; o formato de cada linha é do motor (LinhaOdd) e não é duplicado aqui
+  if (!listaDe((linha) => linha !== undefined)(snapshot.odds))
+    return 'decisao.snapshot.odds deve ser uma lista sem posições vazias';
   if (!ehObjetoSimples(snapshot.estatisticas))
     return 'decisao.snapshot.estatisticas deve ser um objeto simples';
   if (!ehObjetoSimples(snapshot.contexto))

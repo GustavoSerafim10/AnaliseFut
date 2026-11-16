@@ -94,11 +94,25 @@ Várias abas podem anexar ao mesmo tempo. O escritor lê a ponta, cria o registr
 A chave do armazém deve ser `(cadeia, seq)` com `add`, que também recusa um `seq` repetido: duas defesas.
 `aceitarAnexo` **não** confia em que o registro veio de `criarRegistro`.
 
-**Contrato da L2 para correções (ainda não implementado):** `conferirRegistro` e `conferirPonta` só veem
-o registro novo e a ponta; **não** veem o registro apontado por `corrige`. A L2 precisa, na gravação de
-uma `correcao`, ler o registro `(cadeia, corrige.seq)` **na mesma transação** e recusar se ele não
-existir ou se o seu `hash` não for `corrige.hash` (a verificação histórica já faz esse cruzamento em
-`verificarCadeia`: `correcao_referencia_ausente` e `correcao_hash_diverge`).
+**Gravação atômica e referência de correção (`armazem.ts`, implementado e testado com um armazém em
+memória; o adaptador de IndexedDB da L2 NÃO existe).** `conferirRegistro` e `conferirPonta` só veem o
+registro novo e a ponta; quem confere o registro apontado por `corrige` é `anexarNaTransacao`, que o
+armazém chama DENTRO da transação de gravação, de forma **síncrona**, nesta ordem:
+
+1. `tx.ponta(cadeia)` → `conferirPonta`: a ponta lida agora tem de ser a que o novo registro continua
+   (senão `ConflitoDeCadeia`: reler e recriar);
+2. numa `correcao`, `tx.ler(cadeia, corrige.seq)` → `conferirReferencia`: o registro **tem de existir
+   nesta cadeia** e ter exatamente o hash `corrige.hash`; senão `ErroDeCadeia` (não é conflito:
+   tentar de novo não conserta uma referência inválida);
+3. `tx.adicionar(registro)` (a chave `(cadeia, seq)` com `add` recusa repetição: segunda defesa).
+
+`anexar(armazem, novo)` faz `await conferirRegistro(novo)` fora da transação e depois UMA transação com
+`anexarNaTransacao`. A atomicidade vem da transação do armazém (`ArmazemLedger.transacao`: corpo
+síncrono, tudo-ou-nada). Leitura da referência e gravação ficam na mesma transação, então nada se
+interpõe entre elas; se a conferência falha, o armazém desfaz tudo (rollback). O adaptador de
+IndexedDB (L2) só precisa implementar `TransacaoLedger` (`ponta`, `ler`, `adicionar`) numa transação
+`readwrite`, sem aguardar nada que não seja do próprio banco. A verificação histórica faz o mesmo
+cruzamento em `verificarCadeia` (`correcao_referencia_ausente` e `correcao_hash_diverge`).
 
 ## Coerência semântica (esquema 1)
 
@@ -149,6 +163,10 @@ válida; os demais campos (intervalo, escanteios, cartões, odds de fechamento�
 | `expostoJogo` | `number?` | opcional, finito ≥ 0 |
 | `motivos` | `string[]` | obrigatório, lista de textos |
 
+**Listas** (`motivos`, `limites`, `snapshot.odds`): **densas**. Cada índice de 0 a `length − 1` precisa
+existir e ser válido; posições vazias (`new Array(3)`, `[1, , 2]`, `length` aumentado) e `undefined`
+são recusados. (`Array.prototype.every` pula as posições vazias e aceitaria uma lista só de buracos.)
+
 **`corrige` (cabeçalho)**: só em `correcao`; exatamente `{ seq, hash }` (campo adicional é **recusado**,
 inclusive em `criarRegistro`, que não descarta em silêncio); `seq` inteiro positivo e **estritamente
 menor** que o `seq` do próprio registro; `hash` no formato SHA-256. Em `verificarCadeia`, o registro
@@ -167,6 +185,24 @@ anos bissextos pela regra gregoriana; fração de segundo de qualquer tamanho.
 Na verificação, os problemas são `data_invalida` e `corpo_incompativel` e tornam a cadeia **adulterada**,
 mesmo que o hash confira (registro forjado com hash refeito). Registros de esquema desconhecido não são
 julgados por estas regras.
+
+## Divergências conhecidas com os produtores (para decisão, antes de a L2 gravar)
+
+Conferidas com os produtores reais (`apps/web/test/ledgerProdutores.test.ts`: 297.000 saídas reais de
+`autorizarStake` e as de `calcularTravas`, `registrarAposta`, formulários e `analisarV4`). Passam
+todas as saídas de pedidos válidos. Fogem do contrato, e estão marcadas como `DIVERGÊNCIA` nos testes:
+
+1. **`autorizarStake` com pedido inválido** (`teto` negativo, `fracaoKelly` negativa): a recusa
+   (`autorizada: false`, com `motivo`) **ecoa** o valor inválido em `teto`/`fracaoKelly` (kelly.ts, `zero()`),
+   e o contrato exige ≥ 0. Não afeta uma autorização válida. Opções: (a) a L2 não grava stake de
+   pedido inválido (recomendada: não existe aposta legítima desse pedido); (b) relaxar `teto` e
+   `fracaoKelly` para "finito"; (c) corrigir o motor para limitar o eco a zero (mexe em Kelly: não feito).
+2. **Resultado sem placar**: o formulário de resultado aceita só o fechamento e `registrarResultado`
+   guarda `casa`/`fora` = `NaN` de propósito (CLV sem placar). O contrato exige inteiros ≥ 0. A L2 deve
+   registrar `resultado` só com placar completo; o fechamento sozinho precisa de outra forma de
+   registro (decisão sua).
+3. **Placar sem validação no formulário**: `num()` aceita decimal (`1.5`) e negativo (`-1`). O Ledger
+   recusa; o formulário deveria impedir antes (mudança de app, não feita).
 
 ## Limitações (importante)
 
@@ -200,4 +236,5 @@ Quanto mais frequente a âncora, menor a janela que um refazimento consistente c
 | `blobs.ts` | blob de texto bruto endereçado por conteúdo |
 | `validacao.ts` | data ISO válida e corpo × tipo |
 | `cadeia.ts` | `criarRegistro`, `conferirRegistro`, `conferirPonta`, `aceitarAnexo`, `verificarCadeia`, `verificarLedger` |
+| `armazem.ts` | contrato de gravação atômica: `TransacaoLedger`, `ArmazemLedger`, `conferirReferencia`, `anexarNaTransacao`, `anexar` |
 | `reproducao.ts` | `resumirSaidaDoMotor`, `impressaoDaDecisao`, `reproduzir*` |

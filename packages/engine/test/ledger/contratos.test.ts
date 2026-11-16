@@ -653,13 +653,12 @@ describe('verificarCadeia: o registro corrigido existe e tem o hash declarado', 
   });
 
   it('adulteração prevalece sobre incompleta quando as duas existem', async () => {
-    const lista = await cadeia();
-    const f = await forjar(lista[IDX.correcao], (c) => {
-      c.cabecalho.corrige = { seq: 3, hash: 'f'.repeat(64) };
-    });
-    const rel = await verificarCadeia([f]); // sem gênese E hash errado… e a referência está ausente
-    expect(['adulterada', 'incompleta']).toContain(rel.estado);
-    expect(codigos(rel)).toContain('sem_genese');
+    const lista = clonar(await cadeia());
+    // cópia parcial (sem gênese, logo incompleta) em que um registro também foi alterado
+    (lista[2].corpo as unknown as { resultado: { casa: number } }).resultado.casa = 9;
+    const rel = await verificarCadeia(lista.slice(2));
+    expect(codigos(rel)).toEqual(expect.arrayContaining(['sem_genese', 'hash_invalido']));
+    expect(rel.estado).toBe('adulterada');
   });
 });
 
@@ -778,6 +777,192 @@ describe('limites de data nas três portas (hash coerente)', () => {
       await expect(aceitarAnexo(null, r)).resolves.toBeUndefined();
       expect((await verificarCadeia([r])).estado).toBe('integra');
     }
+  });
+});
+
+// ───────────────────────── números não finitos, domínios e listas esparsas
+
+/**
+ * Valores que não passam pelo JSON (NaN, Infinity) e listas esparsas não podem ser "forjados com o
+ * hash refeito": o próprio hash falha ao serializar. Por isso eles entram SEM refazer o hash, e a
+ * validação tem de recusá-los ANTES (em `conferirRegistro`, em `criarRegistro` e, na verificação
+ * histórica, como `corpo_incompativel`).
+ */
+async function recusaSemHash(idx: number, alterar: (c: RegistroLedger) => void, esperado: RegExp) {
+  const lista = await cadeia();
+  const r = clonar(lista[idx]);
+  alterar(r);
+  await expect(conferirRegistro(r)).rejects.toThrow(esperado);
+  const rel = await verificarCadeia([...lista.slice(0, idx), r]);
+  expect(rel.estado).toBe('adulterada');
+  expect(codigos(rel)).toContain('corpo_incompativel');
+  const refeito = await criarRegistro(
+    { ...pedido(r.cabecalho.tipo, idx + 1), corpo: r.corpo },
+    lista[idx - 1] ?? null,
+  ).catch((e: unknown) => e);
+  expect((refeito as Error).message).toMatch(esperado);
+}
+
+const NAO_FINITOS = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+
+describe('stakeAutorizada: NaN, Infinity e negativos nos campos em que são proibidos', () => {
+  // [campo, aceita negativo?]  (kellyCheio pode ser negativo; os demais não)
+  const numericos: [string, boolean][] = [
+    ['kellyCheio', true],
+    ['fracaoKelly', false],
+    ['fracaoBanca', false],
+    ['teto', false],
+    ['valor', false],
+  ];
+  for (const [campo, aceitaNegativo] of numericos) {
+    for (const ruim of NAO_FINITOS)
+      it(`recusa ${campo} = ${String(ruim)}`, async () => {
+        await recusaSemHash(
+          IDX.aposta,
+          definir(`stakeAutorizada.${campo}`, ruim),
+          /stakeAutorizada/,
+        );
+      });
+    if (!aceitaNegativo)
+      for (const ruim of [-1, -0.0001, -Number.MIN_VALUE])
+        it(`recusa ${campo} = ${ruim} (negativo)`, async () => {
+          await recusaSemHash(
+            IDX.aposta,
+            definir(`stakeAutorizada.${campo}`, ruim),
+            /stakeAutorizada/,
+          );
+        });
+  }
+  it('kellyCheio negativo é aceito (EV negativo continua negativo)', async () => {
+    await aceita(IDX.aposta, definir('stakeAutorizada.kellyCheio', -0.5));
+  });
+});
+
+describe('travas: campos numéricos e booleanos ausentes ou inválidos', () => {
+  const finitos = ['bancaInicial', 'bancaAtual', 'pico'];
+  const naoNegativos = ['drawdown', 'fatorKelly', 'expostoHoje', 'expostoJogo', 'perdasHoje'];
+  for (const campo of [...finitos, ...naoNegativos])
+    for (const ruim of NAO_FINITOS)
+      it(`recusa ${campo} = ${String(ruim)}`, async () => {
+        await recusaSemHash(IDX.aposta, definir(`travas.${campo}`, ruim), /travas/);
+      });
+  for (const campo of naoNegativos)
+    it(`recusa ${campo} negativo`, async () => {
+      await recusaSemHash(IDX.aposta, definir(`travas.${campo}`, -1), /travas/);
+    });
+  for (const campo of finitos)
+    it(`${campo} negativo é aceito (a banca pode ficar negativa)`, async () => {
+      await aceita(IDX.aposta, definir(`travas.${campo}`, -10));
+    });
+  for (const ruim of [1.5, 0.1, Number.NaN])
+    it(`perdasHoje = ${ruim} (não inteiro) é recusado`, async () => {
+      await recusaSemHash(IDX.aposta, definir('travas.perdasHoje', ruim), /travas/);
+    });
+  for (const campo of ['diaEncerrado'])
+    for (const ruim of [0, 1, 'true', null])
+      it(`${campo} = ${JSON.stringify(ruim)} não é booleano`, async () => {
+        await recusaSemHash(IDX.aposta, definir(`travas.${campo}`, ruim), /travas/);
+      });
+});
+
+describe('aposta: odd <= 1 e não finita', () => {
+  for (const odd of [1, 0.999, 0.5, 0, -1, Number.NEGATIVE_INFINITY, Number.NaN])
+    it(`recusa odd = ${String(odd)}`, async () => {
+      await recusaSemHash(IDX.aposta, definir('aposta.odd', odd), /odd/);
+    });
+  for (const odd of [1.000001, 1.01, 2, 1000])
+    it(`aceita odd = ${odd}`, async () => {
+      await aceita(IDX.aposta, definir('aposta.odd', odd));
+    });
+  for (const valor of NAO_FINITOS)
+    it(`recusa valor = ${String(valor)}`, async () => {
+      await recusaSemHash(IDX.aposta, definir('aposta.valor', valor), /valor/);
+    });
+});
+
+describe('resultado: placar negativo, decimal, não finito ou ausente', () => {
+  for (const campo of ['casa', 'fora'])
+    for (const ruim of [-1, 0.5, 1.0000001, Number.NaN, Number.POSITIVE_INFINITY, '2', null])
+      it(`recusa ${campo} = ${String(ruim)}`, async () => {
+        await recusaSemHash(IDX.resultado, definir(`resultado.${campo}`, ruim), /resultado/);
+      });
+  for (const campo of ['casa', 'fora', 'registradoEm'])
+    it(`recusa ${campo} ausente`, async () => {
+      await recusaSemHash(IDX.resultado, definir(`resultado.${campo}`, REMOVER), /resultado/);
+    });
+  it('recusa o resultado inteiro ausente ou vazio', async () => {
+    await recusaSemHash(IDX.resultado, definir('resultado', REMOVER), /resultado/);
+    await recusaSemHash(IDX.resultado, definir('resultado', {}), /resultado/);
+  });
+  for (const [casa, fora] of [
+    [0, 0],
+    [3, 1],
+    [10, 12],
+  ])
+    it(`aceita ${casa} x ${fora}`, async () => {
+      const lista = await cadeia();
+      const f = await forjar(lista[IDX.resultado], (c) => {
+        definir('resultado.casa', casa)(c);
+        definir('resultado.fora', fora)(c);
+      });
+      await expect(conferirRegistro(f)).resolves.toBeUndefined();
+    });
+});
+
+describe('listas esparsas: Array.every pula as posições vazias, a validação não', () => {
+  it('premissa: `every` aceita uma lista só de buracos (por isso a verificação é índice a índice)', () => {
+    expect(new Array<string>(3).every((x) => typeof x === 'string')).toBe(true);
+    // eslint-disable-next-line no-sparse-arrays
+    expect(['a', , 'b'].every((x) => typeof x === 'string')).toBe(true);
+  });
+
+  const esparsas: [string, () => unknown][] = [
+    ['só buracos (new Array(3))', () => new Array<string>(3)],
+    // eslint-disable-next-line no-sparse-arrays
+    ['buraco no começo', () => [, 'a']],
+    // eslint-disable-next-line no-sparse-arrays
+    ['buraco no meio', () => ['a', , 'b']],
+    [
+      'buraco no fim (length maior)',
+      () => {
+        const l = ['a'];
+        l.length = 3;
+        return l;
+      },
+    ],
+    ['undefined explícito', () => ['a', undefined]],
+  ];
+
+  for (const [nome, fazer] of esparsas) {
+    it(`travas.motivos: ${nome}`, async () => {
+      await recusaSemHash(IDX.aposta, definir('travas.motivos', fazer()), /travas\.motivos/);
+    });
+    it(`stakeAutorizada.limites: ${nome}`, async () => {
+      await recusaSemHash(
+        IDX.aposta,
+        definir('stakeAutorizada.limites', fazer()),
+        /stakeAutorizada\.limites/,
+      );
+    });
+    it(`snapshot.odds: ${nome}`, async () => {
+      await recusaSemHash(IDX.decisao, definir('snapshot.odds', fazer()), /odds/);
+    });
+  }
+
+  it('listas densas válidas continuam aceitas (inclusive vazias)', async () => {
+    await aceita(IDX.aposta, definir('travas.motivos', []));
+    await aceita(IDX.aposta, definir('travas.motivos', ['a', 'b']));
+    await aceita(IDX.aposta, definir('stakeAutorizada.limites', ['teto', 'dia']));
+    await aceita(IDX.decisao, definir('snapshot.odds', [{}, { casa: 'x' }]));
+  });
+
+  it('elemento inválido numa lista cheia: texto que não é texto, limite desconhecido', async () => {
+    await recusaSemHash(IDX.aposta, definir('travas.motivos', ['a', 5]), /travas\.motivos/);
+    await recusaSemHash(
+      IDX.aposta,
+      definir('stakeAutorizada.limites', ['teto', 'semana']),
+      /limites/,
+    );
   });
 });
 
