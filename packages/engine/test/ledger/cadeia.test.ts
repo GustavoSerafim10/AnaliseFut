@@ -18,7 +18,12 @@ import {
 
 const T = (i: number) => `2026-11-13T15:${String(i % 60).padStart(2, '0')}:00-03:00`;
 const POLITICAS = { x: 1 };
-const corpo = (i: number): CorpoLedger => ({ decisao: null, resultado: { placar: [i, 0] } });
+/** o mínimo que um `resultado` precisa ter (placar inteiro e data do registro) */
+const BASE_RES = { casa: 1, fora: 0, registradoEm: T(1) };
+const corpo = (i: number): CorpoLedger => ({
+  decisao: null,
+  resultado: { casa: i, fora: 0, registradoEm: T(i), placar: [i, 0] },
+});
 
 async function construir(n: number, cadeia = 'A', opcoes: { prefixo?: string } = {}) {
   const lista: RegistroLedger[] = [];
@@ -52,7 +57,8 @@ describe('formato do hash (documentado e conferido por fora)', () => {
       '{"cabecalho":{"cadeia":"A","criadoEm":"2026-11-13T15:01:00-03:00","esquema":1,' +
       `"impressaoPoliticas":"${impressao}","politicas":{"x":1},"prevHash":null,"seq":1,` +
       '"tipo":"resultado","versaoMotor":"teste"},' +
-      '"corpo":{"decisao":null,"resultado":{"placar":[1,0]}}}';
+      '"corpo":{"decisao":null,"resultado":{"casa":1,"fora":0,"placar":[1,0],' +
+      '"registradoEm":"2026-11-13T15:01:00-03:00"}}}';
     expect(serializarCanonico({ cabecalho: r.cabecalho, corpo: r.corpo })).toBe(esperado);
     const independente = createHash('sha256')
       .update('pe-ledger/v1\n' + esperado, 'utf8')
@@ -85,7 +91,10 @@ describe('formato do hash (documentado e conferido por fora)', () => {
         tipo: 'resultado',
         cadeia: 'A',
         criadoEm: T(1),
-        corpo: { resultado: { b: 1, a: 2 }, decisao: null },
+        corpo: {
+          resultado: { b: 1, registradoEm: T(1), a: 2, fora: 0, casa: 1 },
+          decisao: null,
+        },
         versaoMotor: 'teste',
         politicas: POLITICAS,
       },
@@ -96,7 +105,7 @@ describe('formato do hash (documentado e conferido por fora)', () => {
         tipo: 'resultado',
         cadeia: 'A',
         criadoEm: T(1),
-        corpo: { decisao: null, resultado: { a: 2, b: 1 } },
+        corpo: { decisao: null, resultado: { casa: 1, fora: 0, registradoEm: T(1), a: 2, b: 1 } },
         versaoMotor: 'teste',
         politicas: POLITICAS,
       },
@@ -118,9 +127,9 @@ describe('formato do hash (documentado e conferido por fora)', () => {
         },
         null,
       );
-    const a = await mk({ decisao: null, resultado: { k: 1 } });
-    const b = await mk({ decisao: null, resultado: { k: 1, extra: undefined } });
-    const c = await mk({ decisao: null, resultado: { k: 1, extra: null } });
+    const a = await mk({ decisao: null, resultado: { ...BASE_RES, k: 1 } });
+    const b = await mk({ decisao: null, resultado: { ...BASE_RES, k: 1, extra: undefined } });
+    const c = await mk({ decisao: null, resultado: { ...BASE_RES, k: 1, extra: null } });
     expect(a.hash).toBe(b.hash);
     expect(c.hash).not.toBe(a.hash);
   });
@@ -257,7 +266,7 @@ describe('criarRegistro', () => {
           tipo: 'resultado',
           cadeia: 'A',
           criadoEm: T(1),
-          corpo: { decisao: null, resultado: { x: NaN } },
+          corpo: { decisao: null, resultado: { ...BASE_RES, x: NaN } },
         },
         null,
       ),
@@ -674,4 +683,4 @@ describe('concorrência: aceitarAnexo (contrato para a gravação atômica da L2
 });
 
 // Hash de referência do registro 1 de `construir(1)`: trava o formato. Se mudar, o ESQUEMA muda.
-const GOLDEN_HASH = '046fc2e577e367d53b05e6efeae07663bcec77b821173467d2be1e3b22f0e533';
+const GOLDEN_HASH = 'bf206d9b8d4011a8e0c2f22ab4e23ddf8f7ec77110f0c90c6b3eddc691882644';

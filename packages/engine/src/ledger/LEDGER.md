@@ -61,8 +61,8 @@ A integridade e a origem são **eixos separados**; a reprodução é um terceiro
 | Estado | Significa |
 |---|---|
 | **integra** | Gênese (`seq` 1, `prevHash` null), `seq` contíguo, todo hash recalculado confere, todo `prevHash` é o hash do anterior. |
-| **incompleta** | Nada adulterado entre o que existe, mas faltam registros (não começa no 1, ou lacuna de `seq`). Cópia parcial e remoção **não** se distinguem só pela cadeia. |
-| **adulterada** | Hash que não confere, `prevHash` que não bate, `seq` duplicado com conteúdo diferente, gênese com `prevHash`, registro malformado, continuidade artificial ou âncora externa que diverge. |
+| **incompleta** | Nada adulterado entre o que existe, mas faltam registros (não começa no 1, ou lacuna de `seq`), inclusive o registro que uma correção aponta (`correcao_referencia_ausente`). Cópia parcial e remoção **não** se distinguem só pela cadeia. |
+| **adulterada** | Hash que não confere, `prevHash` que não bate, `seq` duplicado com conteúdo diferente, gênese com `prevHash`, registro malformado, data inválida, corpo incompatível com o tipo, correção que aponta para outro conteúdo (`correcao_hash_diverge`), continuidade artificial ou âncora externa que diverge. |
 | **incompativel** | Há registro de um esquema que esta versão não sabe verificar. Não é "ok" nem "adulterado". |
 
 Precedência quando há mais de um problema: adulterada > incompatível > incompleta > íntegra.
@@ -94,23 +94,79 @@ Várias abas podem anexar ao mesmo tempo. O escritor lê a ponta, cria o registr
 A chave do armazém deve ser `(cadeia, seq)` com `add`, que também recusa um `seq` repetido: duas defesas.
 `aceitarAnexo` **não** confia em que o registro veio de `criarRegistro`.
 
+**Contrato da L2 para correções (ainda não implementado):** `conferirRegistro` e `conferirPonta` só veem
+o registro novo e a ponta; **não** veem o registro apontado por `corrige`. A L2 precisa, na gravação de
+uma `correcao`, ler o registro `(cadeia, corrige.seq)` **na mesma transação** e recusar se ele não
+existir ou se o seu `hash` não for `corrige.hash` (a verificação histórica já faz esse cruzamento em
+`verificarCadeia`: `correcao_referencia_ausente` e `correcao_hash_diverge`).
+
 ## Coerência semântica (esquema 1)
 
 Aplicada em `criarRegistro`, `conferirRegistro`/`aceitarAnexo` **e** `verificarCadeia` (`validacao.ts`):
 
-| Tipo | Corpo (exatamente estes campos; `undefined` conta como ausente) |
+O **corpo** de cada tipo tem exatamente estes campos (`undefined` conta como ausente; campo a mais ou a
+menos é incompatível). Os objetos aninhados que copiam saídas do motor ou do app exigem os campos
+centrais com o tipo e o domínio abaixo e **toleram campos a mais**.
+
+| Tipo | Corpo |
 |---|---|
-| `decisao` | `entradaMotor {v4, lista}` (objeto ou null), `saida`, `snapshot {odds, estatisticas, contexto, prints}` (`prints`: nome → hash de blob), `impressao` (texto) |
-| `aposta_registrada` | `decisao` (null ou `{seq, hash}`), `aposta`, `stakeAutorizada`, `travas` |
-| `resultado` | `decisao` (null ou `{seq, hash}`), `resultado` |
-| `correcao` | `motivo` (texto), `novo`; o cabeçalho **exige** `corrige` |
+| `decisao` | `entradaMotor {v4, lista}` (objeto ou null); `saida`: objeto simples (pode ser `{}` ou parcial); `snapshot {odds, estatisticas, contexto, prints}`: `odds` lista, `estatisticas` e `contexto` objeto simples (sem contrato mais rígido), `prints` nome → hash de blob; `impressao` texto não vazio |
+| `aposta_registrada` | `decisao` (null ou `{seq, hash}`), `aposta`, `stakeAutorizada`, `travas` (abaixo) |
+| `resultado` | `decisao` (null ou `{seq, hash}`), `resultado` (abaixo) |
+| `correcao` | `motivo` (texto), `novo` (qualquer valor serializável, **presente**: não há produtor ainda, então não há estrutura); o cabeçalho **exige** `corrige` |
 | `exclusao` | `motivo` (texto ou null) |
 
-Campo a mais, campo a menos ou de outro tipo é incompatível; `corrige` em tipo que não é `correcao` também.
-`criadoEm` precisa ser ISO 8601 com deslocamento **e existir no calendário** (a conferência é por
-componente: o `Date.parse` do V8 aceita 30/02 e o rola para março). Na verificação, estes problemas
-são `data_invalida` e `corpo_incompativel` e tornam a cadeia **adulterada**, mesmo que o hash confira
-(registro forjado com hash refeito). Registros de esquema desconhecido não são julgados por estas regras.
+**`aposta`**: objeto simples; `odd` número finito **> 1**; `casa` texto **não vazio** (após aparar espaços);
+`feitaEm` data ISO válida; `valor` opcional, finito **≥ 0**; `entrada` opcional, objeto simples.
+
+**`resultado.resultado`**: objeto simples; `casa` e `fora` **inteiros ≥ 0**; `registradoEm` data ISO
+válida; os demais campos (intervalo, escanteios, cartões, odds de fechamento…) são livres.
+
+**`stakeAutorizada`** (`StakeAutorizada`, `kelly.ts`; o compilador exige uma regra por campo declarado):
+
+| Campo | Declarado | Validação |
+|---|---|---|
+| `autorizada` | `boolean` | obrigatório, lógico |
+| `motivo` | `string?` | opcional, texto |
+| `kellyCheio` | `number` | obrigatório, finito (**pode ser negativo**: "EV negativo continua negativo") |
+| `fracaoKelly` | `number` | obrigatório, finito ≥ 0 |
+| `fracaoBanca` | `number` | obrigatório, finito ≥ 0 |
+| `limites` | `('teto' \| 'jogo' \| 'dia')[]` | obrigatório, lista só desses três valores |
+| `teto` | `number` | obrigatório, finito ≥ 0 |
+| `valor` | `number?` | opcional, finito ≥ 0 |
+
+**`travas`** (`TravasBanca`, `banca.ts`; também uma regra por campo declarado):
+
+| Campo | Declarado | Validação |
+|---|---|---|
+| `bancaInicial`, `bancaAtual`, `pico` | `number` | obrigatório, finito (a banca pode ficar negativa) |
+| `drawdown` | `number` | obrigatório, finito ≥ 0 |
+| `fatorKelly` | `number` | obrigatório, finito ≥ 0 |
+| `pausadoAte` | `string \| null` | obrigatório (`null` vale), data ISO válida quando texto |
+| `perdasHoje` | `number` | obrigatório, inteiro ≥ 0 |
+| `diaEncerrado` | `boolean` | obrigatório, lógico |
+| `expostoHoje` | `number` | obrigatório, finito ≥ 0 |
+| `expostoJogo` | `number?` | opcional, finito ≥ 0 |
+| `motivos` | `string[]` | obrigatório, lista de textos |
+
+**`corrige` (cabeçalho)**: só em `correcao`; exatamente `{ seq, hash }` (campo adicional é **recusado**,
+inclusive em `criarRegistro`, que não descarta em silêncio); `seq` inteiro positivo e **estritamente
+menor** que o `seq` do próprio registro; `hash` no formato SHA-256. Em `verificarCadeia`, o registro
+`corrige.seq` precisa existir na cadeia e ter o hash `corrige.hash`: hash diferente é
+`correcao_hash_diverge` (**adulterada**); registro ausente é `correcao_referencia_ausente`
+(**incompleta**: numa cadeia contígua desde o `seq` 1 o registro corrigido, de `seq` menor, sempre
+existe, então só falta numa cópia parcial ou com lacuna; apontar para um `seq` que nunca existiria já é
+`corpo_incompativel`, adulterada).
+
+**`criadoEm` e demais datas** (`feitaEm`, `registradoEm`, `pausadoAte`): ISO 8601 com deslocamento,
+**existindo no calendário** (o `Date.parse` do V8 aceita 30/02 e o rola para março, então a conferência
+é por componente). `Z` e `+00:00` valem; `-00:00` é recusado; o deslocamento vai de **−12:00 a +14:00**
+(minutos de 00 a 59); hora 24, segundo 60 (intercalar), letras minúsculas e espaços são recusados;
+anos bissextos pela regra gregoriana; fração de segundo de qualquer tamanho.
+
+Na verificação, os problemas são `data_invalida` e `corpo_incompativel` e tornam a cadeia **adulterada**,
+mesmo que o hash confira (registro forjado com hash refeito). Registros de esquema desconhecido não são
+julgados por estas regras.
 
 ## Limitações (importante)
 

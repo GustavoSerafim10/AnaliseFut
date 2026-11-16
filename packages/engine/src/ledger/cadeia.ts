@@ -103,8 +103,9 @@ export async function criarRegistro<C extends CorpoLedger>(
   } else if (pedido.corrige) {
     throw new ErroDeCadeia('`corrige` só existe em registros do tipo correcao');
   }
+  // inclui `corrige` com campo a mais: recusado, nunca descartado em silêncio
   const incompativel = motivoCorpoIncompativel(
-    { tipo: pedido.tipo, corrige: pedido.corrige },
+    { tipo: pedido.tipo, corrige: pedido.corrige, seq },
     pedido.corpo,
   );
   if (incompativel) throw new ErroDeCadeia(incompativel);
@@ -148,7 +149,9 @@ export async function conferirRegistro(novo: RegistroLedger): Promise<void> {
   try {
     recalculado = await hashDoRegistro(novo.cabecalho, novo.corpo);
   } catch (e) {
-    throw new ErroDeCadeia(`registro recusado: conteúdo não serializável (${(e as Error).message})`);
+    throw new ErroDeCadeia(
+      `registro recusado: conteúdo não serializável (${(e as Error).message})`,
+    );
   }
   if (recalculado !== novo.hash)
     throw new ErroDeCadeia(
@@ -198,11 +201,15 @@ const ADULTERADOS: ReadonlySet<CodigoProblema> = new Set([
   'ancora_diverge',
   'data_invalida',
   'corpo_incompativel',
+  'correcao_hash_diverge',
 ]);
+// `correcao_referencia_ausente` é incompleta, não adulterada: numa cadeia contígua desde o seq 1 o
+// registro corrigido (seq menor) sempre existe; ele só falta numa cópia parcial ou com lacuna.
 const INCOMPLETOS: ReadonlySet<CodigoProblema> = new Set([
   'sem_genese',
   'lacuna_de_seq',
   'ancora_ausente',
+  'correcao_referencia_ausente',
 ]);
 
 const ehObjeto = (x: unknown): x is Record<string, unknown> =>
@@ -322,6 +329,27 @@ export async function verificarCadeia(
         detalhe: 'o hash recalculado não é o gravado: o registro foi alterado',
       });
     else verificaveis.add(r);
+  }
+
+  // correções: o registro apontado tem de existir nesta cadeia e ter o hash declarado em `corrige`
+  for (const r of ordenados) {
+    if (r.cabecalho.tipo !== 'correcao' || !ESQUEMAS_SUPORTADOS.includes(r.cabecalho.esquema))
+      continue;
+    if (motivoCorpoIncompativel(r.cabecalho, r.corpo) !== null) continue; // já acusado acima
+    const alvo = r.cabecalho.corrige!;
+    const apontado = porSeq.get(alvo.seq);
+    if (!apontado)
+      problemas.push({
+        codigo: 'correcao_referencia_ausente',
+        seq: r.cabecalho.seq,
+        detalhe: `a correção aponta para o registro ${alvo.seq}, que não está nesta cadeia`,
+      });
+    else if (apontado.hash !== alvo.hash)
+      problemas.push({
+        codigo: 'correcao_hash_diverge',
+        seq: r.cabecalho.seq,
+        detalhe: `o hash em \`corrige\` não é o do registro ${alvo.seq}: a correção aponta para outro conteúdo`,
+      });
   }
 
   if (ordenados.length === 0) {

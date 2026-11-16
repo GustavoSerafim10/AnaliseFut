@@ -133,6 +133,8 @@ export type CodigoProblema =
   | 'registro_malformado'
   | 'data_invalida'
   | 'corpo_incompativel'
+  | 'correcao_hash_diverge'
+  | 'correcao_referencia_ausente'
   | 'hash_invalido'
   | 'prevhash_nao_confere'
   | 'genese_com_prevhash'

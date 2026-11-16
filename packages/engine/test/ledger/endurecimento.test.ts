@@ -24,6 +24,30 @@ const HASH = 'a'.repeat(64);
 const clonar = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 const codigos = (r: { problemas: { codigo: string }[] }) => r.problemas.map((p) => p.codigo);
 
+/** uma `StakeAutorizada` como o motor a produz (com limite de teto aplicado) */
+const STAKE_OK = {
+  autorizada: true,
+  kellyCheio: 0.2,
+  fracaoKelly: 0.25,
+  fracaoBanca: 0.02,
+  limites: ['teto'],
+  teto: 0.02,
+  valor: 20,
+};
+/** uma `TravasBanca` como `calcularTravas` a produz */
+const TRAVAS_OK = {
+  bancaInicial: 1000,
+  bancaAtual: 1000,
+  pico: 1000,
+  drawdown: 0,
+  fatorKelly: 1,
+  pausadoAte: null,
+  perdasHoje: 0,
+  diaEncerrado: false,
+  expostoHoje: 0,
+  motivos: [],
+};
+
 const CORPOS: Record<TipoRegistro, CorpoLedger> = {
   decisao: {
     entradaMotor: { v4: null, lista: null },
@@ -33,11 +57,14 @@ const CORPOS: Record<TipoRegistro, CorpoLedger> = {
   },
   aposta_registrada: {
     decisao: { seq: 1, hash: HASH },
-    aposta: { odd: 2, casa: '1win', valor: 10 },
-    stakeAutorizada: { valor: 10 },
-    travas: {},
+    aposta: { odd: 2, casa: '1win', valor: 10, feitaEm: T(2) },
+    stakeAutorizada: STAKE_OK,
+    travas: TRAVAS_OK,
   },
-  resultado: { decisao: null, resultado: { placar: [1, 0] } },
+  resultado: {
+    decisao: null,
+    resultado: { casa: 1, fora: 0, registradoEm: T(3), placar: [1, 0] },
+  },
   correcao: { motivo: 'placar digitado errado', novo: { placar: [2, 1] } },
   exclusao: { motivo: null },
 };
@@ -145,7 +172,8 @@ describe('aceitarAnexo: recalcula o hash e não confia em criarRegistro', () => 
   it('conteúdo não serializável é recusado, não propaga o erro cru', async () => {
     const r = await criarRegistro(pedido('resultado', 1), null);
     const mau = clonar(r);
-    (mau.corpo as unknown as { resultado: unknown }).resultado = { x: Number.NaN };
+    // o resto do resultado continua válido: só o NaN impede de serializar
+    (mau.corpo as unknown as { resultado: Record<string, unknown> }).resultado.x = Number.NaN;
     await expect(aceitarAnexo(null, mau)).rejects.toThrow(/não serializável/);
   });
 
@@ -389,15 +417,17 @@ describe('motivoCorpoIncompativel', () => {
   it('aceita os cinco corpos válidos', () => {
     for (const tipo of Object.keys(CORPOS) as TipoRegistro[]) {
       const corrige = tipo === 'correcao' ? { seq: 1, hash: HASH } : undefined;
-      expect(motivoCorpoIncompativel({ tipo, corrige }, CORPOS[tipo])).toBeNull();
+      expect(motivoCorpoIncompativel({ tipo, corrige, seq: 2 }, CORPOS[tipo])).toBeNull();
     }
   });
 
   it('exclusão: motivo null e texto valem; ausente e número não', () => {
-    expect(motivoCorpoIncompativel({ tipo: 'exclusao' }, { motivo: null })).toBeNull();
-    expect(motivoCorpoIncompativel({ tipo: 'exclusao' }, { motivo: 'duplicada' })).toBeNull();
-    expect(motivoCorpoIncompativel({ tipo: 'exclusao' }, {})).toMatch(/motivo/);
-    expect(motivoCorpoIncompativel({ tipo: 'exclusao' }, { motivo: 3 })).toMatch(/motivo/);
+    expect(motivoCorpoIncompativel({ tipo: 'exclusao', seq: 1 }, { motivo: null })).toBeNull();
+    expect(
+      motivoCorpoIncompativel({ tipo: 'exclusao', seq: 1 }, { motivo: 'duplicada' }),
+    ).toBeNull();
+    expect(motivoCorpoIncompativel({ tipo: 'exclusao', seq: 1 }, {})).toMatch(/motivo/);
+    expect(motivoCorpoIncompativel({ tipo: 'exclusao', seq: 1 }, { motivo: 3 })).toMatch(/motivo/);
   });
 
   it('decisão: prints precisam ser hashes de blob', () => {
@@ -405,11 +435,11 @@ describe('motivoCorpoIncompativel', () => {
       snapshot: { prints: Record<string, string> };
     };
     corpo.snapshot.prints = { 'print-1': 'não é hash' };
-    expect(motivoCorpoIncompativel({ tipo: 'decisao' }, corpo)).toMatch(/prints/);
+    expect(motivoCorpoIncompativel({ tipo: 'decisao', seq: 1 }, corpo)).toMatch(/prints/);
   });
 
   it('corpo que nem é objeto', () => {
     for (const c of [null, 1, 'x', [], undefined])
-      expect(motivoCorpoIncompativel({ tipo: 'resultado' }, c)).toMatch(/não é um objeto/);
+      expect(motivoCorpoIncompativel({ tipo: 'resultado', seq: 1 }, c)).toMatch(/não é um objeto/);
   });
 });
