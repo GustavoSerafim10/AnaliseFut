@@ -80,10 +80,37 @@ mudou sem avisar ou deixou de ser determinístico).
 ## Concorrência (contrato para a L2)
 
 Várias abas podem anexar ao mesmo tempo. O escritor lê a ponta, cria o registro com
-`criarRegistro(pedido, ponta)` e, **dentro da mesma transação de gravação**, chama
-`aceitarAnexo(pontaGravadaAgora, novo)`. Se outro escritor avançou a ponta, lança `ConflitoDeCadeia`
-e o escritor relê a ponta e recria. A chave do armazém deve ser `(cadeia, seq)` com `add`, que
-também recusa `seq` repetido: duas defesas independentes.
+`criarRegistro(pedido, ponta)` e grava assim:
+
+1. `await conferirRegistro(novo)` — **antes** da transação: o registro é válido em si (forma, esquema,
+   data, corpo coerente com o tipo e **hash declarado = hash recalculado**). Falha com `ErroDeCadeia`,
+   que **não** se resolve relendo a ponta.
+2. Dentro da transação de gravação, **sem `await` de nada que não seja do próprio banco** (uma
+   transação de IndexedDB se encerra sozinha se aguardar outra coisa): `conferirPonta(pontaGravadaAgora, novo)`
+   (síncrona). Se outro escritor avançou a ponta, lança `ConflitoDeCadeia`; o escritor relê a ponta,
+   recria e recomeça.
+
+`aceitarAnexo(ponta, novo)` (assíncrona) faz os dois passos em sequência, para quem não usa transação.
+A chave do armazém deve ser `(cadeia, seq)` com `add`, que também recusa um `seq` repetido: duas defesas.
+`aceitarAnexo` **não** confia em que o registro veio de `criarRegistro`.
+
+## Coerência semântica (esquema 1)
+
+Aplicada em `criarRegistro`, `conferirRegistro`/`aceitarAnexo` **e** `verificarCadeia` (`validacao.ts`):
+
+| Tipo | Corpo (exatamente estes campos; `undefined` conta como ausente) |
+|---|---|
+| `decisao` | `entradaMotor {v4, lista}` (objeto ou null), `saida`, `snapshot {odds, estatisticas, contexto, prints}` (`prints`: nome → hash de blob), `impressao` (texto) |
+| `aposta_registrada` | `decisao` (null ou `{seq, hash}`), `aposta`, `stakeAutorizada`, `travas` |
+| `resultado` | `decisao` (null ou `{seq, hash}`), `resultado` |
+| `correcao` | `motivo` (texto), `novo`; o cabeçalho **exige** `corrige` |
+| `exclusao` | `motivo` (texto ou null) |
+
+Campo a mais, campo a menos ou de outro tipo é incompatível; `corrige` em tipo que não é `correcao` também.
+`criadoEm` precisa ser ISO 8601 com deslocamento **e existir no calendário** (a conferência é por
+componente: o `Date.parse` do V8 aceita 30/02 e o rola para março). Na verificação, estes problemas
+são `data_invalida` e `corpo_incompativel` e tornam a cadeia **adulterada**, mesmo que o hash confira
+(registro forjado com hash refeito). Registros de esquema desconhecido não são julgados por estas regras.
 
 ## Limitações (importante)
 
@@ -115,5 +142,6 @@ Quanto mais frequente a âncora, menor a janela que um refazimento consistente c
 | `tipos.ts` | contratos (registro, corpos, relatórios) |
 | `versao.ts` | `VERSAO_MOTOR`, `politicasVigentes()`, `impressaoDasPoliticas()` |
 | `blobs.ts` | blob de texto bruto endereçado por conteúdo |
-| `cadeia.ts` | `criarRegistro`, `aceitarAnexo`, `verificarCadeia`, `verificarLedger` |
+| `validacao.ts` | data ISO válida e corpo × tipo |
+| `cadeia.ts` | `criarRegistro`, `conferirRegistro`, `conferirPonta`, `aceitarAnexo`, `verificarCadeia`, `verificarLedger` |
 | `reproducao.ts` | `resumirSaidaDoMotor`, `impressaoDaDecisao`, `reproduzir*` |

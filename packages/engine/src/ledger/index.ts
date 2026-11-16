@@ -3,5 +3,6 @@ export * from './hash';
 export * from './tipos';
 export * from './versao';
 export * from './blobs';
+export * from './validacao';
 export * from './cadeia';
 export * from './reproducao';

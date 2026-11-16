@@ -131,6 +131,8 @@ export type OrigemCadeia = 'local' | 'importada' | 'indeterminada';
 export type CodigoProblema =
   | 'esquema_incompativel'
   | 'registro_malformado'
+  | 'data_invalida'
+  | 'corpo_incompativel'
   | 'hash_invalido'
   | 'prevhash_nao_confere'
   | 'genese_com_prevhash'

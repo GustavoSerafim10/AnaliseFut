@@ -7,9 +7,12 @@
  *
  * CONCORRÊNCIA (contrato para a L2, que grava): vários escritores (abas) podem tentar anexar ao
  * mesmo tempo. Quem anexa lê a ponta, cria o registro com `criarRegistro(pedido, ponta)` e, DENTRO
- * da mesma transação de gravação, chama `aceitarAnexo(pontaGravadaAgora, novo)`. Se outro escritor
+ * da mesma transação de gravação, confere a ponta (`conferirPonta`, síncrona). Se outro escritor
  * já avançou a ponta, lança `ConflitoDeCadeia` e o chamador recomeça (relê a ponta e recria). A chave
  * do armazém deve ser (cadeia, seq) com `add`, que também recusa um seq repetido: duas defesas.
+ * `aceitarAnexo` (assíncrona) faz as duas conferências: `conferirRegistro` (o registro é válido e o
+ * hash declarado é o do conteúdo) e `conferirPonta`. Registro inválido lança `ErroDeCadeia`, que NÃO
+ * se resolve relendo a ponta.
  */
 import { ehHashSha256, sha256Hex } from './hash';
 import type { Json } from './json';
@@ -31,6 +34,7 @@ import {
   type RelatorioLedger,
   type TipoRegistro,
 } from './tipos';
+import { ehDataIsoComDeslocamento, motivoCorpoIncompativel } from './validacao';
 import { impressaoDasPoliticas, politicasVigentes, VERSAO_MOTOR } from './versao';
 
 export class ErroDeCadeia extends Error {
@@ -57,8 +61,6 @@ export async function hashDoRegistro(
 ): Promise<string> {
   return sha256Hex(prefixoDeDominio(cabecalho.esquema) + serializarCanonico({ cabecalho, corpo }));
 }
-
-const ISO_COM_DESLOCAMENTO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 export interface PedidoRegistro<C extends CorpoLedger> {
   tipo: TipoRegistro;
@@ -87,7 +89,7 @@ export async function criarRegistro<C extends CorpoLedger>(
   if (typeof pedido.cadeia !== 'string' || !pedido.cadeia) throw new ErroDeCadeia('cadeia vazia');
   if (!TIPOS_DE_REGISTRO.includes(pedido.tipo))
     throw new ErroDeCadeia(`tipo de registro desconhecido: ${pedido.tipo}`);
-  if (!ISO_COM_DESLOCAMENTO.test(pedido.criadoEm) || !Number.isFinite(Date.parse(pedido.criadoEm)))
+  if (!ehDataIsoComDeslocamento(pedido.criadoEm))
     throw new ErroDeCadeia(`criadoEm precisa ser ISO 8601 com deslocamento: ${pedido.criadoEm}`);
   if (ultimo && ultimo.cabecalho.cadeia !== pedido.cadeia)
     throw new ErroDeCadeia('a ponta lida é de outra cadeia: cadeias nunca são fundidas');
@@ -101,6 +103,11 @@ export async function criarRegistro<C extends CorpoLedger>(
   } else if (pedido.corrige) {
     throw new ErroDeCadeia('`corrige` só existe em registros do tipo correcao');
   }
+  const incompativel = motivoCorpoIncompativel(
+    { tipo: pedido.tipo, corrige: pedido.corrige },
+    pedido.corpo,
+  );
+  if (incompativel) throw new ErroDeCadeia(incompativel);
   const politicas = pedido.politicas ?? politicasVigentes();
   const cabecalho: CabecalhoLedger = {
     esquema: VERSAO_ESQUEMA_LEDGER,
@@ -120,10 +127,53 @@ export async function criarRegistro<C extends CorpoLedger>(
 }
 
 /**
- * Chamada DENTRO da transação de gravação: confirma que `novo` continua exatamente a ponta que está
- * gravada agora. Lança ConflitoDeCadeia se outro escritor chegou antes (ou se algo não bate).
+ * Confere o registro SOZINHO, sem olhar a cadeia: forma, esquema, data, corpo coerente com o tipo e
+ * hash declarado igual ao hash recalculado. Lança ErroDeCadeia (nunca ConflitoDeCadeia: reler a
+ * ponta e tentar de novo não conserta um registro inválido). É assíncrona (SHA-256 nativo); numa
+ * transação de IndexedDB, que se encerra ao aguardar algo que não seja do próprio banco, chame-a
+ * ANTES de abrir a transação e deixe só `conferirPonta` (síncrona) dentro dela.
  */
-export function aceitarAnexo(pontaGravada: RegistroLedger | null, novo: RegistroLedger): void {
+export async function conferirRegistro(novo: RegistroLedger): Promise<void> {
+  const malformado = motivoMalformado(novo);
+  if (malformado) throw new ErroDeCadeia(`registro recusado: ${malformado}`);
+  if (!ESQUEMAS_SUPORTADOS.includes(novo.cabecalho.esquema))
+    throw new ErroDeCadeia(`registro recusado: esquema ${novo.cabecalho.esquema} não suportado`);
+  if (!ehDataIsoComDeslocamento(novo.cabecalho.criadoEm))
+    throw new ErroDeCadeia(
+      `registro recusado: criadoEm precisa ser ISO 8601 com deslocamento: ${novo.cabecalho.criadoEm}`,
+    );
+  const incompativel = motivoCorpoIncompativel(novo.cabecalho, novo.corpo);
+  if (incompativel) throw new ErroDeCadeia(`registro recusado: ${incompativel}`);
+  let recalculado: string;
+  try {
+    recalculado = await hashDoRegistro(novo.cabecalho, novo.corpo);
+  } catch (e) {
+    throw new ErroDeCadeia(`registro recusado: conteúdo não serializável (${(e as Error).message})`);
+  }
+  if (recalculado !== novo.hash)
+    throw new ErroDeCadeia(
+      'registro recusado: o hash declarado não é o do conteúdo (registro alterado ou forjado)',
+    );
+}
+
+/**
+ * Aceita o anexo: o registro tem de ser válido em si (`conferirRegistro`) E continuar exatamente a
+ * ponta gravada agora (`conferirPonta`). Não confia em que veio de `criarRegistro`.
+ */
+export async function aceitarAnexo(
+  pontaGravada: RegistroLedger | null,
+  novo: RegistroLedger,
+): Promise<void> {
+  await conferirRegistro(novo);
+  conferirPonta(pontaGravada, novo);
+}
+
+/**
+ * Parte SÍNCRONA e atômica do anexo, para chamar DENTRO da transação de gravação: confirma que `novo`
+ * continua exatamente a ponta que está gravada agora. Lança ConflitoDeCadeia se outro escritor
+ * chegou antes (ou se algo não bate). Não confere o hash do registro: isso é `conferirRegistro`.
+ */
+export function conferirPonta(pontaGravada: RegistroLedger | null, novo: RegistroLedger): void {
   const seqEsperado = (pontaGravada?.cabecalho.seq ?? 0) + 1;
   if (pontaGravada && pontaGravada.cabecalho.cadeia !== novo.cabecalho.cadeia)
     throw new ConflitoDeCadeia('a ponta gravada é de outra cadeia');
@@ -146,6 +196,8 @@ const ADULTERADOS: ReadonlySet<CodigoProblema> = new Set([
   'seq_duplicada',
   'continuidade_artificial',
   'ancora_diverge',
+  'data_invalida',
+  'corpo_incompativel',
 ]);
 const INCOMPLETOS: ReadonlySet<CodigoProblema> = new Set([
   'sem_genese',
@@ -242,6 +294,16 @@ export async function verificarCadeia(
       });
       continue;
     }
+    // coerência semântica do esquema 1 (a data e o corpo do tipo): independe de o hash conferir
+    if (!ehDataIsoComDeslocamento(r.cabecalho.criadoEm))
+      problemas.push({
+        codigo: 'data_invalida',
+        seq: r.cabecalho.seq,
+        detalhe: `criadoEm não é ISO 8601 com deslocamento: ${r.cabecalho.criadoEm}`,
+      });
+    const incompativel = motivoCorpoIncompativel(r.cabecalho, r.corpo);
+    if (incompativel)
+      problemas.push({ codigo: 'corpo_incompativel', seq: r.cabecalho.seq, detalhe: incompativel });
     let recalculado: string | null = null;
     try {
       recalculado = await hashDoRegistro(r.cabecalho, r.corpo);
