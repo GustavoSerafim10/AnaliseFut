@@ -16,7 +16,7 @@ import {
 import { ROTULO_DECISAO, type Decisao, type RedTeam } from './decisao';
 import { descreverAposta } from './descricao';
 import { blend, W_MAX_NIVEL3 } from './gates';
-import { autorizarStake, valorEmReais } from './kelly';
+import { autorizarStake } from './kelly';
 import { folgaDoJogo, POLITICA_EXPOSICAO, tetoDaAposta } from './politicaExposicao';
 import { fracaoEmRisco, probEfetiva } from './liquidacao';
 import {
@@ -41,6 +41,31 @@ import {
 import { analisarSensibilidade, type ResultadoSensibilidade } from './sensibilidade';
 import type { DQ, Lambdas, LinhaOdd } from './tipos';
 import { NOMES_TESE, teseDe, type IdTese } from './varredura';
+
+/**
+ * Tolerância de ruído em centavos: ε × banca × 100, proporcional ao erro do ponto flutuante das
+ * frações (soma em R$ / banca, 0,06 − exposto), que fica abaixo de 0,1 ε da banca (medido). Nunca
+ * passa da tolerância anterior (5e-7 centavo): em banca acima de ~R$ 22,5 milhões ela para ali.
+ */
+const TOLERANCIA_ANTERIOR_CENTAVOS = 5e-7;
+function toleranciaCentavos(banca: number): number {
+  return Math.min(Number.EPSILON * banca * 100, TOLERANCIA_ANTERIOR_CENTAVOS);
+}
+
+/**
+ * Centavos INTEIROS que uma fração da banca representa, arredondados para BAIXO (nunca acima do
+ * teto), sem o ruído do ponto flutuante: antes do piso soma-se `toleranciaCentavos(banca)`. Assim
+ * R$ 0,0099999999999961 (R$ 0,01 calculado em ponto flutuante) conta 1 centavo, e uma poeira de
+ * R$ 7e-15 conta 0; um deficit real maior que a tolerância nunca vira o centavo de cima.
+ * Banca ou fração inválida, zero ou negativa: 0. Produto não finito ou acima de 2^53 centavos (sem
+ * centavo exato em ponto flutuante): NaN, que quem chama trata como falha numérica.
+ */
+function centavosDe(banca: number, fracao: number): number {
+  if (!Number.isFinite(banca) || banca <= 0 || !Number.isFinite(fracao) || fracao <= 0) return 0;
+  const x = banca * fracao * 100;
+  if (!Number.isFinite(x) || x > Number.MAX_SAFE_INTEGER) return NaN;
+  return Math.floor(x + toleranciaCentavos(banca));
+}
 
 export type NivelReferencia = 'R1' | 'R2' | 'R3' | 'R4';
 export type Estrategia = 'S1' | 'S2' | 'S3' | 'S4';
@@ -618,19 +643,56 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
     motivos.push(`${t.perdasHoje} perdas hoje: dia encerrado`);
     return comC('NO_BET', undefined, sens);
   }
-  const folgaDia = TETO_DIA - (t?.expostoHoje ?? 0);
-  if (folgaDia <= 0) {
-    motivos.push('teto de 6% da banca no dia já atingido');
-    return comC('WATCHLIST', 'só amanhã', sens);
+  // Critério MONETÁRIO dos saldos e da stake: R$ 0,01, a menor aposta possível. As exposições
+  // chegam como soma em R$ dividida pela banca, em ponto flutuante: o mesmo total (ex.: R$ 60 de
+  // R$ 1.000) pode deixar folga 0 ou uma "poeira" como 7e-18 conforme as parcelas. Saldo que não
+  // comporta R$ 0,01 é saldo esgotado: a mesma exposição dá sempre a mesma decisão. Só conta como
+  // ESGOTADO se o teto inteiro comportava ao menos R$ 0,01 (senão a causa é a banca pequena, e quem
+  // recusa é a regra da stake abaixo, com o motivo certo).
+  const banca = t?.bancaAtual ?? e.banca;
+  const bancaPositiva = banca !== undefined && Number.isFinite(banca) && banca > 0;
+  // integridade numérica (não é limite de banca): banca ou exposição do dia que não seja número
+  // finito, ou banca cujo teto do dia em centavos não cabe em ponto flutuante com centavo exato
+  // (não finito ou acima de 2^53 centavos), não chega à autorização: NO_BET por falha numérica.
+  if (banca !== undefined && !Number.isFinite(banca)) {
+    motivos.push(`falha numérica: banca inválida (${String(banca)}): sem stake calculável`);
+    return comC('NO_BET', undefined, sens);
   }
+  if (bancaPositiva && Number.isNaN(centavosDe(banca!, TETO_DIA))) {
+    motivos.push(
+      `falha numérica: banca de R$ ${String(banca)} não permite calcular centavos exatos: sem stake calculável`,
+    );
+    return comC('NO_BET', undefined, sens);
+  }
+  const expostoHoje = t?.expostoHoje ?? 0;
+  if (!Number.isFinite(expostoHoje) || expostoHoje < 0) {
+    motivos.push(
+      `falha numérica: exposição do dia inválida (${String(expostoHoje)}): sem stake calculável`,
+    );
+    return comC('NO_BET', undefined, sens);
+  }
+  const saldoEsgotado = (folga: number, teto: number) =>
+    bancaPositiva && centavosDe(banca!, teto) >= 1 && centavosDe(banca!, folga) < 1;
+  const folgaDia = TETO_DIA - expostoHoje;
+  const diaEsgotado = folgaDia <= 0 || saldoEsgotado(folgaDia, TETO_DIA);
 
-  // teto agregado por jogo: o que já está comprometido neste evento (qualquer mercado) sai do saldo
+  // teto agregado por jogo: o que já está comprometido neste evento (qualquer mercado) sai do saldo.
+  // Vem ANTES do dia: com o jogo esgotado não há outra aposta neste evento (NO_BET), nem amanhã;
+  // a WATCHLIST do dia fica só para quando o jogo ainda tem saldo e o que falta é o saldo do dia.
   const folgaJogo = folgaDoJogo(t?.expostoJogo);
-  if (folgaJogo <= 0) {
+  if (folgaJogo <= 0 || saldoEsgotado(folgaJogo, POLITICA_EXPOSICAO.tetoPorJogo)) {
     motivos.push(
       `teto de ${pct(POLITICA_EXPOSICAO.tetoPorJogo)} da banca neste jogo já comprometido (${pct(t?.expostoJogo ?? 0)} em apostas registradas): sem saldo para outra aposta`,
     );
+    if (diaEsgotado) motivos.push('teto de 6% da banca no dia também atingido');
     return comC('NO_BET', undefined, sens);
+  }
+  if (diaEsgotado) {
+    motivos.push('teto de 6% da banca no dia já atingido');
+    motivos.push(
+      'o saldo do dia renova amanhã; isso não garante que esta partida ainda estará disponível',
+    );
+    return comC('WATCHLIST', 'só amanhã', sens);
   }
   const nivelStake = c.nivel as 'R1' | 'R2' | 'R3';
   // a stake sai da MESMA função que autoriza toda a exposição (kelly.ts); a política está em
@@ -659,12 +721,29 @@ export function analisarV4(e: EntradaV4): ResultadoV4 {
   if (aut.limites.includes('dia'))
     ajustesStake.push('limitada pelo que resta do teto de 6% no dia');
   if (!aut.autorizada && aut.motivo) ajustesStake.push(`stake zero: ${aut.motivo}`);
-  const banca = t?.bancaAtual ?? e.banca;
+  const valor = banca !== undefined ? centavosDe(banca, aut.fracaoBanca) / 100 : undefined;
+  // falha numérica na stake (NaN/Infinity em qualquer passo): nunca vira BET
+  if (valor !== undefined && !Number.isFinite(valor)) {
+    motivos.push('falha numérica: valor da stake não calculável com centavo exato');
+    return comC('NO_BET', undefined, sens);
+  }
+  // nenhum BET sem stake executável: nem autorização recusada, nem fração zero, nem R$ 0,00
+  // (não basta `aut.autorizada`: uma fração positiva menor que 1 centavo também é autorizada)
+  if (!aut.autorizada || !(aut.fracaoBanca > 0) || valor === 0) {
+    motivos.push(
+      !aut.autorizada || !(aut.fracaoBanca > 0)
+        ? `stake zero: ${aut.motivo ?? 'nenhuma exposição autorizada pelos limites'}`
+        : bancaPositiva
+          ? `stake de ${pct(aut.fracaoBanca)} da banca não chega a R$ 0,01 com banca de R$ ${banca!.toFixed(2)}: sem aposta executável`
+          : `banca de R$ ${String(banca)}: sem saldo para apostar`,
+    );
+    return comC('NO_BET', undefined, sens);
+  }
   const stake: StakeV4 = {
     kellyCheio: aut.kellyCheio,
     fracaoKelly: aut.fracaoKelly,
     fracaoBanca: aut.fracaoBanca,
-    valor: banca !== undefined ? valorEmReais(banca, aut.fracaoBanca) : undefined,
+    valor,
     ajustes: ajustesStake,
   };
   motivos.push(
