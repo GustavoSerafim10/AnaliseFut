@@ -1,6 +1,7 @@
 import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type TravasBanca } from '@pe/engine';
 import { useEffect, useState } from 'react';
+import { importarEvidencias, lerEvidencias } from '../armazemEvidencias';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { lerOdd, lerOddsDosOutrosLados, lerParInteiro } from '../placar';
@@ -332,7 +333,9 @@ export function AbaHistorico({
     ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
     : null;
 
-  function baixar() {
+  async function baixar() {
+    // evidências (Fase 0) vão no mesmo arquivo; se o banco delas falhar, o histórico sai igual
+    const evidencias = await lerEvidencias().catch(() => null);
     const blob = new Blob(
       [
         exportarJson(historico, {
@@ -340,10 +343,16 @@ export function AbaHistorico({
           rascunho: rascunhoAtual,
           ...identidadesSalvas(),
           multiplas,
+          ...(evidencias ? { evidencias } : {}),
         }),
       ],
       { type: 'application/json' },
     );
+    if (!evidencias)
+      setMsg({
+        tipo: 'alerta',
+        texto: 'Backup baixado sem as evidências: o banco de evidências não abriu neste aparelho.',
+      });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `backup-pricing-engine-${isoLocal(new Date()).slice(0, 10)}.json`;
@@ -376,6 +385,26 @@ export function AbaHistorico({
     if (x.rascunho && restaurarRascunho(x.rascunho)) veio.push('análise aberta');
     setMsg({ tipo: 'ok', texto: `Importado: ${veio.join(', ')}.` });
     setJson('');
+    // evidências: juntadas sem sobrescrever nada; o histórico acima já foi importado
+    const invalidas = x.evidenciasInvalidas
+      ? ` ${x.evidenciasInvalidas} item(ns) de evidência sem a forma esperada ficaram de fora.`
+      : '';
+    if (x.evidencias?.length)
+      importarEvidencias(x.evidencias)
+        .then((e) =>
+          setMsg({
+            tipo: invalidas ? 'alerta' : 'ok',
+            texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam.${invalidas}`,
+          }),
+        )
+        .catch((erro: Error) =>
+          setMsg({
+            tipo: 'alerta',
+            texto: `Importado: ${veio.join(', ')}. As evidências NÃO foram importadas: ${erro.message}`,
+          }),
+        );
+    else if (invalidas)
+      setMsg({ tipo: 'alerta', texto: `Importado: ${veio.join(', ')}.${invalidas}` });
   }
 
   return (
@@ -729,7 +758,7 @@ export function AbaHistorico({
         </div>
       )}
       <div className="linha-acoes">
-        <button onClick={baixar}>⬇️ Exportar backup</button>
+        <button onClick={() => void baixar()}>⬇️ Exportar backup</button>
         <label className="botao">
           ⬆️ Importar arquivo
           <input

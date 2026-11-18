@@ -27,6 +27,7 @@ import type { OddLine } from '@pe/schemas';
 import { abrirDeposito, migrarHistorico, type Deposito } from './armazem';
 import type { Derivado } from './dados';
 import { inicioIso, isoLocal, type Rascunho } from './estado';
+import { pareceEvidencia, type Evidencia } from './evidencias';
 import type { Multipla } from './multiplas';
 
 const CHAVE = 'pe-historico-v1';
@@ -816,6 +817,10 @@ export interface ExtrasBackup {
   cores?: Record<string, { cor1: string; cor2: string }>;
   escudos?: Record<string, { imagem: string; cor1?: string; cor2?: string }>;
   multiplas?: Multipla[];
+  /** Fase 0: revisões do registro de evidências (campo opcional; backups antigos não têm) */
+  evidencias?: Evidencia[];
+  /** itens de "evidencias" que não tinham a forma de uma evidência: contados, não escondidos */
+  evidenciasInvalidas?: number;
 }
 
 export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {}): string {
@@ -828,13 +833,21 @@ export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {
 
 export function lerExtrasBackup(texto: string): ExtrasBackup {
   try {
-    const { banca, rascunho, cores, escudos, multiplas } = JSON.parse(texto) as ExtrasBackup;
+    const { banca, rascunho, cores, escudos, multiplas, evidencias } = JSON.parse(
+      texto,
+    ) as ExtrasBackup;
+    const lista: unknown[] = Array.isArray(evidencias) ? evidencias : [];
+    const validas = lista.filter(pareceEvidencia);
     return {
       ...(banca !== undefined ? { banca } : {}),
       ...(rascunho ? { rascunho } : {}),
       ...(cores ? { cores } : {}),
       ...(escudos ? { escudos } : {}),
       ...(Array.isArray(multiplas) ? { multiplas } : {}),
+      ...(validas.length ? { evidencias: validas } : {}),
+      ...(lista.length > validas.length
+        ? { evidenciasInvalidas: lista.length - validas.length }
+        : {}),
     };
   } catch {
     return {};
