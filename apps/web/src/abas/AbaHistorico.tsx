@@ -1,7 +1,24 @@
 import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type TravasBanca } from '@pe/engine';
 import { useEffect, useState } from 'react';
-import { importarEvidencias, lerEvidencias } from '../armazemEvidencias';
+import {
+  desfazerImportacao,
+  importacoesPendentes,
+  importarEvidencias,
+  importarEvidenciasEmLotes,
+  paginasDeEvidencias,
+  type DiarioImportacao,
+} from '../armazemEvidencias';
+import {
+  ehGzip,
+  escreverBackupGz,
+  evidenciasDoBackupGz,
+  FORMATO_BACKUP,
+  verificarBackupGz,
+  verificarEvidencias,
+  VERSAO_BACKUP_GZ,
+  type CabecalhoBackupGz,
+} from '../backupGz';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
 import { lerOdd, lerOddsDosOutrosLados, lerParInteiro } from '../placar';
@@ -19,10 +36,9 @@ import {
   balanco,
   calibracao,
   clvDe,
-  exportarJson,
+  extrasDoBackup,
   gravarUltimoBackup,
-  importarJson,
-  lerExtrasBackup,
+  importarBackup,
   lerUltimoBackup,
   filtrar,
   marco,
@@ -333,42 +349,81 @@ export function AbaHistorico({
     ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
     : null;
 
+  const [pendentes, setPendentes] = useState<DiarioImportacao[]>([]);
+  const lerPendentes = () =>
+    void importacoesPendentes()
+      .then(setPendentes)
+      .catch(() => setPendentes([]));
+  useEffect(lerPendentes, []);
+
+  /**
+   * Backup versão 3 (.json.gz): histórico e extras na 1ª linha, uma revisão de evidência por
+   * linha, escrito em fluxo (nunca uma string única). Se o banco de evidências falhar, o
+   * histórico sai igual, com aviso.
+   */
   async function baixar() {
-    // evidências (Fase 0) vão no mesmo arquivo; se o banco delas falhar, o histórico sai igual
-    const evidencias = await lerEvidencias().catch(() => null);
-    const blob = new Blob(
-      [
-        exportarJson(historico, {
-          banca: bancaInicial,
-          rascunho: rascunhoAtual,
-          ...identidadesSalvas(),
-          multiplas,
-          ...(evidencias ? { evidencias } : {}),
-        }),
-      ],
-      { type: 'application/json' },
-    );
-    if (!evidencias)
-      setMsg({
-        tipo: 'alerta',
-        texto: 'Backup baixado sem as evidências: o banco de evidências não abriu neste aparelho.',
-      });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `backup-pricing-engine-${isoLocal(new Date()).slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    const agora = isoLocal(new Date());
-    gravarUltimoBackup(agora);
-    setUltimoBackup(agora);
+    let semEvidencias = false;
+    async function* paginas() {
+      try {
+        yield* paginasDeEvidencias();
+      } catch {
+        semEvidencias = true;
+      }
+    }
+    setMsg({ tipo: 'ok', texto: 'Montando o backup compactado…' });
+    try {
+      const cabecalho: CabecalhoBackupGz = {
+        formato: FORMATO_BACKUP,
+        versao: VERSAO_BACKUP_GZ,
+        exportadoEm: isoLocal(new Date()),
+        historico,
+        banca: bancaInicial,
+        rascunho: rascunhoAtual,
+        ...identidadesSalvas(),
+        multiplas,
+      };
+      const { blob, revisoes } = await escreverBackupGz(cabecalho, paginas());
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `backup-pricing-engine-${isoLocal(new Date()).slice(0, 10)}.json.gz`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      const agora = isoLocal(new Date());
+      gravarUltimoBackup(agora);
+      setUltimoBackup(agora);
+      const mb = (blob.size / 1_048_576).toFixed(1);
+      setMsg(
+        semEvidencias
+          ? {
+              tipo: 'alerta',
+              texto: `Backup baixado (${mb} MB) SEM as evidências: o banco de evidências não abriu neste aparelho.`,
+            }
+          : {
+              tipo: 'ok',
+              texto: `Backup baixado: ${historico.length} análise(s) e ${revisoes} revisão(ões) de evidência, ${mb} MB compactado.`,
+            },
+      );
+    } catch (e) {
+      setMsg({ tipo: 'alerta', texto: `O backup não foi gerado: ${(e as Error).message}` });
+    }
   }
 
-  function importar(texto: string) {
-    const r = importarJson(texto, historico);
-    if ('erro' in r) return setMsg({ tipo: 'alerta', texto: r.erro });
+  /** Arquivo escolhido: .json.gz (versão 3) pelo caminho em fluxo; .json antigo pelo de sempre. */
+  async function importarArquivo(f: File) {
+    const inicio = new Uint8Array(await f.slice(0, 2).arrayBuffer());
+    if (ehGzip(inicio)) await importarGz(f);
+    else importar(await f.text());
+  }
+
+  /** Aplica histórico e extras (o que já existe neste aparelho não é substituído). */
+  function aplicarBackup(bruto: unknown): string[] | null {
+    const r = importarBackup(bruto, historico);
+    if ('erro' in r) {
+      setMsg({ tipo: 'alerta', texto: r.erro });
+      return null;
+    }
     setHistorico(r.lista);
-    // o que já existe neste aparelho não é substituído
-    const x = lerExtrasBackup(texto);
+    const x = extrasDoBackup(bruto);
     const veio: string[] = [`${r.novas} análise(s) nova(s)`];
     if (x.banca && !bancaInicial) {
       setBancaInicial(x.banca);
@@ -383,28 +438,106 @@ export function AbaHistorico({
       veio.push('cores e escudos');
     }
     if (x.rascunho && restaurarRascunho(x.rascunho)) veio.push('análise aberta');
-    setMsg({ tipo: 'ok', texto: `Importado: ${veio.join(', ')}.` });
+    return veio;
+  }
+
+  /**
+   * 1ª passada confere o arquivo inteiro (SHA-256 de cada revisão, rodapé, contagem) sem gravar
+   * nada; só então grava, em lotes com diário. Arquivo com qualquer problema: nada importado.
+   */
+  async function importarGz(f: File) {
+    setMsg({ tipo: 'ok', texto: 'Conferindo o arquivo (SHA-256 de cada revisão)…' });
+    const v = await verificarBackupGz(() => f.stream());
+    if (!v.ok)
+      return setMsg({
+        tipo: 'alerta',
+        texto: `Arquivo recusado, nada foi importado. ${v.problemas
+          .map((p) => (p.linha ? `Linha ${p.linha}: ${p.motivo}` : p.motivo))
+          .join('; ')}.`,
+      });
+    const veio = aplicarBackup(v.cabecalho);
+    if (!veio) return;
+    try {
+      const e = await importarEvidenciasEmLotes(
+        evidenciasDoBackupGz(() => f.stream(), v.hashes),
+        { arquivo: f.name, esperadas: v.revisoes },
+        (d) =>
+          setMsg({
+            tipo: 'ok',
+            texto: `Importando evidências: ${d.processadas} de ${d.esperadas} revisões…`,
+          }),
+      );
+      setMsg({
+        tipo: 'ok',
+        texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam. SHA-256 conferido em ${v.revisoes} revisão(ões).`,
+      });
+    } catch (erro) {
+      setMsg({
+        tipo: 'alerta',
+        texto: `Importado: ${veio.join(', ')}. Evidências: ${(erro as Error).message}. Veja o aviso de importação pendente abaixo.`,
+      });
+    } finally {
+      lerPendentes();
+    }
+  }
+
+  async function desfazer(d: DiarioImportacao) {
+    if (
+      !confirm(
+        `Desfazer a importação de "${d.arquivo}"? Saem só as ${d.novas} revisão(ões) que ela gravou; o resto fica.`,
+      )
+    )
+      return;
+    try {
+      const n = await desfazerImportacao(d.id);
+      setMsg({ tipo: 'ok', texto: `Importação desfeita: ${n} revisão(ões) removida(s).` });
+    } catch (e) {
+      setMsg({ tipo: 'alerta', texto: `Não consegui desfazer: ${(e as Error).message}` });
+    }
+    lerPendentes();
+  }
+
+  /** Backup antigo (.json, versões 1 e 2): mesmas regras, e evidências com SHA-256 conferido. */
+  async function importar(texto: string) {
+    let bruto: unknown;
+    try {
+      bruto = JSON.parse(texto);
+    } catch (e) {
+      return setMsg({ tipo: 'alerta', texto: `JSON inválido: ${(e as Error).message}` });
+    }
+    const veio = aplicarBackup(bruto);
+    if (!veio) return;
     setJson('');
-    // evidências: juntadas sem sobrescrever nada; o histórico acima já foi importado
+    const x = extrasDoBackup(bruto);
     const invalidas = x.evidenciasInvalidas
       ? ` ${x.evidenciasInvalidas} item(ns) de evidência sem a forma esperada ficaram de fora.`
       : '';
-    if (x.evidencias?.length)
-      importarEvidencias(x.evidencias)
-        .then((e) =>
-          setMsg({
-            tipo: invalidas ? 'alerta' : 'ok',
-            texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam.${invalidas}`,
-          }),
-        )
-        .catch((erro: Error) =>
-          setMsg({
-            tipo: 'alerta',
-            texto: `Importado: ${veio.join(', ')}. As evidências NÃO foram importadas: ${erro.message}`,
-          }),
-        );
-    else if (invalidas)
-      setMsg({ tipo: 'alerta', texto: `Importado: ${veio.join(', ')}.${invalidas}` });
+    if (!x.evidencias?.length)
+      return setMsg({
+        tipo: invalidas ? 'alerta' : 'ok',
+        texto: `Importado: ${veio.join(', ')}.${invalidas}`,
+      });
+    // evidências: SHA-256 de todas antes de gravar qualquer uma; o histórico acima já entrou
+    const problemas = await verificarEvidencias(x.evidencias);
+    if (problemas.length)
+      return setMsg({
+        tipo: 'alerta',
+        texto: `Importado: ${veio.join(', ')}. As evidências NÃO foram importadas (nenhuma): ${problemas.map((p) => p.motivo).join('; ')}.${invalidas}`,
+      });
+    try {
+      const e = await importarEvidencias(x.evidencias);
+      setMsg({
+        tipo: invalidas ? 'alerta' : 'ok',
+        texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam.${invalidas}`,
+      });
+    } catch (erro) {
+      setMsg({
+        tipo: 'alerta',
+        texto: `Importado: ${veio.join(', ')}. Evidências: ${(erro as Error).message}`,
+      });
+    } finally {
+      lerPendentes();
+    }
   }
 
   return (
@@ -763,12 +896,12 @@ export function AbaHistorico({
           ⬆️ Importar arquivo
           <input
             type="file"
-            accept="application/json,.json"
+            accept="application/json,application/gzip,.json,.gz"
             hidden
             onChange={async (x) => {
               const f = x.target.files?.[0];
-              if (f) importar(await f.text());
               x.target.value = '';
+              if (f) await importarArquivo(f);
             }}
           />
         </label>
@@ -776,11 +909,26 @@ export function AbaHistorico({
       <details>
         <summary>Colar JSON</summary>
         <textarea rows={4} value={json} onChange={(x) => setJson(x.target.value)} />
-        <button onClick={() => importar(json)} disabled={!json.trim()}>
+        <button onClick={() => void importar(json)} disabled={!json.trim()}>
           Importar
         </button>
       </details>
       {msg && <div className={`caixa ${msg.tipo}`}>{msg.texto}</div>}
+      {pendentes.map((d) => (
+        <div key={d.id} className="caixa alerta">
+          A importação de <strong>{d.arquivo}</strong> (
+          {new Date(d.iniciadaEm).toLocaleString('pt-BR', {
+            dateStyle: 'short',
+            timeStyle: 'short',
+          })}
+          ) não terminou: {d.processadas} de {d.esperadas} revisões tratadas, {d.novas} gravada(s)
+          {d.erro ? ` — ${d.erro}` : ' (interrompida)'}. Importe o mesmo arquivo de novo para
+          completar (nada duplica) ou desfaça só o que ela gravou.{' '}
+          <button className="mini" onClick={() => void desfazer(d)}>
+            Desfazer esta importação
+          </button>
+        </div>
+      ))}
     </section>
   );
 }

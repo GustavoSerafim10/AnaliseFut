@@ -833,9 +833,16 @@ export function exportarJson(lista: EntradaHistorico[], extras: ExtrasBackup = {
 
 export function lerExtrasBackup(texto: string): ExtrasBackup {
   try {
-    const { banca, rascunho, cores, escudos, multiplas, evidencias } = JSON.parse(
-      texto,
-    ) as ExtrasBackup;
+    return extrasDoBackup(JSON.parse(texto));
+  } catch {
+    return {};
+  }
+}
+
+/** Extras de um backup já lido (o .json antigo ou o cabeçalho do .json.gz). */
+export function extrasDoBackup(bruto: unknown): ExtrasBackup {
+  try {
+    const { banca, rascunho, cores, escudos, multiplas, evidencias } = bruto as ExtrasBackup;
     const lista: unknown[] = Array.isArray(evidencias) ? evidencias : [];
     const validas = lista.filter(pareceEvidencia);
     return {
@@ -883,6 +890,14 @@ export function importarJson(
   } catch (e) {
     return { erro: `JSON inválido: ${(e as Error).message}` };
   }
+  return importarBackup(bruto, atual);
+}
+
+/** Junta um backup já lido (o .json antigo ou o cabeçalho do .json.gz) ao histórico atual. */
+export function importarBackup(
+  bruto: unknown,
+  atual: EntradaHistorico[],
+): { lista: EntradaHistorico[]; novas: number } | { erro: string } {
   const itens = (bruto as { historico?: unknown })?.historico;
   if (!Array.isArray(itens)) return { erro: 'não é um backup do histórico (falta "historico")' };
   const validas = itens.filter(

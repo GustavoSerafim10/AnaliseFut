@@ -86,3 +86,18 @@ describe('backup com evidências', () => {
     });
   });
 });
+
+describe('cabeçalho do .json.gz aplicado como o .json antigo', () => {
+  it('importarBackup(objeto) dá o mesmo que importarJson(texto); extras iguais', async () => {
+    const { extrasDoBackup, importarBackup } = await import('../src/historico');
+    const texto = exportarJson([entrada('1'), entrada('2')], { banca: 1500 });
+    const obj = JSON.parse(texto) as unknown;
+    expect(JSON.stringify(importarBackup(obj, [entrada('3')]))).toBe(
+      JSON.stringify(importarJson(texto, [entrada('3')])),
+    );
+    expect(extrasDoBackup(obj)).toEqual(lerExtrasBackup(texto));
+    expect(importarBackup({ semHistorico: true }, [])).toEqual({
+      erro: 'não é um backup do histórico (falta "historico")',
+    });
+  });
+});
