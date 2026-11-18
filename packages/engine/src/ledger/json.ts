@@ -64,6 +64,24 @@ function ehObjetoPuro(v: object): boolean {
   return p === Object.prototype || p === null;
 }
 
+/**
+ * Nome do tipo de um objeto recusado, só para a mensagem, SEM executar getters: lê pelos descritores
+ * o `constructor` do protótipo e o `name` dele, e só usa valores de DADO em texto. Qualquer outra
+ * coisa (getter, Proxy que lança, sem construtor) vira "desconhecido". Nunca lança.
+ */
+function nomeDoTipo(obj: object): string {
+  try {
+    const proto: unknown = Object.getPrototypeOf(obj);
+    if (proto === null || typeof proto !== 'object') return 'desconhecido';
+    const c = Object.getOwnPropertyDescriptor(proto, 'constructor');
+    if (!c || !('value' in c) || typeof c.value !== 'function') return 'desconhecido';
+    const n = Object.getOwnPropertyDescriptor(c.value, 'name');
+    return n && 'value' in n && typeof n.value === 'string' && n.value ? n.value : 'desconhecido';
+  } catch {
+    return 'desconhecido';
+  }
+}
+
 function serializar(v: unknown, caminho: string, pilha: object[]): string {
   if (v === null) return 'null';
   switch (typeof v) {
@@ -90,18 +108,23 @@ function serializar(v: unknown, caminho: string, pilha: object[]): string {
   try {
     if (Array.isArray(obj)) {
       const partes: string[] = [];
-      for (let i = 0; i < obj.length; i++) {
+      // o comprimento e cada posição são lidos UMA vez: a conferência e a serialização usam o mesmo
+      // valor capturado (um getter ou Proxy não consegue mostrar um valor e serializar outro)
+      const comprimento = obj.length;
+      for (let i = 0; i < comprimento; i++) {
         if (!(i in obj)) throw new ErroSerializacao('array esparso (buraco)', `${caminho}[${i}]`);
-        if (obj[i] === undefined)
+        const item: unknown = obj[i];
+        if (item === undefined)
           throw new ErroSerializacao('undefined dentro de array', `${caminho}[${i}]`);
-        partes.push(serializar(obj[i], `${caminho}[${i}]`, pilha));
+        partes.push(serializar(item, `${caminho}[${i}]`, pilha));
       }
       return `[${partes.join(',')}]`;
     }
-    if (!ehObjetoPuro(obj)) {
-      const nome = (obj as { constructor?: { name?: string } }).constructor?.name ?? 'desconhecido';
-      throw new ErroSerializacao(`objeto não puro (${nome}); use string ISO para datas`, caminho);
-    }
+    if (!ehObjetoPuro(obj))
+      throw new ErroSerializacao(
+        `objeto não puro (${nomeDoTipo(obj)}); use string ISO para datas`,
+        caminho,
+      );
     const registro = obj as Record<string, unknown>;
     const partes: string[] = [];
     for (const chave of Object.keys(registro).sort()) {

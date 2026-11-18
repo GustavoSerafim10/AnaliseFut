@@ -7,14 +7,28 @@
  */
 import type { Json } from './json';
 
-/** Versão do FORMATO (campos, serialização canônica e cálculo do hash). Muda se qualquer um mudar. */
+/**
+ * Versão do FORMATO (campos, serialização canônica e cálculo do hash) dos registros que esta versão
+ * ESCREVE. Muda se qualquer um mudar. O esquema de cada tipo está em `ESQUEMA_DO_TIPO`.
+ */
 export const VERSAO_ESQUEMA_LEDGER = 1;
 
-/** Esquemas que esta versão do código sabe verificar. Os demais ficam "incompatíveis", nunca "ok". */
-export const ESQUEMAS_SUPORTADOS: readonly number[] = [1];
+/**
+ * Esquemas que esta versão do código sabe verificar (LER). Os demais ficam "incompatíveis", nunca
+ * "ok" e nunca "adulterados", qualquer que seja o tipo do registro.
+ */
+export const ESQUEMAS_SUPORTADOS: readonly number[] = [1, 2];
 
+/** Os cinco tipos do esquema 1: os únicos que esta versão sabe ESCREVER. */
 export type TipoRegistro = 'decisao' | 'aposta_registrada' | 'resultado' | 'correcao' | 'exclusao';
 
+/** Tipos que esta versão só sabe LER e verificar (a escrita ainda não está habilitada). */
+export type TipoSomenteLeitura = 'fechamento';
+
+/** Qualquer tipo que o verificador conhece. */
+export type TipoDeRegistroLido = TipoRegistro | TipoSomenteLeitura;
+
+/** Os tipos que esta versão ESCREVE (esquema 1). */
 export const TIPOS_DE_REGISTRO: readonly TipoRegistro[] = [
   'decisao',
   'aposta_registrada',
@@ -22,6 +36,29 @@ export const TIPOS_DE_REGISTRO: readonly TipoRegistro[] = [
   'correcao',
   'exclusao',
 ];
+
+/** Os tipos que esta versão só LÊ. */
+export const TIPOS_SOMENTE_LEITURA: readonly TipoSomenteLeitura[] = ['fechamento'];
+
+/**
+ * O esquema a que cada tipo pertence. Igualdade ESTRITA: um tipo só é válido no seu esquema (um
+ * `resultado` com esquema 2, ou um `fechamento` com esquema 1, é registro incoerente). Os cinco tipos
+ * do esquema 1 mantêm o esquema 1 e, portanto, o prefixo e os hashes de sempre.
+ */
+export const ESQUEMA_DO_TIPO: Readonly<Record<TipoDeRegistroLido, number>> = {
+  decisao: 1,
+  aposta_registrada: 1,
+  resultado: 1,
+  correcao: 1,
+  exclusao: 1,
+  fechamento: 2,
+};
+
+/** Os tipos válidos de cada esquema conhecido (derivado de `ESQUEMA_DO_TIPO`). */
+export const TIPOS_DO_ESQUEMA: Readonly<Record<number, readonly TipoDeRegistroLido[]>> = {
+  1: [...TIPOS_DE_REGISTRO],
+  2: [...TIPOS_SOMENTE_LEITURA],
+};
 
 /** Aponta para um registro da mesma cadeia pelo número e pelo hash (o hash impede apontar para outro). */
 export interface RefRegistro {
@@ -32,7 +69,7 @@ export interface RefRegistro {
 export interface CabecalhoLedger {
   /** versão do formato deste registro */
   esquema: number;
-  tipo: TipoRegistro;
+  tipo: TipoDeRegistroLido;
   /** identidade da cadeia (um aparelho ou uma origem importada); nunca é fundida com outra */
   cadeia: string;
   /** 1, 2, 3... dentro da cadeia, sem lacunas */
@@ -101,8 +138,26 @@ export interface CorpoExclusao {
   motivo: string | null;
 }
 
+/**
+ * ESQUEMA 2, SOMENTE LEITURA. O fechamento das odds de UMA aposta registrada, para o CLV. Vários
+ * fechamentos da mesma aposta são permitidos (vale o de maior `seq`); uma correção usa `correcao`.
+ * Esta versão verifica registros deste tipo, mas ainda NÃO os escreve.
+ */
+export interface CorpoFechamento {
+  /** a aposta (registro `aposta_registrada` anterior, desta cadeia) a que este fechamento se refere */
+  aposta: RefRegistro;
+  /** odd de fechamento da referência no lado apostado: finita e maior que 1 */
+  oddFechamento: number;
+  /** odds de fechamento dos outros lados do mesmo mercado (vazia: CLV cru, sem tirar a margem) */
+  fechamentoOutros: number[];
+  /** quando o fechamento foi registrado (ISO 8601 com deslocamento) */
+  registradoEm: string;
+  /** de onde veio a odd de fechamento (texto livre); opcional */
+  fonte?: string;
+}
+
 export type CorpoLedger =
-  CorpoDecisao | CorpoAposta | CorpoResultado | CorpoCorrecao | CorpoExclusao;
+  CorpoDecisao | CorpoAposta | CorpoResultado | CorpoCorrecao | CorpoExclusao | CorpoFechamento;
 
 export interface RegistroLedger<C extends CorpoLedger = CorpoLedger> {
   cabecalho: CabecalhoLedger;
@@ -135,6 +190,15 @@ export type CodigoProblema =
   | 'corpo_incompativel'
   | 'correcao_hash_diverge'
   | 'correcao_referencia_ausente'
+  | 'decisao_referencia_ausente'
+  | 'decisao_hash_diverge'
+  | 'decisao_tipo_incorreto'
+  | 'decisao_nao_anterior'
+  | 'referencia_outra_cadeia'
+  | 'fechamento_referencia_ausente'
+  | 'fechamento_hash_diverge'
+  | 'fechamento_tipo_incorreto'
+  | 'fechamento_nao_anterior'
   | 'hash_invalido'
   | 'prevhash_nao_confere'
   | 'genese_com_prevhash'

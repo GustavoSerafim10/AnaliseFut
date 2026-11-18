@@ -2,9 +2,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
-  aceitarAnexo,
-  conferirPonta,
-  conferirRegistro,
+  anexar,
   ConflitoDeCadeia,
   criarRegistro,
   ErroDeCadeia,
@@ -15,6 +13,7 @@ import {
   type CorpoLedger,
   type RegistroLedger,
 } from '../../src/ledger';
+import { ArmazemDeTeste, gravarSobre } from './apoioGravacao';
 
 const T = (i: number) => `2026-11-13T15:${String(i % 60).padStart(2, '0')}:00-03:00`;
 const POLITICAS = { x: 1 };
@@ -598,9 +597,10 @@ describe('âncora externa', () => {
   });
 });
 
-describe('concorrência: aceitarAnexo (contrato para a gravação atômica da L2)', () => {
+describe('concorrência: a porta de escrita `anexar` (contrato para a gravação atômica da L2)', () => {
   it('o primeiro escritor passa; o segundo, que leu a mesma ponta, recebe conflito', async () => {
     const [a] = await construir(1);
+    const armazem = new ArmazemDeTeste([a]);
     const pedido = (n: number) => ({
       tipo: 'resultado' as const,
       cadeia: 'A',
@@ -612,43 +612,44 @@ describe('concorrência: aceitarAnexo (contrato para a gravação atômica da L2
     // duas abas leem a mesma ponta (a) e criam o seq 2 ao mesmo tempo
     const daAba1 = await criarRegistro(pedido(10), a);
     const daAba2 = await criarRegistro(pedido(11), a);
-    await expect(aceitarAnexo(a, daAba1)).resolves.toBeUndefined(); // a aba 1 grava
+    await expect(anexar(armazem, daAba1)).resolves.toBeUndefined(); // a aba 1 grava
     // a ponta gravada agora é daAba1: a aba 2 falha e precisa reler
-    await expect(aceitarAnexo(daAba1, daAba2)).rejects.toBeInstanceOf(ConflitoDeCadeia);
+    await expect(anexar(armazem, daAba2)).rejects.toBeInstanceOf(ConflitoDeCadeia);
     // ao reler e recriar, passa
     const refeito = await criarRegistro(pedido(11), daAba1);
-    await expect(aceitarAnexo(daAba1, refeito)).resolves.toBeUndefined();
+    await expect(anexar(armazem, refeito)).resolves.toBeUndefined();
     expect(refeito.cabecalho.seq).toBe(3);
+    expect(armazem.lista()).toEqual([a, daAba1, refeito]);
   });
 
   it('gênese só entra em cadeia vazia', async () => {
     const [a] = await construir(1);
     const outraGenese = (await construir(1))[0];
-    await expect(aceitarAnexo(null, a)).resolves.toBeUndefined();
-    await expect(aceitarAnexo(a, outraGenese)).rejects.toBeInstanceOf(ConflitoDeCadeia);
+    await expect(gravarSobre([], a)).resolves.toBeUndefined();
+    await expect(gravarSobre([a], outraGenese)).rejects.toBeInstanceOf(ConflitoDeCadeia);
   });
 
   it('seq pulado ou prevHash errado são recusados', async () => {
     const lista = await construir(3);
-    await expect(aceitarAnexo(lista[0], lista[2])).rejects.toThrow(/esperado seq 2/);
+    // seq pulado: o anterior (seq 2) não está gravado
+    await expect(gravarSobre([lista[0]], lista[2])).rejects.toThrow(/seq 2/);
     const falso = clonar(lista[1]);
     falso.cabecalho.prevHash = 'f'.repeat(64);
     falso.hash = await hashDoRegistro(falso.cabecalho, falso.corpo); // hash coerente: só a ponta denuncia
-    await expect(aceitarAnexo(lista[0], falso)).rejects.toThrow(/prevHash/);
+    await expect(gravarSobre([lista[0]], falso)).rejects.toThrow(/prevHash/);
   });
 
-  it('ponta de outra cadeia é recusada', async () => {
+  it('registro de outra cadeia não continua esta', async () => {
     const a = (await construir(1, 'A'))[0];
     const b = (await construir(2, 'B'))[1];
-    await expect(aceitarAnexo(a, b)).rejects.toBeInstanceOf(ConflitoDeCadeia);
+    await expect(gravarSobre([a], b)).rejects.toBeInstanceOf(ConflitoDeCadeia);
   });
 
   it('cem abas concorrentes: exatamente uma vence por rodada e a cadeia final é íntegra', async () => {
-    let gravada: RegistroLedger[] = [];
-    const ponta = () => gravada.at(-1) ?? null;
+    const armazem = new ArmazemDeTeste();
     const tentar = async (n: number): Promise<boolean> => {
       for (let i = 0; i < 1000; i++) {
-        const lida = ponta();
+        const lida = armazem.lista().at(-1) ?? null;
         const novo = await criarRegistro(
           {
             tipo: 'resultado',
@@ -661,10 +662,7 @@ describe('concorrência: aceitarAnexo (contrato para a gravação atômica da L2
           lida,
         );
         try {
-          // a transação: confere a ponta gravada NESTE instante e grava
-          await conferirRegistro(novo); // assíncrono, fora da "transação"
-          conferirPonta(ponta(), novo); // síncrono + gravação: o trecho atômico
-          gravada = [...gravada, novo];
+          await anexar(armazem, novo); // Fase A fora da transação, Fase B atômica dentro dela
           return true;
         } catch (e) {
           if (!(e instanceof ConflitoDeCadeia)) throw e;
@@ -674,6 +672,7 @@ describe('concorrência: aceitarAnexo (contrato para a gravação atômica da L2
     };
     const resultados = await Promise.all(Array.from({ length: 100 }, (_, i) => tentar(i + 1)));
     expect(resultados.every(Boolean)).toBe(true);
+    const gravada = armazem.lista();
     expect(gravada).toHaveLength(100);
     expect((await verificarCadeia(gravada)).estado).toBe('integra');
     expect(gravada.map((r) => r.cabecalho.seq)).toEqual(

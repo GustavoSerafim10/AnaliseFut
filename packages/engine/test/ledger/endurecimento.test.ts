@@ -1,12 +1,13 @@
 /**
- * Endurecimento da L1: `aceitarAnexo` confere o registro (hash recalculado, data, corpo × tipo) e a
- * verificação histórica aplica a mesma coerência semântica. Registros inválidos são FORJADOS com o
- * hash recalculado de propósito: assim o hash confere e só a regra nova os detecta.
+ * Endurecimento da L1: a porta de escrita (`anexar`) confere o registro (hash recalculado, data,
+ * corpo × tipo) e a verificação histórica aplica a mesma coerência semântica. Registros inválidos são
+ * FORJADOS com o hash recalculado de propósito: assim o hash confere e só a regra nova os detecta.
+ * (Antes, estes testes usavam `aceitarAnexo`, retirada da API: gravam agora por `anexar`, que confere
+ * ainda mais: referências, registro anterior e ponta, atomicamente.)
  */
 import { describe, expect, it } from 'vitest';
 import {
-  aceitarAnexo,
-  conferirPonta,
+  anexar,
   conferirRegistro,
   ConflitoDeCadeia,
   criarRegistro,
@@ -18,6 +19,7 @@ import {
   type RegistroLedger,
   type TipoRegistro,
 } from '../../src/ledger';
+import { ArmazemDeTeste, gravarSobre } from './apoioGravacao';
 
 const T = (i: number) => `2026-11-13T15:${String(i % 60).padStart(2, '0')}:00-03:00`;
 const HASH = 'a'.repeat(64);
@@ -91,8 +93,18 @@ async function cadeiaComTodosOsTipos(): Promise<RegistroLedger[]> {
     'exclusao',
   ];
   for (const [i, tipo] of tipos.entries()) {
+    // a aposta aponta para a decisão REAL do seq 1 (o hash dela), como o Ledger exige
     const extra: Partial<Pedido> =
-      tipo === 'correcao' ? { corrige: { seq: 3, hash: lista[2].hash } } : {};
+      tipo === 'correcao'
+        ? { corrige: { seq: 3, hash: lista[2].hash } }
+        : tipo === 'aposta_registrada'
+          ? {
+              corpo: {
+                ...CORPOS.aposta_registrada,
+                decisao: { seq: 1, hash: lista[0].hash },
+              } as CorpoLedger,
+            }
+          : {};
     lista.push(await criarRegistro(pedido(tipo, i + 1, extra), lista.at(-1) ?? null));
   }
   return lista;
@@ -109,14 +121,12 @@ async function forjar(
   return f;
 }
 
-describe('aceitarAnexo: registros válidos continuam sendo aceitos', () => {
+describe('anexar: registros válidos continuam sendo aceitos', () => {
   it('os cinco tipos, encadeados, um a um', async () => {
     const lista = await cadeiaComTodosOsTipos();
-    let ponta: RegistroLedger | null = null;
-    for (const r of lista) {
-      await expect(aceitarAnexo(ponta, r)).resolves.toBeUndefined();
-      ponta = r;
-    }
+    const armazem = new ArmazemDeTeste();
+    for (const r of lista) await expect(anexar(armazem, r)).resolves.toBeUndefined();
+    expect(armazem.lista()).toEqual(lista);
     expect(lista.map((r) => r.cabecalho.tipo)).toEqual([
       'decisao',
       'aposta_registrada',
@@ -128,23 +138,23 @@ describe('aceitarAnexo: registros válidos continuam sendo aceitos', () => {
 
   it('registro que passou por JSON (IndexedDB, backup) também é aceito', async () => {
     const [d] = await cadeiaComTodosOsTipos();
-    await expect(aceitarAnexo(null, clonar(d))).resolves.toBeUndefined();
+    await expect(gravarSobre([], clonar(d))).resolves.toBeUndefined();
   });
 
   it('data com "Z" e com milissegundos é aceita', async () => {
     for (const criadoEm of ['2026-11-13T18:00:00Z', '2026-11-13T18:00:00.123+00:00']) {
       const r = await criarRegistro(pedido('resultado', 1, { criadoEm }), null);
-      await expect(aceitarAnexo(null, r)).resolves.toBeUndefined();
+      await expect(gravarSobre([], r)).resolves.toBeUndefined();
     }
   });
 });
 
-describe('aceitarAnexo: recalcula o hash e não confia em criarRegistro', () => {
+describe('anexar: recalcula o hash e não confia em criarRegistro', () => {
   it('corpo alterado depois de criado (hash declarado é o antigo)', async () => {
     const r = await criarRegistro(pedido('resultado', 1), null);
     const adulterado = clonar(r);
     (adulterado.corpo as unknown as { resultado: { placar: number[] } }).resultado.placar[0] = 99;
-    await expect(aceitarAnexo(null, adulterado)).rejects.toThrow(/hash declarado/);
+    await expect(gravarSobre([], adulterado)).rejects.toThrow(/hash declarado/);
     await expect(conferirRegistro(adulterado)).rejects.toBeInstanceOf(ErroDeCadeia);
   });
 
@@ -152,20 +162,20 @@ describe('aceitarAnexo: recalcula o hash e não confia em criarRegistro', () => 
     const r = await criarRegistro(pedido('resultado', 1), null);
     const adulterado = clonar(r);
     adulterado.cabecalho.versaoMotor = 'outra';
-    await expect(aceitarAnexo(null, adulterado)).rejects.toThrow(/hash declarado/);
+    await expect(gravarSobre([], adulterado)).rejects.toThrow(/hash declarado/);
   });
 
   it('hash declarado incorreto (bem formado, mas de outro conteúdo)', async () => {
     const r = await criarRegistro(pedido('resultado', 1), null);
     const errado = { ...clonar(r), hash: 'f'.repeat(64) };
-    await expect(aceitarAnexo(null, errado)).rejects.toThrow(/hash declarado/);
+    await expect(gravarSobre([], errado)).rejects.toThrow(/hash declarado/);
   });
 
   it('hash ausente ou fora do formato', async () => {
     const r = await criarRegistro(pedido('resultado', 1), null);
     for (const hash of ['curto', 'A'.repeat(64), undefined, 123]) {
       const mau = { ...clonar(r), hash } as unknown as RegistroLedger;
-      await expect(aceitarAnexo(null, mau)).rejects.toBeInstanceOf(ErroDeCadeia);
+      await expect(gravarSobre([], mau)).rejects.toBeInstanceOf(ErroDeCadeia);
     }
   });
 
@@ -174,20 +184,20 @@ describe('aceitarAnexo: recalcula o hash e não confia em criarRegistro', () => 
     const mau = clonar(r);
     // o resto do resultado continua válido: só o NaN impede de serializar
     (mau.corpo as unknown as { resultado: Record<string, unknown> }).resultado.x = Number.NaN;
-    await expect(aceitarAnexo(null, mau)).rejects.toThrow(/não serializável/);
+    await expect(gravarSobre([], mau)).rejects.toThrow(/não serializável/);
   });
 
   it('esquema desconhecido: recusado em vez de gravar algo que não sabemos conferir', async () => {
     const r = await forjar(await criarRegistro(pedido('resultado', 1), null), (c) => {
       c.cabecalho.esquema = 99;
     });
-    await expect(aceitarAnexo(null, r)).rejects.toThrow(/esquema 99/);
+    await expect(gravarSobre([], r)).rejects.toThrow(/esquema 99/);
   });
 
   it('registro inválido NÃO é um conflito: reler a ponta não o conserta', async () => {
     const r = await criarRegistro(pedido('resultado', 1), null);
     const errado = { ...clonar(r), hash: 'f'.repeat(64) };
-    const erro = await aceitarAnexo(null, errado).catch((e: unknown) => e);
+    const erro = await gravarSobre([], errado).catch((e: unknown) => e);
     expect(erro).toBeInstanceOf(ErroDeCadeia);
     expect(erro).not.toBeInstanceOf(ConflitoDeCadeia);
   });
@@ -195,28 +205,35 @@ describe('aceitarAnexo: recalcula o hash e não confia em criarRegistro', () => 
   it('o conflito de ponta continua sendo conflito (e vem depois da conferência do registro)', async () => {
     const [a] = await cadeiaComTodosOsTipos();
     const outraGenese = await criarRegistro(pedido('resultado', 9), null);
-    await expect(aceitarAnexo(a, outraGenese)).rejects.toBeInstanceOf(ConflitoDeCadeia);
+    await expect(gravarSobre([a], outraGenese)).rejects.toBeInstanceOf(ConflitoDeCadeia);
     // registro inválido E ponta velha: prevalece o erro do registro
     const errado = { ...clonar(outraGenese), hash: 'f'.repeat(64) };
-    const erro = await aceitarAnexo(a, errado).catch((e: unknown) => e);
+    const erro = await gravarSobre([a], errado).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ErroDeCadeia);
     expect(erro).not.toBeInstanceOf(ConflitoDeCadeia);
   });
 
-  it('conferirPonta é síncrona e só confere a ponta (o hash é de conferirRegistro)', async () => {
+  it('a identidade da ponta é conferida na gravação (era o teste direto de conferirPonta, agora interna)', async () => {
     const lista = await cadeiaComTodosOsTipos();
-    expect(() => conferirPonta(lista[0], lista[1])).not.toThrow();
-    expect(() => conferirPonta(lista[0], lista[2])).toThrow(ConflitoDeCadeia);
+    // a ponta certa: grava
+    await expect(gravarSobre([lista[0]], lista[1])).resolves.toBeUndefined();
+    // outro escritor já gravou o seq 2: a ponta é o seq 2, e o seq 2 de novo é conflito
+    const erro = await gravarSobre([lista[0], lista[1]], lista[1]).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ConflitoDeCadeia);
+    expect((erro as Error).message).toMatch(/esperado seq 3, recebido 2/);
+    // seq pulado (falta o anterior): conflito, a ser resolvido relendo a ponta
+    await expect(gravarSobre([lista[0]], lista[2])).rejects.toBeInstanceOf(ConflitoDeCadeia);
   });
 });
 
-describe('aceitarAnexo: corpo incompatível com o tipo declarado', () => {
+describe('anexar: corpo incompatível com o tipo declarado', () => {
   it('um corpo de resultado dentro de um registro do tipo exclusão (hash coerente)', async () => {
     const r = await forjar(await criarRegistro(pedido('resultado', 1), null), (c) => {
       c.cabecalho.tipo = 'exclusao';
     });
     // o hash confere, mas o corpo não é de uma exclusão
     expect(r.hash).toBe(await hashDoRegistro(r.cabecalho, r.corpo));
-    await expect(aceitarAnexo(null, r)).rejects.toThrow(/incompatível com o tipo "exclusao"/);
+    await expect(gravarSobre([], r)).rejects.toThrow(/incompatível com o tipo "exclusao"/);
   });
 
   it('cada tipo recusa o corpo dos outros quatro', async () => {
@@ -235,7 +252,7 @@ describe('aceitarAnexo: corpo incompatível com o tipo declarado', () => {
         });
         const motivo = motivoCorpoIncompativel(forjado.cabecalho, forjado.corpo);
         expect(motivo, `${outro} como ${tipo}`).toMatch(/incompatível/);
-        await expect(aceitarAnexo(null, forjado)).rejects.toBeInstanceOf(ErroDeCadeia);
+        await expect(gravarSobre([], forjado)).rejects.toBeInstanceOf(ErroDeCadeia);
       }
   });
 
@@ -252,7 +269,7 @@ describe('aceitarAnexo: corpo incompatível com o tipo declarado', () => {
     ];
     for (const [nome, alterar] of alteracoes) {
       const f = await forjar(base, alterar);
-      await expect(aceitarAnexo(null, f), nome).rejects.toThrow(/incompatível/);
+      await expect(gravarSobre([], f), nome).rejects.toThrow(/incompatível/);
     }
   });
 
@@ -261,11 +278,11 @@ describe('aceitarAnexo: corpo incompatível com o tipo declarado', () => {
     const semCorrige = await forjar(lista[3], (c) => {
       delete c.cabecalho.corrige;
     });
-    await expect(aceitarAnexo(lista[2], semCorrige)).rejects.toThrow(/corrige/);
+    await expect(gravarSobre(lista.slice(0, 3), semCorrige)).rejects.toThrow(/corrige/);
     const comCorrigeIndevido = await forjar(lista[4], (c) => {
       c.cabecalho.corrige = { seq: 1, hash: HASH };
     });
-    await expect(aceitarAnexo(lista[3], comCorrigeIndevido)).rejects.toThrow(/só existe/);
+    await expect(gravarSobre(lista.slice(0, 4), comCorrigeIndevido)).rejects.toThrow(/só existe/);
   });
 
   it('criarRegistro também recusa o corpo errado (não nasce registro incoerente)', async () => {
@@ -278,7 +295,7 @@ describe('aceitarAnexo: corpo incompatível com o tipo declarado', () => {
   });
 });
 
-describe('aceitarAnexo: data inválida', () => {
+describe('anexar: data inválida', () => {
   const invalidas = [
     'ontem',
     '',
@@ -296,7 +313,7 @@ describe('aceitarAnexo: data inválida', () => {
       const f = await forjar(base, (c) => {
         c.cabecalho.criadoEm = data;
       });
-      await expect(aceitarAnexo(null, f), JSON.stringify(data)).rejects.toThrow(/criadoEm/);
+      await expect(gravarSobre([], f), JSON.stringify(data)).rejects.toThrow(/criadoEm/);
     }
   });
 
@@ -305,7 +322,7 @@ describe('aceitarAnexo: data inválida', () => {
     const f = await forjar(base, (c) => {
       (c.cabecalho as unknown as { criadoEm: unknown }).criadoEm = 20261113;
     });
-    await expect(aceitarAnexo(null, f)).rejects.toBeInstanceOf(ErroDeCadeia);
+    await expect(gravarSobre([], f)).rejects.toBeInstanceOf(ErroDeCadeia);
   });
 
   it('criarRegistro continua recusando as mesmas datas', async () => {

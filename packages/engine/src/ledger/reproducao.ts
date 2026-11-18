@@ -4,6 +4,7 @@
  * Ledger não muda porque o motor de hoje pensa diferente. Uma divergência é informação
  * (o motor mudou? algum número de política mudou? ou o motor deixou de ser determinístico?).
  */
+import { descreverFalha } from './falha'; // módulo interno
 import { melhoresEntradas, type PedidoEntradas, type ResultadoEntradas } from '../entradas';
 import { analisarV4, type EntradaV4, type ResultadoV4 } from '../v4';
 import { sha256Hex } from './hash';
@@ -235,7 +236,7 @@ export async function reproduzir(
       ...base,
       situacao: 'nao_reproduzivel',
       causa: 'erro_ao_executar',
-      detalhe: (e as Error).message,
+      detalhe: descreverFalha(e),
     };
   }
   if (base.hashSaidaGravada === base.hashSaidaRecalculada)

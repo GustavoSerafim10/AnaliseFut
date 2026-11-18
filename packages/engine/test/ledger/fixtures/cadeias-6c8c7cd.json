@@ -1,0 +1,639 @@
+{
+ "geradoPor": "código do commit 6c8c7cd (antes da Etapa 0 e da V2)",
+ "cadeias": {
+  "cincoTiposComReferenciaReal": {
+   "descricao": "os cinco tipos; aposta e resultado apontam para a decisão real",
+   "esperado": {
+    "estado": "integra",
+    "codigos": []
+   },
+   "registros": [
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "decisao",
+      "cadeia": "A",
+      "seq": 1,
+      "prevHash": null,
+      "criadoEm": "2026-11-13T15:01:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "entradaMotor": {
+       "v4": null,
+       "lista": null
+      },
+      "saida": {
+       "v4": null
+      },
+      "snapshot": {
+       "odds": [],
+       "estatisticas": {},
+       "contexto": {},
+       "prints": {}
+      },
+      "impressao": "abc"
+     },
+     "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "aposta_registrada",
+      "cadeia": "A",
+      "seq": 2,
+      "prevHash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3",
+      "criadoEm": "2026-11-13T15:02:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 1,
+       "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+      },
+      "aposta": {
+       "odd": 2,
+       "casa": "1win",
+       "valor": 10,
+       "feitaEm": "2026-11-13T15:02:00-03:00"
+      },
+      "stakeAutorizada": {
+       "autorizada": true,
+       "kellyCheio": 0.2,
+       "fracaoKelly": 0.25,
+       "fracaoBanca": 0.02,
+       "limites": [
+        "teto"
+       ],
+       "teto": 0.02,
+       "valor": 20
+      },
+      "travas": {
+       "bancaInicial": 1000,
+       "bancaAtual": 1000,
+       "pico": 1000,
+       "drawdown": 0,
+       "fatorKelly": 1,
+       "pausadoAte": null,
+       "perdasHoje": 0,
+       "diaEncerrado": false,
+       "expostoHoje": 0,
+       "motivos": []
+      }
+     },
+     "hash": "0574a7523474848ff38af7416f2acd42b58df437982017a83b316d9b16fb6bb6"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "resultado",
+      "cadeia": "A",
+      "seq": 3,
+      "prevHash": "0574a7523474848ff38af7416f2acd42b58df437982017a83b316d9b16fb6bb6",
+      "criadoEm": "2026-11-13T15:03:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 1,
+       "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+      },
+      "resultado": {
+       "casa": 2,
+       "fora": 1,
+       "registradoEm": "2026-11-13T15:03:00-03:00"
+      }
+     },
+     "hash": "7e9f650a8083c0f725ce619764d822a27d17768af65d06b074c397cfec81ca8e"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "correcao",
+      "cadeia": "A",
+      "seq": 4,
+      "prevHash": "7e9f650a8083c0f725ce619764d822a27d17768af65d06b074c397cfec81ca8e",
+      "criadoEm": "2026-11-13T15:04:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      },
+      "corrige": {
+       "seq": 3,
+       "hash": "7e9f650a8083c0f725ce619764d822a27d17768af65d06b074c397cfec81ca8e"
+      }
+     },
+     "corpo": {
+      "motivo": "m",
+      "novo": {
+       "casa": 3,
+       "fora": 1
+      }
+     },
+     "hash": "b9fba1ef698f8999a0e02379d01e75db7fb89c0e355ed2b313fbf242d185da6f"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "exclusao",
+      "cadeia": "A",
+      "seq": 5,
+      "prevHash": "b9fba1ef698f8999a0e02379d01e75db7fb89c0e355ed2b313fbf242d185da6f",
+      "criadoEm": "2026-11-13T15:05:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "motivo": null
+     },
+     "hash": "354120b8009873c0683d6a0e9894adc72d1c4d98763ba03d9720d6a3315258e6"
+    }
+   ]
+  },
+  "decisaoNula": {
+   "descricao": "aposta e resultado sem vínculo com a decisão (decisao: null)",
+   "esperado": {
+    "estado": "integra",
+    "codigos": []
+   },
+   "registros": [
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "decisao",
+      "cadeia": "A",
+      "seq": 1,
+      "prevHash": null,
+      "criadoEm": "2026-11-13T15:01:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "entradaMotor": {
+       "v4": null,
+       "lista": null
+      },
+      "saida": {
+       "v4": null
+      },
+      "snapshot": {
+       "odds": [],
+       "estatisticas": {},
+       "contexto": {},
+       "prints": {}
+      },
+      "impressao": "abc"
+     },
+     "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "aposta_registrada",
+      "cadeia": "A",
+      "seq": 2,
+      "prevHash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3",
+      "criadoEm": "2026-11-13T15:02:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": null,
+      "aposta": {
+       "odd": 2,
+       "casa": "1win",
+       "valor": 10,
+       "feitaEm": "2026-11-13T15:02:00-03:00"
+      },
+      "stakeAutorizada": {
+       "autorizada": true,
+       "kellyCheio": 0.2,
+       "fracaoKelly": 0.25,
+       "fracaoBanca": 0.02,
+       "limites": [
+        "teto"
+       ],
+       "teto": 0.02,
+       "valor": 20
+      },
+      "travas": {
+       "bancaInicial": 1000,
+       "bancaAtual": 1000,
+       "pico": 1000,
+       "drawdown": 0,
+       "fatorKelly": 1,
+       "pausadoAte": null,
+       "perdasHoje": 0,
+       "diaEncerrado": false,
+       "expostoHoje": 0,
+       "motivos": []
+      }
+     },
+     "hash": "4f0b655a3d2b8045369bee60fc3f0d4bbe7f1a5564bce8bade70d1a5e4b097c1"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "resultado",
+      "cadeia": "A",
+      "seq": 3,
+      "prevHash": "4f0b655a3d2b8045369bee60fc3f0d4bbe7f1a5564bce8bade70d1a5e4b097c1",
+      "criadoEm": "2026-11-13T15:03:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": null,
+      "resultado": {
+       "casa": 2,
+       "fora": 1,
+       "registradoEm": "2026-11-13T15:03:00-03:00"
+      }
+     },
+     "hash": "f884c6a205e5c63cbb5e68d3470b7050dd1eb5ee8a22f75f784995b333641cd2"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "exclusao",
+      "cadeia": "A",
+      "seq": 4,
+      "prevHash": "f884c6a205e5c63cbb5e68d3470b7050dd1eb5ee8a22f75f784995b333641cd2",
+      "criadoEm": "2026-11-13T15:04:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "motivo": null
+     },
+     "hash": "cf743d45ff0a5a20cdac91c332e4e46ad31fdb5d9f55f3dfd0befe7ffe858e36"
+    }
+   ]
+  },
+  "referenciaArbitraria": {
+   "descricao": "decisao com hash inventado: o código anterior ACEITAVA (só conferia a forma)",
+   "esperado": {
+    "estado": "adulterada",
+    "codigos": [
+     "decisao_hash_diverge",
+     "decisao_hash_diverge"
+    ]
+   },
+   "registros": [
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "decisao",
+      "cadeia": "A",
+      "seq": 1,
+      "prevHash": null,
+      "criadoEm": "2026-11-13T15:01:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "entradaMotor": {
+       "v4": null,
+       "lista": null
+      },
+      "saida": {
+       "v4": null
+      },
+      "snapshot": {
+       "odds": [],
+       "estatisticas": {},
+       "contexto": {},
+       "prints": {}
+      },
+      "impressao": "abc"
+     },
+     "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "aposta_registrada",
+      "cadeia": "A",
+      "seq": 2,
+      "prevHash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3",
+      "criadoEm": "2026-11-13T15:02:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 1,
+       "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "aposta": {
+       "odd": 2,
+       "casa": "1win",
+       "valor": 10,
+       "feitaEm": "2026-11-13T15:02:00-03:00"
+      },
+      "stakeAutorizada": {
+       "autorizada": true,
+       "kellyCheio": 0.2,
+       "fracaoKelly": 0.25,
+       "fracaoBanca": 0.02,
+       "limites": [
+        "teto"
+       ],
+       "teto": 0.02,
+       "valor": 20
+      },
+      "travas": {
+       "bancaInicial": 1000,
+       "bancaAtual": 1000,
+       "pico": 1000,
+       "drawdown": 0,
+       "fatorKelly": 1,
+       "pausadoAte": null,
+       "perdasHoje": 0,
+       "diaEncerrado": false,
+       "expostoHoje": 0,
+       "motivos": []
+      }
+     },
+     "hash": "2aec96f4c66230ea39048510186725f62199e8e18b132a67924dfb9dc256662e"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "resultado",
+      "cadeia": "A",
+      "seq": 3,
+      "prevHash": "2aec96f4c66230ea39048510186725f62199e8e18b132a67924dfb9dc256662e",
+      "criadoEm": "2026-11-13T15:03:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 1,
+       "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "resultado": {
+       "casa": 2,
+       "fora": 1,
+       "registradoEm": "2026-11-13T15:03:00-03:00"
+      }
+     },
+     "hash": "863208bf366ff7a2f4df53d39faaed9550ea5f0ce6da82c09a099fc6fe433b4b"
+    }
+   ]
+  },
+  "referenciaParaOTipoErrado": {
+   "descricao": "a aposta aponta (hash certo) para um resultado, não para uma decisão",
+   "esperado": {
+    "estado": "adulterada",
+    "codigos": [
+     "decisao_tipo_incorreto"
+    ]
+   },
+   "registros": [
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "decisao",
+      "cadeia": "A",
+      "seq": 1,
+      "prevHash": null,
+      "criadoEm": "2026-11-13T15:01:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "entradaMotor": {
+       "v4": null,
+       "lista": null
+      },
+      "saida": {
+       "v4": null
+      },
+      "snapshot": {
+       "odds": [],
+       "estatisticas": {},
+       "contexto": {},
+       "prints": {}
+      },
+      "impressao": "abc"
+     },
+     "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "resultado",
+      "cadeia": "A",
+      "seq": 2,
+      "prevHash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3",
+      "criadoEm": "2026-11-13T15:02:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 1,
+       "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+      },
+      "resultado": {
+       "casa": 2,
+       "fora": 1,
+       "registradoEm": "2026-11-13T15:03:00-03:00"
+      }
+     },
+     "hash": "75eda43ce10edd382281544b2484ec435d741bc77453a0ea625579a333af3359"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "aposta_registrada",
+      "cadeia": "A",
+      "seq": 3,
+      "prevHash": "75eda43ce10edd382281544b2484ec435d741bc77453a0ea625579a333af3359",
+      "criadoEm": "2026-11-13T15:03:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 2,
+       "hash": "75eda43ce10edd382281544b2484ec435d741bc77453a0ea625579a333af3359"
+      },
+      "aposta": {
+       "odd": 2,
+       "casa": "1win",
+       "valor": 10,
+       "feitaEm": "2026-11-13T15:02:00-03:00"
+      },
+      "stakeAutorizada": {
+       "autorizada": true,
+       "kellyCheio": 0.2,
+       "fracaoKelly": 0.25,
+       "fracaoBanca": 0.02,
+       "limites": [
+        "teto"
+       ],
+       "teto": 0.02,
+       "valor": 20
+      },
+      "travas": {
+       "bancaInicial": 1000,
+       "bancaAtual": 1000,
+       "pico": 1000,
+       "drawdown": 0,
+       "fatorKelly": 1,
+       "pausadoAte": null,
+       "perdasHoje": 0,
+       "diaEncerrado": false,
+       "expostoHoje": 0,
+       "motivos": []
+      }
+     },
+     "hash": "6e4c0870f17456b25734fcd1763a199f1bdb9fa1716203578c0f7be4e444a633"
+    }
+   ]
+  },
+  "referenciaNaoAnterior": {
+   "descricao": "a aposta (seq 2) aponta para o seq 2: não é anterior",
+   "esperado": {
+    "estado": "adulterada",
+    "codigos": [
+     "decisao_nao_anterior"
+    ]
+   },
+   "registros": [
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "decisao",
+      "cadeia": "A",
+      "seq": 1,
+      "prevHash": null,
+      "criadoEm": "2026-11-13T15:01:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "entradaMotor": {
+       "v4": null,
+       "lista": null
+      },
+      "saida": {
+       "v4": null
+      },
+      "snapshot": {
+       "odds": [],
+       "estatisticas": {},
+       "contexto": {},
+       "prints": {}
+      },
+      "impressao": "abc"
+     },
+     "hash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3"
+    },
+    {
+     "cabecalho": {
+      "esquema": 1,
+      "tipo": "aposta_registrada",
+      "cadeia": "A",
+      "seq": 2,
+      "prevHash": "5ebb54250cc9076030a751080e393009861ab0fa3a06144e41a36236068fc5e3",
+      "criadoEm": "2026-11-13T15:02:00-03:00",
+      "versaoMotor": "teste",
+      "impressaoPoliticas": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+      "politicas": {
+       "x": 1
+      }
+     },
+     "corpo": {
+      "decisao": {
+       "seq": 2,
+       "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "aposta": {
+       "odd": 2,
+       "casa": "1win",
+       "valor": 10,
+       "feitaEm": "2026-11-13T15:02:00-03:00"
+      },
+      "stakeAutorizada": {
+       "autorizada": true,
+       "kellyCheio": 0.2,
+       "fracaoKelly": 0.25,
+       "fracaoBanca": 0.02,
+       "limites": [
+        "teto"
+       ],
+       "teto": 0.02,
+       "valor": 20
+      },
+      "travas": {
+       "bancaInicial": 1000,
+       "bancaAtual": 1000,
+       "pico": 1000,
+       "drawdown": 0,
+       "fatorKelly": 1,
+       "pausadoAte": null,
+       "perdasHoje": 0,
+       "diaEncerrado": false,
+       "expostoHoje": 0,
+       "motivos": []
+      }
+     },
+     "hash": "66f3ae9039dc8677812b61dec7c7ec115883b35312b7539a25efa257a1cb948a"
+    }
+   ]
+  }
+ }
+}

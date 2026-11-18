@@ -13,11 +13,12 @@
  * o motor e o app podem acrescentar informação sem invalidar o passado. Estatísticas e contexto
  * são só "objeto simples": não têm contrato mais rígido.
  */
+import { descreverFalha } from './falha'; // módulo interno
 import type { TravasBanca } from '../banca';
 import type { StakeAutorizada } from '../kelly';
 import { ehHashSha256 } from './hash';
 import { serializarCanonico } from './json';
-import type { CabecalhoLedger, TipoRegistro } from './tipos';
+import { ESQUEMA_DO_TIPO, type CabecalhoLedger, type TipoDeRegistroLido } from './tipos';
 
 // ─────────────── datas
 
@@ -315,7 +316,7 @@ function validarCorrecao(c: Obj): string | null {
   try {
     serializarCanonico(c.novo);
   } catch (erro) {
-    return `correcao.novo não é serializável: ${(erro as Error).message}`;
+    return `correcao.novo não é serializável: ${descreverFalha(erro)}`;
   }
   return null;
 }
@@ -332,12 +333,49 @@ function validarExclusao(c: Obj): string | null {
     : 'exclusao.motivo deve ser texto ou null';
 }
 
-const VALIDADORES: Record<TipoRegistro, (c: Obj) => string | null> = {
+/** uma referência `{ seq, hash }` exata, com seq inteiro positivo e hash SHA-256 */
+const refValida = (x: unknown): boolean =>
+  ehObjetoSimples(x) &&
+  chavesExatas(x, ['seq', 'hash'], 'ref') === null &&
+  Number.isInteger(x.seq) &&
+  (x.seq as number) >= 1 &&
+  ehHashSha256(x.hash);
+
+/** odd de fechamento: finita e maior que 1 (o CLV divide por ela) */
+const oddDeFechamento: Regra = {
+  esperado: 'um número finito maior que 1',
+  ok: (x) => finito(x) && x > 1,
+};
+
+/** Campos do `fechamento` (esquema 2). `fonte` é o único opcional; nenhum outro campo é permitido. */
+const REGRAS_FECHAMENTO: Record<string, Regra & { opcional?: boolean }> = {
+  aposta: {
+    esperado: 'uma referência { seq, hash } exata a uma aposta registrada anterior',
+    ok: refValida,
+  },
+  oddFechamento: oddDeFechamento,
+  fechamentoOutros: {
+    esperado: 'uma lista (possivelmente vazia) de números finitos maiores que 1',
+    ok: listaDe((x) => finito(x) && x > 1),
+  },
+  registradoEm: R.data,
+  fonte: { ...R.textoNaoVazio, opcional: true },
+};
+
+function validarFechamento(c: Obj): string | null {
+  const permitidas = Object.keys(REGRAS_FECHAMENTO);
+  const sobram = chavesPresentes(c).filter((k) => !permitidas.includes(k));
+  if (sobram.length) return `fechamento: campos que não são deste tipo: ${sobram.join(', ')}`;
+  return validarCampos(c, REGRAS_FECHAMENTO, 'fechamento');
+}
+
+const VALIDADORES: Record<TipoDeRegistroLido, (c: Obj) => string | null> = {
   decisao: validarDecisao,
   aposta_registrada: validarAposta,
   resultado: validarResultado,
   correcao: validarCorrecao,
   exclusao: validarExclusao,
+  fechamento: validarFechamento,
 };
 
 /**
@@ -346,7 +384,7 @@ const VALIDADORES: Record<TipoRegistro, (c: Obj) => string | null> = {
  * apontado existe e tem esse hash, só a cadeia sabe (verificarCadeia; na gravação, a L2).
  */
 function motivoCorrigeInvalido(
-  tipo: TipoRegistro,
+  tipo: TipoDeRegistroLido,
   corrige: unknown,
   seqDoRegistro: number,
 ): string | null {
@@ -365,15 +403,20 @@ function motivoCorrigeInvalido(
 }
 
 /**
- * Motivo pelo qual o corpo não é do tipo declarado (ou a ligação `corrige` do cabeçalho não bate com
- * o tipo); null se o registro é coerente. Só vale para o esquema 1.
+ * Motivo pelo qual o registro é incoerente: o tipo não pertence ao esquema declarado (igualdade
+ * estrita com `ESQUEMA_DO_TIPO`), o corpo não é do tipo ou a ligação `corrige` do cabeçalho não bate
+ * com o tipo; null se é coerente. Vale para os esquemas 1 e 2. `esquema` é opcional: sem ele, só o
+ * corpo e a ligação são conferidos.
  */
 export function motivoCorpoIncompativel(
-  cabecalho: Pick<CabecalhoLedger, 'tipo' | 'corrige' | 'seq'>,
+  cabecalho: Pick<CabecalhoLedger, 'tipo' | 'corrige' | 'seq'> & { esquema?: number },
   corpo: unknown,
 ): string | null {
   const validar = VALIDADORES[cabecalho.tipo];
   if (!validar) return `tipo desconhecido: ${String(cabecalho.tipo)}`;
+  const esquemaDoTipo = ESQUEMA_DO_TIPO[cabecalho.tipo];
+  if (cabecalho.esquema !== undefined && cabecalho.esquema !== esquemaDoTipo)
+    return `registro incoerente: o tipo "${cabecalho.tipo}" pertence ao esquema ${esquemaDoTipo}, não ao ${String(cabecalho.esquema)}`;
   if (!ehObjeto(corpo)) return 'corpo não é um objeto';
   const erro = validar(corpo);
   if (erro) return `corpo incompatível com o tipo "${cabecalho.tipo}": ${erro}`;

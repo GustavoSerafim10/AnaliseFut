@@ -2,14 +2,14 @@
  * Segunda rodada de endurecimento da L1: contrato de tipos e domínios dos corpos, `corrige` exato e
  * íntegro, e limites de data/deslocamento. Os registros inválidos são FORJADOS com o hash
  * recalculado: o hash confere, então só a regra nova os detecta, em `criarRegistro`,
- * `conferirRegistro`/`aceitarAnexo` e `verificarCadeia`.
+ * `conferirRegistro`, na porta de escrita (`anexar`) e em `verificarCadeia`.
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { TravasBanca } from '../../src/banca';
 import type { StakeAutorizada } from '../../src/kelly';
 import {
-  aceitarAnexo,
+  anexar,
   conferirRegistro,
   criarRegistro,
   ehDataIsoComDeslocamento,
@@ -19,6 +19,7 @@ import {
   type RegistroLedger,
   type TipoRegistro,
 } from '../../src/ledger';
+import { ArmazemDeTeste, gravarSobre } from './apoioGravacao';
 
 const T = (i: number) => `2026-11-13T15:${String(i % 60).padStart(2, '0')}:00-03:00`;
 const HASH = 'a'.repeat(64);
@@ -87,8 +88,18 @@ const IDX = { decisao: 0, aposta: 1, resultado: 2, correcao: 3, exclusao: 4 };
 async function cadeia(): Promise<RegistroLedger[]> {
   const lista: RegistroLedger[] = [];
   for (const [i, tipo] of ORDEM.entries()) {
+    // a aposta aponta para a decisão REAL do seq 1 (o hash dela), como o Ledger exige
     const extra: Partial<Pedido> =
-      tipo === 'correcao' ? { corrige: { seq: 3, hash: lista[2].hash } } : {};
+      tipo === 'correcao'
+        ? { corrige: { seq: 3, hash: lista[2].hash } }
+        : tipo === 'aposta_registrada'
+          ? {
+              corpo: {
+                ...CORPOS.aposta_registrada,
+                decisao: { seq: 1, hash: lista[0].hash },
+              } as CorpoLedger,
+            }
+          : {};
     lista.push(await criarRegistro(pedido(tipo, i + 1, extra), lista.at(-1) ?? null));
   }
   return lista;
@@ -118,13 +129,13 @@ async function recusa(idx: number, alterar: (c: RegistroLedger) => void, esperad
   const lista = await cadeia();
   const forjado = await forjar(lista[idx], alterar);
   await expect(conferirRegistro(forjado)).rejects.toThrow(esperado);
-  await expect(aceitarAnexo(lista[idx - 1] ?? null, forjado)).rejects.toThrow(esperado);
+  await expect(gravarSobre(lista.slice(0, idx), forjado)).rejects.toThrow(esperado);
   const rel = await verificarCadeia([...lista.slice(0, idx), forjado]);
   expect(rel.estado).toBe('adulterada');
   expect(codigos(rel)).toContain('corpo_incompativel');
   const refeito = await criarRegistro(
     {
-      ...pedido(forjado.cabecalho.tipo, idx + 1),
+      ...pedido(forjado.cabecalho.tipo as TipoRegistro, idx + 1),
       corpo: forjado.corpo,
       ...(forjado.cabecalho.corrige ? { corrige: forjado.cabecalho.corrige } : {}),
     },
@@ -139,7 +150,7 @@ async function aceita(idx: number, alterar: (c: RegistroLedger) => void) {
   const lista = await cadeia();
   const forjado = await forjar(lista[idx], alterar);
   await expect(conferirRegistro(forjado)).resolves.toBeUndefined();
-  await expect(aceitarAnexo(lista[idx - 1] ?? null, forjado)).resolves.toBeUndefined();
+  await expect(gravarSobre(lista.slice(0, idx), forjado)).resolves.toBeUndefined();
   const rel = await verificarCadeia([...lista.slice(0, idx), forjado]);
   expect(rel.problemas).toEqual([]);
   expect(rel.estado).toBe('integra');
@@ -475,13 +486,13 @@ describe('cabeçalho `corrige`: exatamente { seq, hash }', () => {
     expect(Object.keys(r.cabecalho.corrige ?? {}).sort()).toEqual(['hash', 'seq']);
   });
 
-  it('conferirRegistro, aceitarAnexo e verificarCadeia recusam campo adicional (hash refeito)', async () => {
+  it('conferirRegistro, anexar e verificarCadeia recusam campo adicional (hash refeito)', async () => {
     const lista = await cadeia();
     const f = await forjar(lista[IDX.correcao], (c) => {
       (c.cabecalho.corrige as unknown as Obj).extra = 1;
     });
     await expect(conferirRegistro(f)).rejects.toThrow(/corrige/);
-    await expect(aceitarAnexo(lista[2], f)).rejects.toThrow(/corrige/);
+    await expect(gravarSobre(lista.slice(0, 3), f)).rejects.toThrow(/corrige/);
     const rel = await verificarCadeia([...lista.slice(0, 3), f]);
     expect(rel.estado).toBe('adulterada');
     expect(rel.problemas).toContainEqual(
@@ -554,7 +565,7 @@ describe('corrige.seq: inteiro positivo e estritamente menor que o seq do regist
         (c.cabecalho.corrige as unknown as Obj).seq = seq;
       });
       await expect(conferirRegistro(f)).rejects.toThrow(/corrige/);
-      await expect(aceitarAnexo(lista[2], f)).rejects.toThrow(/corrige/);
+      await expect(gravarSobre(lista.slice(0, 3), f)).rejects.toThrow(/corrige/);
       const rel = await verificarCadeia([...lista.slice(0, 3), f]);
       expect(rel.estado).toBe('adulterada');
       expect(codigos(rel)).toContain('corpo_incompativel');
@@ -570,7 +581,7 @@ describe('corrige.seq: inteiro positivo e estritamente menor que o seq do regist
         },
         lista[4],
       );
-      await expect(aceitarAnexo(lista[4], r)).resolves.toBeUndefined();
+      await expect(gravarSobre(lista, r)).resolves.toBeUndefined();
       expect((await verificarCadeia([...lista, r])).estado).toBe('integra');
     }
     // corrigir uma correção (seq 4) a partir do seq 6
@@ -764,7 +775,7 @@ describe('limites de data nas três portas (hash coerente)', () => {
         c.cabecalho.criadoEm = criadoEm;
       });
       await expect(conferirRegistro(f), criadoEm).rejects.toThrow(/criadoEm/);
-      await expect(aceitarAnexo(null, f), criadoEm).rejects.toThrow(/criadoEm/);
+      await expect(gravarSobre([], f), criadoEm).rejects.toThrow(/criadoEm/);
       const rel = await verificarCadeia([f]);
       expect(rel.estado).toBe('adulterada');
       expect(codigos(rel)).toEqual(['data_invalida']);
@@ -774,7 +785,7 @@ describe('limites de data nas três portas (hash coerente)', () => {
   it('aceitas pelas três portas', async () => {
     for (const criadoEm of boas) {
       const r = await criarRegistro(pedido('resultado', 1, { criadoEm }), null);
-      await expect(aceitarAnexo(null, r)).resolves.toBeUndefined();
+      await expect(gravarSobre([], r)).resolves.toBeUndefined();
       expect((await verificarCadeia([r])).estado).toBe('integra');
     }
   });
@@ -797,7 +808,7 @@ async function recusaSemHash(idx: number, alterar: (c: RegistroLedger) => void, 
   expect(rel.estado).toBe('adulterada');
   expect(codigos(rel)).toContain('corpo_incompativel');
   const refeito = await criarRegistro(
-    { ...pedido(r.cabecalho.tipo, idx + 1), corpo: r.corpo },
+    { ...pedido(r.cabecalho.tipo as TipoRegistro, idx + 1), corpo: r.corpo },
     lista[idx - 1] ?? null,
   ).catch((e: unknown) => e);
   expect((refeito as Error).message).toMatch(esperado);
@@ -1001,11 +1012,9 @@ describe('o formato do hash não mudou (SHA-256 e JSON canônico intactos)', () 
 
   it('registros válidos de todos os tipos continuam sendo criados, aceitos e verificados', async () => {
     const lista = await cadeia();
-    let ponta: RegistroLedger | null = null;
-    for (const r of lista) {
-      await expect(aceitarAnexo(ponta, r)).resolves.toBeUndefined();
-      ponta = r;
-    }
+    const armazem = new ArmazemDeTeste();
+    for (const r of lista) await expect(anexar(armazem, r)).resolves.toBeUndefined();
+    expect(armazem.lista()).toEqual(lista);
     expect((await verificarCadeia(lista)).estado).toBe('integra');
   });
 });
