@@ -896,7 +896,50 @@ export function lerEstatisticasConsenso(
   return { ...leituras[0], campos, outros, avisos };
 }
 
-/** Junta a leitura de vários prints do mesmo site (rolagem com sobreposição). */
+/** Número como o site mostra, para avisos ("3.9"). */
+const mostrar = (x: number) => String(Number(x.toFixed(2)));
+
+/** O aviso fala do valor deste time (marcado "[casa]"/"[fora]"). */
+const ehDoTime = (a: string, t: Time) => a.startsWith(`[${t}] `);
+
+/**
+ * Valor de um time quando vários prints do mesmo site trazem o campo. Iguais ou um só: esse.
+ * Diferentes: o que mais prints trazem; empatado, o que veio sem correção de OCR (aviso do
+ * time); ainda empatado, o do primeiro print. Sempre com aviso: nada some em silêncio.
+ */
+function escolherEntrePrints(
+  valores: ValorLido[],
+  t: Time,
+): { valor?: number; origem: ValorLido[]; aviso?: string } {
+  const com = valores.filter((x) => x[t] !== undefined);
+  if (!com.length) return { origem: [] };
+  const grupos = new Map<number, ValorLido[]>();
+  for (const x of com) grupos.set(x[t]!, [...(grupos.get(x[t]!) ?? []), x]);
+  if (grupos.size === 1) return { valor: com[0][t], origem: com };
+  const limpo = (g: ValorLido[]) => g.some((x) => !x.avisos.some((a) => ehDoTime(a, t)));
+  let melhor: [number, ValorLido[]] | undefined;
+  for (const g of grupos) {
+    if (!melhor) melhor = g;
+    else if (g[1].length !== melhor[1].length) {
+      if (g[1].length > melhor[1].length) melhor = g;
+    } else if (limpo(g[1]) && !limpo(melhor[1])) melhor = g;
+  }
+  const lista = [...grupos.keys()].map(mostrar).join(' × ');
+  return {
+    valor: melhor![0],
+    origem: melhor![1],
+    aviso: avisoDoTime(
+      t,
+      `prints da mesma fonte divergem (${lista}): usando ${mostrar(melhor![0])}, conferir`,
+    ),
+  };
+}
+
+/**
+ * Junta a leitura de vários prints do mesmo site (rolagem com sobreposição). Valor que só um
+ * print traz completa os outros; valor que dois prints trazem diferente passa por
+ * escolherEntrePrints (antes o primeiro print vencia sem aviso).
+ */
 export function juntarLeiturasStats(leituras: LeituraStats[]): LeituraStats | null {
   if (!leituras.length) return null;
   const base: LeituraStats = {
@@ -906,18 +949,34 @@ export function juntarLeiturasStats(leituras: LeituraStats[]): LeituraStats | nu
     colunasInvertidas: leituras.some((l) => l.colunasInvertidas),
     avisos: [],
   };
+  const nomes = new Set(leituras.flatMap((l) => Object.keys(l.campos) as CampoStat[]));
+  for (const c of nomes) {
+    const valores = leituras.map((l) => l.campos[c]).filter((x): x is ValorLido => !!x);
+    const casa = escolherEntrePrints(valores, 'casa');
+    const fora = escolherEntrePrints(valores, 'fora');
+    // avisos gerais de todos; os de um time, só das leituras cujo valor foi o escolhido
+    // (ou de todas, se nenhum print trouxe valor para ele: o aviso explica a falta)
+    const doTime = (t: Time, e: { valor?: number; origem: ValorLido[] }) =>
+      (e.valor === undefined ? valores : e.origem).flatMap((x) =>
+        x.avisos.filter((a) => ehDoTime(a, t)),
+      );
+    const gerais = valores.flatMap((x) =>
+      x.avisos.filter((a) => !ehDoTime(a, 'casa') && !ehDoTime(a, 'fora')),
+    );
+    const avisos = [
+      ...gerais,
+      ...doTime('casa', casa),
+      ...doTime('fora', fora),
+      ...[casa.aviso, fora.aviso].filter((a): a is string => !!a),
+    ];
+    base.campos[c] = {
+      casa: casa.valor,
+      fora: fora.valor,
+      bruto: (casa.origem[0] ?? fora.origem[0] ?? valores[0]).bruto,
+      avisos: [...new Set(avisos)],
+    };
+  }
   for (const l of leituras) {
-    for (const [c, v] of Object.entries(l.campos) as [CampoStat, ValorLido][]) {
-      const a = base.campos[c];
-      base.campos[c] = a
-        ? {
-            ...a,
-            casa: a.casa ?? v.casa,
-            fora: a.fora ?? v.fora,
-            avisos: [...a.avisos, ...v.avisos],
-          }
-        : v;
-    }
     for (const o of l.outros)
       if (!base.outros.some((x) => x.rotulo === o.rotulo)) base.outros.push(o);
     base.avisos.push(...l.avisos);
