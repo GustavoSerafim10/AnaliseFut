@@ -12,6 +12,25 @@ const p1 = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
 const n2 = (x: number) => x.toFixed(2).replace('.', ',');
 const GOLS = [0, 1, 2, 3, 4];
 
+/**
+ * Cor de mapa de calor térmico pela chance relativa ao placar mais provável (t de 0 a 1):
+ * azul profundo → ciano → amarelo → laranja. Só aparência; o número escrito na célula é o dado.
+ */
+const ESCALA_TERMICA: [number, string][] = [
+  [0, '#0b2a4a'],
+  [0.45, '#0ea5e9'],
+  [0.8, '#eab308'],
+  [1, '#f97316'],
+];
+function corTermica(t: number): string {
+  const x = Math.max(0, Math.min(1, t));
+  const i = ESCALA_TERMICA.findIndex(([p]) => p >= x);
+  const [p1, c1] = ESCALA_TERMICA[Math.max(0, i - 1)];
+  const [p2, c2] = ESCALA_TERMICA[Math.max(0, i)];
+  const peso = p2 === p1 ? 100 : Math.round(((x - p1) / (p2 - p1)) * 100);
+  return `color-mix(in srgb, color-mix(in oklab, ${c1}, ${c2} ${peso}%) ${Math.round(40 + x * 50)}%, transparent)`;
+}
+
 export interface ItemSituacao {
   nome: string;
   ok: boolean;
@@ -95,9 +114,7 @@ function MapaPlacares({ lam, nomes }: { lam: Lambdas; nomes: { casa: string; for
                   key={f}
                   role="cell"
                   className={v === max ? 'cc-placar-topo' : ''}
-                  style={{
-                    background: `color-mix(in srgb, var(--azul-tech) ${Math.round(8 + (v / max) * 62)}%, transparent)`,
-                  }}
+                  style={{ background: corTermica(v / max) }}
                   title={`${nomes.casa} ${c} × ${f} ${nomes.fora}: ${p1(v)}`}
                 >
                   {p0(v)}

@@ -169,6 +169,7 @@ export function AbaJogo({
     <section className="passo aba-jogo">
       {vazio && (
         <div className="nova-analise" style={{ backgroundImage: `url(${fundoEstadio})` }}>
+          <span className="na-particulas" aria-hidden="true" />
           <div className="na-lado na-esquerda" aria-hidden="true">
             <span>Análise quantitativa</span>
             <span>Precisão</span>

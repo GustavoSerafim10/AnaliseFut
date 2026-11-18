@@ -1,0 +1,549 @@
+/* =========================================================================
+   Tema "estádio noturno" — camada por cima de estilos.css (carregada depois).
+   Só aparência: nenhuma regra aqui esconde texto, campo ou botão. Quem pede menos
+   movimento recebe tudo parado pelo bloco prefers-reduced-motion de estilos.css.
+   ========================================================================= */
+:root {
+  --fundo: #060b14;
+  --fundo-2: #08111f;
+  --vidro: rgba(11, 19, 32, 0.72);
+  --vidro-borda: rgba(56, 189, 248, 0.14);
+  --vidro-borda-viva: rgba(56, 189, 248, 0.45);
+  --ciano-vivo: #38bdf8;
+  --ciano-fundo: #0284c7;
+  --esmeralda: #10b981;
+  --rubi: #f43f5e;
+  --ambar-vivo: #f59e0b;
+  --mola: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- 1. atmosfera: base profunda, foto do estádio com refletores, grade tática ---------- */
+body {
+  background: var(--fundo);
+}
+.ambiente {
+  background:
+    radial-gradient(1100px 420px at 50% -8%, rgba(56, 189, 248, 0.16), transparent 65%),
+    radial-gradient(700px 360px at 8% -6%, rgba(255, 255, 255, 0.07), transparent 60%),
+    radial-gradient(700px 360px at 92% -6%, rgba(255, 255, 255, 0.07), transparent 60%),
+    radial-gradient(800px 600px at 100% 110%, rgba(2, 132, 199, 0.1), transparent 60%),
+    linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(180deg, var(--fundo-2), var(--fundo) 55%);
+}
+/* a foto do estádio do próprio site, bem apagada, sumindo para a base */
+.ambiente::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 70vh;
+  background: url('./assets/estadio-dados.webp') center 30% / cover no-repeat;
+  opacity: 0.14;
+  -webkit-mask: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 100%);
+  mask: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.6) 45%, transparent 100%);
+}
+
+/* ---------- vidro fosco em cartões e painéis ---------- */
+.caixa,
+.painel,
+.cc-painel,
+.kpi,
+.na-lado {
+  background-color: var(--vidro);
+  border-color: var(--vidro-borda);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.caixa.ok {
+  background-color: rgba(16, 185, 129, 0.1);
+}
+.caixa.alerta {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+/* celular: menos desfoque, menos custo de desenho */
+@media (max-width: 860px) {
+  .caixa,
+  .painel,
+  .cc-painel,
+  .kpi,
+  .na-lado {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* cartões interativos: sobem 2 px, borda ciano e sombra luminosa */
+.cc-painel,
+.kpi,
+.cartao-odd,
+.entrada-item,
+button.cl-linha,
+.rx-duelo,
+.rx-radar,
+.rx-gols,
+.rx-placares {
+  transition:
+    transform 0.25s var(--mola),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.cc-painel:hover,
+.kpi:hover,
+.cartao-odd:hover,
+.entrada-item:hover,
+.rx-duelo:hover,
+.rx-radar:hover,
+.rx-gols:hover,
+.rx-placares:hover {
+  transform: translateY(-2px);
+  border-color: var(--vidro-borda-viva);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.45),
+    0 0 22px rgba(56, 189, 248, 0.18);
+}
+button.cl-linha:hover {
+  transform: translateY(-2px);
+  background: rgba(56, 189, 248, 0.06);
+  box-shadow: 0 0 0 1px var(--vidro-borda-viva);
+}
+.nav-principal button {
+  transition:
+    color 0.2s ease,
+    text-shadow 0.2s ease,
+    transform 0.2s var(--mola);
+}
+.nav-principal button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.55);
+}
+
+/* ---------- 2. banner da partida: auras por time, núcleo no VS, brilho passando ---------- */
+.mc-luz.casa {
+  background:
+    radial-gradient(ellipse 30% 80% at 12% 50%, rgba(255, 255, 255, 0.28), transparent 70%),
+    radial-gradient(ellipse 48% 110% at 8% 50%, var(--casa), transparent 72%);
+}
+.mc-luz.fora {
+  background:
+    radial-gradient(ellipse 30% 80% at 88% 50%, rgba(226, 232, 240, 0.3), transparent 70%),
+    radial-gradient(ellipse 48% 110% at 92% 50%, var(--fora), transparent 72%);
+}
+.mc-escudo {
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--cor-time, #38bdf8) 55%, transparent));
+}
+.mc-vs::before {
+  content: '';
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.55) 0%,
+    rgba(56, 189, 248, 0.18) 38%,
+    transparent 68%
+  );
+  animation: nucleo-vs 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes nucleo-vs {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.match-center::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 58%
+  );
+  background-size: 260% 100%;
+  animation: brilho-banner 8s ease-in-out infinite;
+}
+@keyframes brilho-banner {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+/* ---------- tela "Nova análise": HUD tático, título aceso, etapas em telemetria ---------- */
+.nova-analise {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.nova-analise::before {
+  background:
+    radial-gradient(ellipse 45% 55% at 50% 45%, rgba(6, 11, 20, 0.45), transparent 70%),
+    linear-gradient(180deg, rgba(2, 132, 199, 0.22), transparent 40%, rgba(6, 11, 20, 0.55)),
+    /* linhas do campo / radar */
+    radial-gradient(
+        circle at 50% 118%,
+        transparent 0 118px,
+        rgba(56, 189, 248, 0.16) 119px 120px,
+        transparent 121px
+      ),
+    radial-gradient(
+      circle at 50% 118%,
+      transparent 0 210px,
+      rgba(56, 189, 248, 0.1) 211px 212px,
+      transparent 213px
+    ),
+    linear-gradient(
+      90deg,
+      transparent calc(50% - 0.5px),
+      rgba(56, 189, 248, 0.14) 50%,
+      transparent calc(50% + 0.5px)
+    );
+}
+.na-particulas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(2px 2px at 12% 72%, rgba(186, 230, 253, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 28% 30%, rgba(186, 230, 253, 0.7), transparent),
+    radial-gradient(2px 2px at 44% 84%, rgba(186, 230, 253, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 63% 22%, rgba(186, 230, 253, 0.7), transparent),
+    radial-gradient(2px 2px at 78% 66%, rgba(186, 230, 253, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 90% 36%, rgba(186, 230, 253, 0.7), transparent);
+  animation: particulas 9s ease-in-out infinite alternate;
+}
+@keyframes particulas {
+  from {
+    transform: translateY(6px);
+    opacity: 0.55;
+  }
+  to {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+.na-centro h2 em {
+  color: var(--ciano-vivo);
+  text-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+}
+.na-direita li {
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.3s ease;
+}
+.na-direita li:first-child {
+  color: var(--ciano-vivo);
+  background: rgba(56, 189, 248, 0.12);
+  box-shadow: inset 2px 0 0 var(--ciano-vivo);
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+.na-direita li:first-child::before {
+  opacity: 1;
+}
+
+/* ---------- dropzone "Colar print": linha de scan, borda acesa ao arrastar ---------- */
+.upload-colar {
+  position: relative;
+  overflow: hidden;
+  background: rgba(56, 189, 248, 0.04);
+  border: 1.5px dashed rgba(56, 189, 248, 0.35);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+.upload-colar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 30%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.16), transparent);
+  animation: scan 3.6s ease-in-out infinite;
+}
+@keyframes scan {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+.upload-colar:hover,
+.upload-colar:focus-visible,
+.upload-linha.arrastando .upload-colar {
+  border-color: var(--ciano-vivo);
+  border-style: solid;
+  background: rgba(56, 189, 248, 0.07);
+  box-shadow: inset 0 0 25px rgba(56, 189, 248, 0.15);
+}
+
+/* ---------- checklist: "Pronto" acende em esmeralda com pulso ---------- */
+.cl-estado {
+  transition:
+    color 0.35s ease,
+    border-color 0.35s ease,
+    background 0.35s ease,
+    box-shadow 0.35s ease;
+}
+.cl-ok {
+  color: var(--esmeralda);
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.13);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.28);
+  animation: confirma 0.7s ease-out;
+}
+@keyframes confirma {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.28);
+  }
+}
+
+/* ---------- 3. barras: largura animada ao abrir e ao atualizar, gradiente luminoso ---------- */
+.rx-barra > span,
+.dist-barra,
+.prob-barra,
+.cc-barra > *,
+.cc-1x2-barra > *,
+.barra-cheia,
+.medidor-barra {
+  transition: width 0.8s var(--mola);
+}
+.dist-barra,
+.prob-barra,
+.cc-1x2-barra > *,
+.barra-cheia {
+  transform-origin: left;
+  animation: cresce 0.9s var(--mola) both;
+}
+.prob-barra.prob-mercado,
+.rx-placares .prob-barra {
+  background: linear-gradient(90deg, var(--ciano-fundo), var(--ciano-vivo));
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+}
+.prob-barra.prob-true {
+  background: linear-gradient(90deg, #6d28d9, #a78bfa);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.45);
+}
+
+/* radar "Perfil ofensivo": forma pulsando */
+.radar-forma {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulso-radar 3.4s ease-in-out infinite;
+}
+.radar-fora {
+  animation-delay: -1.7s;
+}
+@keyframes pulso-radar {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  50% {
+    transform: scale(1.035);
+    filter: drop-shadow(0 0 9px currentColor);
+  }
+}
+
+/* medidor "Situação dos dados": o arco se preenche ao abrir */
+.cc-medidor-valor {
+  animation: enche-arco 1.1s var(--mola) both;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+}
+@keyframes enche-arco {
+  from {
+    stroke-dashoffset: var(--f, 0);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* mapa de placares: célula térmica reage ao passar o mouse */
+.cc-placares-linha > span {
+  transition:
+    transform 0.2s var(--mola),
+    box-shadow 0.2s ease,
+    outline-color 0.2s ease;
+  outline: 1px solid transparent;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.cc-placares-linha > span:hover {
+  position: relative;
+  z-index: 1;
+  transform: scale(1.12);
+  outline-color: var(--ciano-vivo);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.55);
+}
+
+/* ---------- melhores entradas: verde/ciano e elevação ---------- */
+.entrada-item.forte {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: inset 3px 0 0 var(--esmeralda);
+}
+.entrada-chance {
+  text-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+}
+
+/* ---------- 4. KPIs como pílulas de telemetria ---------- */
+.kpi {
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(56, 189, 248, 0.06),
+    0 10px 26px rgba(0, 0, 0, 0.4);
+}
+.kpi-valor {
+  text-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+}
+.kpi-ok {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.2);
+}
+.kpi-ok .kpi-valor {
+  text-shadow: 0 0 14px rgba(16, 185, 129, 0.55);
+}
+
+/* selos de status: esmeralda = passou; âmbar/rubi = parar */
+.chip-bet,
+.chip-ok,
+.cc-ev.passou,
+.ponto-ok {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+}
+.chip-watch {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+}
+
+/* decisão final: escudo tático com radar varrendo atrás do selo */
+.decisao-selo {
+  position: relative;
+  isolation: isolate;
+}
+.decisao-selo::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0 300deg,
+      color-mix(in srgb, var(--cor, #38bdf8) 45%, transparent) 360deg
+    ),
+    repeating-radial-gradient(circle, transparent 0 13px, rgba(56, 189, 248, 0.12) 14px 15px);
+  animation: varre-radar 4s linear infinite;
+}
+@keyframes varre-radar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.decisao-centro.nobet {
+  --cor: var(--rubi);
+  border-color: rgba(244, 63, 94, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(244, 63, 94, 0.12),
+    0 0 34px rgba(244, 63, 94, 0.14);
+}
+.decisao-centro.watch,
+.decisao-centro.investigar {
+  --cor: var(--ambar-vivo);
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 34px rgba(245, 158, 11, 0.12);
+}
+.decisao-centro.bet {
+  --cor: var(--esmeralda);
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 34px rgba(16, 185, 129, 0.16);
+}
+
+/* auditoria: energia correndo entre as etapas */
+.etapa::before {
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.25),
+    var(--ciano-vivo) 30%,
+    rgba(56, 189, 248, 0.25) 60%,
+    var(--ciano-vivo) 90%
+  );
+  background-size: 200% 100%;
+  animation: energia 2.2s linear infinite;
+}
+@keyframes energia {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+/* grafo da decisão: fluxo luminoso nas arestas ativas */
+.gd-aresta.ativa,
+.gd-aresta.escolhida {
+  stroke-dasharray: 6 6;
+  animation: fluxo 1.2s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
+}
+@keyframes fluxo {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* ---------- botão principal: gradiente elétrico com brilho passando no hover ---------- */
+button.primario {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(100deg, var(--ciano-vivo), var(--ciano-fundo) 55%, #2563eb);
+  border-color: rgba(125, 211, 252, 0.6);
+  color: #03111f;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+}
+button.primario::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -60%;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+}
+button.primario:hover:not(:disabled)::after {
+  opacity: 1;
+  animation: shimmer 0.9s ease;
+}
+@keyframes shimmer {
+  from {
+    left: -60%;
+  }
+  to {
+    left: 120%;
+  }
+}
+button.primario:hover:not(:disabled) {
+  box-shadow: 0 0 28px rgba(56, 189, 248, 0.55);
+}

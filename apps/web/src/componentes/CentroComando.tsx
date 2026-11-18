@@ -151,7 +151,8 @@ export function Arco({
             d={curva(R)}
             pathLength={100}
             strokeDasharray={`${fracao * 100} 100`}
-            style={{ stroke: `url(#arco-${id})` }}
+            // --f: o arco começa vazio e se preenche até a fração (tema-noturno.css)
+            style={{ stroke: `url(#arco-${id})`, ['--f' as string]: fracao * 100 }}
           />
           <circle className="cc-arco-ponta" cx={px} cy={py} r={4} />
         </>
