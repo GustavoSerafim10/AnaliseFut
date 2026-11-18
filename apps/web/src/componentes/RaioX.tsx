@@ -64,7 +64,7 @@ function Radar({
       className="radar"
       viewBox="-36 0 332 260"
       role="img"
-      aria-label={`Radar ofensivo: ${nomes.casa} em amarelo, ${nomes.fora} em ciano`}
+      aria-label={`Radar ofensivo: ${nomes.casa} em ciano, ${nomes.fora} em violeta`}
     >
       {[0.25, 0.5, 0.75, 1].map((f) => (
         <polygon

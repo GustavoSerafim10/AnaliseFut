@@ -547,3 +547,27 @@ button.primario:hover:not(:disabled)::after {
 button.primario:hover:not(:disabled) {
   box-shadow: 0 0 28px rgba(56, 189, 248, 0.55);
 }
+
+/* ---------- Raio-X: mandante ciano × visitante violeta ----------
+   antes eram --realce (#00d4ff) e --ciano (#22d3ee), quase a mesma cor: não dava para saber
+   qual barra, coluna ou forma do radar era de qual time */
+.legenda-time.casa,
+.rx-duelo .casa,
+.rx-par .casa {
+  --cor-time: var(--ciano-vivo);
+}
+.legenda-time.fora,
+.rx-duelo .fora,
+.rx-par .fora {
+  --cor-time: #a78bfa;
+}
+.radar-casa {
+  color: var(--ciano-vivo);
+  fill: rgba(56, 189, 248, 0.2);
+  stroke: var(--ciano-vivo);
+}
+.radar-fora {
+  color: #a78bfa;
+  fill: rgba(167, 139, 250, 0.2);
+  stroke: #a78bfa;
+}
