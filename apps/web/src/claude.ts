@@ -29,8 +29,15 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
     const v = d.tabela[c.campo];
     if (!v) continue;
     const f = (x?: number) => (x === undefined ? '?' : String(Number(x.toFixed(2))));
+    // divergência: os dois valores e o escolhido, para a leitura crítica não depender de um só
+    const divergencia = (['casa', 'fora'] as const)
+      .filter((t) => v[t].divergente)
+      .map(
+        (t) =>
+          `${nomes[t]}: SofaScore ${f(v[t].porFonte.sofascore)} × SuperScore ${f(v[t].porFonte.superscore)}, usado ${v[t].fonte}`,
+      );
     l.push(
-      `- ${c.rotulo}: ${nomes.casa} ${f(v.casa.valor)} × ${f(v.fora.valor)} ${nomes.fora}${v.casa.divergente || v.fora.divergente ? ' (fontes divergem)' : ''}`,
+      `- ${c.rotulo}: ${nomes.casa} ${f(v.casa.valor)} × ${f(v.fora.valor)} ${nomes.fora}${divergencia.length ? ` (fontes divergem — ${divergencia.join('; ')})` : ''}`,
     );
   }
   if (d.desfalques.length) {

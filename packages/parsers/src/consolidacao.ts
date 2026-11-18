@@ -46,12 +46,15 @@ export function consolidar(
     for (const time of ['casa', 'fora'] as const) {
       const porFonte: ValorConsolidado['porFonte'] = {};
       const avisos: string[] = [];
+      /** fonte cujo valor deste time passou por correção de OCR (aviso marcado com o time) */
+      const corrigida = new Set<FonteStats>();
       for (const f of ['sofascore', 'superscore'] as const) {
         const v = leituras[f]?.campos[def.campo];
         const n = v?.[time];
         if (n !== undefined) {
           porFonte[f] = n;
           avisos.push(...avisosDoTime(v?.avisos ?? [], time).map((a) => `${f}: ${a}`));
+          if ((v?.avisos ?? []).some((a) => a.startsWith(`[${time}] `))) corrigida.add(f);
         }
       }
       const manual = correcoes[`${def.campo}.${time}`];
@@ -64,9 +67,18 @@ export function consolidar(
         const base = Math.max(Math.abs(a), Math.abs(b));
         divergente = base > 0 && Math.abs(a - b) / base > LIMITE_DIVERGENCIA_FONTES;
         if (divergente) {
-          fonte = PREFERENCIA[def.campo] ?? 'sofascore';
+          // só uma das duas teve o valor corrigido pelo OCR: a outra, lida limpa, é a confiável
+          // (no Remo, "2080(811%)" do SofaScore virou 208 e ganhava do 298 certo do SuperScore)
+          const limpa =
+            corrigida.size === 1
+              ? (['sofascore', 'superscore'] as const).find((f) => !corrigida.has(f))
+              : undefined;
+          fonte = limpa ?? PREFERENCIA[def.campo] ?? 'sofascore';
           valor = porFonte[fonte];
-          avisos.push(`fontes divergem > 15% (${a} × ${b}): usando ${fonte}, conferir`);
+          const motivo = limpa
+            ? ` (o valor do ${limpa === 'sofascore' ? 'superscore' : 'sofascore'} teve correção de OCR)`
+            : '';
+          avisos.push(`fontes divergem > 15% (${a} × ${b}): usando ${fonte}${motivo}, conferir`);
         } else {
           valor = (a + b) / 2;
           fonte = 'média';
