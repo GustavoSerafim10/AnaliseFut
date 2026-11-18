@@ -163,6 +163,8 @@ export interface DiarioImportacao {
   erro?: string;
   /** desfazer: revisões removidas */
   removidas?: number;
+  /** tentativa interrompida que uma reimportação completa do mesmo arquivo terminou */
+  completadaPor?: string;
 }
 
 export interface ResultadoImportacao {
@@ -177,6 +179,35 @@ const novoLote = () => `imp-${Date.now().toString(36)}-${Math.random().toString(
 function gravarDiario(d: DiarioImportacao): Promise<void> {
   return transacao<void>([DIARIO], 'readwrite', (tx) => {
     tx.objectStore(DIARIO).put(d);
+  });
+}
+
+/**
+ * Marca a importação como concluída e, na mesma transação, dá por completadas as tentativas
+ * interrompidas do MESMO arquivo (mesmo nome e mesma contagem): esta passou por todas as
+ * revisões dele, então tudo o que elas gravaram já faz parte do resultado. Sem isso o aviso
+ * continuaria, e "desfazer" a tentativa velha apagaria revisões que agora valem. Nada é apagado.
+ */
+function concluirComTentativas(d: DiarioImportacao): Promise<void> {
+  return transacao<void>([DIARIO], 'readwrite', (tx) => {
+    const loja = tx.objectStore(DIARIO);
+    loja.put(d);
+    const pedido = loja.getAll();
+    pedido.onsuccess = () => {
+      for (const v of pedido.result as DiarioImportacao[])
+        if (
+          v.id !== d.id &&
+          (v.estado === 'em-andamento' || v.estado === 'falhou') &&
+          v.arquivo === d.arquivo &&
+          v.esperadas === d.esperadas
+        )
+          loja.put({
+            ...v,
+            estado: 'concluida',
+            completadaPor: d.id,
+            atualizadaEm: d.atualizadaEm,
+          });
+    };
   });
 }
 
@@ -256,7 +287,7 @@ export async function importarEvidenciasEmLotes(
         `processadas ${diario.processadas} de ${diario.esperadas} revisões esperadas`,
       );
     diario = { ...diario, estado: 'concluida', atualizadaEm: new Date().toISOString() };
-    await gravarDiario(diario);
+    await concluirComTentativas(diario);
     aoProgredir?.(diario);
     return {
       lote: diario.id,
