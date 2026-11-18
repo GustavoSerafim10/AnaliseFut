@@ -99,15 +99,14 @@ describe('StakeAutorizada: saída real de autorizarStake', () => {
     }
   });
 
-  it('DIVERGÊNCIA: recusa por pedido inválido ecoa o valor inválido (teto negativo, fração negativa)', () => {
-    // autorizarStake devolve zero(...) com o teto/fração INVÁLIDOS do pedido; o contrato do Ledger
-    // exige ≥ 0. Origem: kelly.ts (`zero()` repete tetoEf/fracao sem limitar a zero).
+  it('recusa por pedido inválido (teto ou fração negativos) já não repete o valor inválido', () => {
+    // corrigido em kelly.ts (`zero()`): antes ecoava teto -1 e fração negativa, que o Ledger recusava.
     const teto = autorizarStake({ p: 0.5, odd: 2, fracaoKelly: 0.25, dq: 'A', teto: -1 });
-    expect(teto).toMatchObject({ autorizada: false, teto: -1 });
-    expect(valida('aposta_registrada', corpoAposta({ stake: teto }))).toMatch(/teto/);
+    expect(teto).toMatchObject({ autorizada: false, teto: 0, motivo: 'teto inválido (-1)' });
+    expect(valida('aposta_registrada', corpoAposta({ stake: teto }))).toBeNull();
     const fracao = autorizarStake({ p: 0.5, odd: 2, fracaoKelly: -0.25, dq: 'A' });
-    expect(fracao.fracaoKelly).toBeLessThan(0);
-    expect(valida('aposta_registrada', corpoAposta({ stake: fracao }))).toMatch(/fracaoKelly/);
+    expect(fracao.fracaoKelly).toBe(0);
+    expect(valida('aposta_registrada', corpoAposta({ stake: fracao }))).toBeNull();
   });
 
   it('pedido com p/odd não finitos vira zero com campos finitos: passa', () => {

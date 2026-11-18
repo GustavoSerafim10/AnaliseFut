@@ -116,10 +116,12 @@ export function autorizarStake(p: PedidoStake): StakeAutorizada {
     autorizada: false,
     motivo,
     kellyCheio: k,
-    fracaoKelly: Number.isFinite(fracao) ? fracao : 0,
+    // uma recusa nunca repete valor inválido do pedido: fração e teto negativos ou não finitos viram 0
+    // (`kellyCheio` não muda: ele pode ser negativo quando o EV é negativo, e isso está correto)
+    fracaoKelly: Number.isFinite(fracao) ? Math.max(0, fracao) : 0,
     fracaoBanca: 0,
     limites: [],
-    teto: tetoEf,
+    teto: Number.isFinite(tetoEf) ? Math.max(0, tetoEf) : 0,
     valor: p.banca !== undefined ? 0 : undefined,
   });
   // entradas inválidas nunca viram stake positiva, NaN ou valor inconsistente: viram zero com motivo
