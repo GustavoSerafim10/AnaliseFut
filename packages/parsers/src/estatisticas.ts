@@ -1012,9 +1012,18 @@ const mostrar = (x: number) => String(Number(x.toFixed(2)));
 const ehDoTime = (a: string, t: Time) => a.startsWith(`[${t}] `);
 
 /**
+ * O valor deste time passou por um REPARO de OCR: o número mudou além da rotina ("1" do início
+ * que sumiu, valor reposto pela conta, prints que divergiam). Não contam a rotina "ponto decimal
+ * perdido" (no SofaScore quase todo valor vem assim, e a correção é certa) nem "confirmado".
+ */
+export function teveReparo(avisos: string[], t: Time): boolean {
+  return avisos.some((a) => ehDoTime(a, t) && !/ponto decimal perdido|confirmado/.test(a));
+}
+
+/**
  * Valor de um time quando vários prints do mesmo site trazem o campo. Iguais ou um só: esse.
- * Diferentes: o que mais prints trazem; empatado, o que veio sem correção de OCR (aviso do
- * time); ainda empatado, o do primeiro print. Sempre com aviso: nada some em silêncio.
+ * Diferentes: o que mais prints trazem; empatado, o que veio sem reparo de OCR (teveReparo);
+ * ainda empatado, o do primeiro print. Sempre com aviso: nada some em silêncio.
  */
 function escolherEntrePrints(
   valores: ValorLido[],
@@ -1025,7 +1034,7 @@ function escolherEntrePrints(
   const grupos = new Map<number, ValorLido[]>();
   for (const x of com) grupos.set(x[t]!, [...(grupos.get(x[t]!) ?? []), x]);
   if (grupos.size === 1) return { valor: com[0][t], origem: com };
-  const limpo = (g: ValorLido[]) => g.some((x) => !x.avisos.some((a) => ehDoTime(a, t)));
+  const limpo = (g: ValorLido[]) => g.some((x) => !teveReparo(x.avisos, t));
   let melhor: [number, ValorLido[]] | undefined;
   for (const g of grupos) {
     if (!melhor) melhor = g;

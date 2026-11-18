@@ -31,18 +31,31 @@ const v = (casa?: number, fora?: number, avisos: string[] = []): ValorLido => ({
   avisos,
 });
 
+/** reparo de verdade: o número mudou além da rotina (o "1" do início que sumiu) */
+const REPARO = '[casa] 3.8 fora da faixa: lido como 13.8 (o "1" do início sumiu no OCR), conferir';
+/** rotina do SofaScore: quase todo valor perde o ponto no OCR e a correção é certa */
+const ROTINA = '[casa] ponto decimal perdido no OCR: 39 lido como 3.9';
+
 describe('etapa 1: prints da mesma fonte com valores diferentes', () => {
-  it('o print limpo vence o que teve correção de OCR, mesmo vindo depois', () => {
+  it('o print sem reparo vence o reparado, mesmo vindo depois', () => {
     const j = juntarLeiturasStats([
-      leitura({ chutesNoAlvo: v(38, 5.3, ['[casa] ponto decimal perdido no OCR: 38 lido como 3.8']) }),
+      leitura({ chutesNoAlvo: v(13.8, 5.3, [REPARO]) }),
       leitura({ chutesNoAlvo: v(3.9, 5.3) }),
     ])!;
     expect(j.campos.chutesNoAlvo?.casa).toBe(3.9);
     expect(j.campos.chutesNoAlvo?.fora).toBe(5.3);
     const avisos = j.campos.chutesNoAlvo!.avisos.join(' | ');
-    expect(avisos).toMatch(/\[casa\] prints da mesma fonte divergem \(38 × 3\.9\): usando 3\.9/);
+    expect(avisos).toContain('[casa] prints da mesma fonte divergem (13.8 × 3.9): usando 3.9');
     // o aviso da leitura descartada não fica pendurado no valor escolhido
-    expect(avisos).not.toMatch(/ponto decimal perdido/);
+    expect(avisos).not.toMatch(/sumiu no OCR/);
+  });
+
+  it('ponto decimal perdido (rotina) não desempata: fica o primeiro', () => {
+    const j = juntarLeiturasStats([
+      leitura({ chutesNoAlvo: v(3.9, 5.3, [ROTINA]) }),
+      leitura({ chutesNoAlvo: v(4.8, 5.3) }),
+    ])!;
+    expect(j.campos.chutesNoAlvo?.casa).toBe(3.9);
   });
 
   it('maioria dos prints vence', () => {
@@ -52,7 +65,7 @@ describe('etapa 1: prints da mesma fonte com valores diferentes', () => {
       leitura({ escanteios: v(2.5, 4.6) }),
     ])!;
     expect(j.campos.escanteios?.casa).toBe(2.5);
-    expect(j.campos.escanteios!.avisos.join(' ')).toMatch(/divergem \(5\.2 × 2\.5\): usando 2\.5/);
+    expect(j.campos.escanteios!.avisos.join(' ')).toContain('divergem (5.2 × 2.5): usando 2.5');
   });
 
   it('empate sem critério fica com o primeiro, mas avisa', () => {
@@ -61,7 +74,7 @@ describe('etapa 1: prints da mesma fonte com valores diferentes', () => {
       leitura({ escanteios: v(6.1, 4.6) }),
     ])!;
     expect(j.campos.escanteios?.casa).toBe(5.2);
-    expect(j.campos.escanteios!.avisos.join(' ')).toMatch(/divergem \(5\.2 × 6\.1\): usando 5\.2/);
+    expect(j.campos.escanteios!.avisos.join(' ')).toContain('divergem (5.2 × 6.1): usando 5.2');
   });
 
   it('valores iguais ou complementares não geram aviso', () => {
@@ -75,22 +88,33 @@ describe('etapa 1: prints da mesma fonte com valores diferentes', () => {
 });
 
 describe('etapa 2: SofaScore × SuperScore divergem mais de 15%', () => {
-  it('vence a fonte cujo valor veio sem correção de OCR', () => {
+  it('vence a fonte cujo valor veio sem reparo de OCR', () => {
     const t = consolidar({
-      sofascore: leitura({
-        chutesNoAlvo: v(38, 5.3, ['[casa] ponto decimal perdido no OCR: 38 lido como 3.8']),
-      }),
+      sofascore: leitura({ chutesNoAlvo: v(13.8, 5.3, [REPARO]) }),
       superscore: leitura({ chutesNoAlvo: v(3.9, 5.3) }, 'superscore'),
     });
-    expect(t.chutesNoAlvo?.casa).toMatchObject({ valor: 3.9, fonte: 'superscore', divergente: true });
-    expect(t.chutesNoAlvo!.casa.avisos.join(' ')).toMatch(
-      /fontes divergem > 15% \(38 × 3\.9\): usando superscore \(o valor do sofascore teve correção de OCR\)/,
+    expect(t.chutesNoAlvo?.casa).toMatchObject({
+      valor: 3.9,
+      fonte: 'superscore',
+      divergente: true,
+    });
+    expect(t.chutesNoAlvo!.casa.avisos.join(' ')).toContain(
+      'fontes divergem > 15% (13.8 × 3.9): usando superscore (o valor do sofascore teve reparo de OCR)',
     );
     // o outro time, sem divergência, segue pela média
     expect(t.chutesNoAlvo?.fora).toMatchObject({ valor: 5.3, fonte: 'média' });
   });
 
-  it('as duas limpas (ou as duas corrigidas): preferência de sempre', () => {
+  it('ponto decimal perdido (rotina do SofaScore) não tira a preferência dele', () => {
+    // caso do Londrina × Náutico: TODO valor do SofaScore veio com esse aviso
+    const t = consolidar({
+      sofascore: leitura({ chutesNoAlvo: v(3.9, 4.5, [ROTINA]) }),
+      superscore: leitura({ chutesNoAlvo: v(5.1, 4.5) }, 'superscore'),
+    });
+    expect(t.chutesNoAlvo?.casa).toMatchObject({ valor: 3.9, fonte: 'sofascore' });
+  });
+
+  it('as duas limpas (ou as duas reparadas): preferência de sempre', () => {
     const t = consolidar({
       sofascore: leitura({ escanteios: v(5.2, 4.6), xg: v(1.0, 1.3) }),
       superscore: leitura({ escanteios: v(7.0, 4.6), xg: v(1.6, 1.3) }, 'superscore'),
@@ -99,7 +123,9 @@ describe('etapa 2: SofaScore × SuperScore divergem mais de 15%', () => {
     expect(t.xg?.casa).toMatchObject({ valor: 1.6, fonte: 'superscore' });
   });
 
-  it('caso real Remo × Botafogo: "2080(811%)" do SofaScore perde para o 298 do SuperScore', () => {
+  it('caso real Remo × Botafogo: o 208 errado do SofaScore só tinha aviso de rotina, segue com aviso de divergência', () => {
+    // limitação declarada: "2080(811%)" (era 298,0) não é detectável como erro; fica o
+    // aviso "fontes divergem" na tabela e os dois valores no texto para o Claude
     const F = (n: string) =>
       readFileSync(new URL(`./fixtures-reais/${n}`, import.meta.url), 'utf8');
     const nomes = { casa: 'Remo', fora: 'Botafogo' };
@@ -113,7 +139,11 @@ describe('etapa 2: SofaScore × SuperScore divergem mais de 15%', () => {
         'superscore-remo-3.txt',
       ]),
     });
-    expect(t.passesCertos?.casa).toMatchObject({ valor: 298, fonte: 'superscore' });
+    expect(t.passesCertos?.casa).toMatchObject({
+      valor: 208,
+      fonte: 'sofascore',
+      divergente: true,
+    });
   });
 });
 

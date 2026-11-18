@@ -11,6 +11,7 @@ import {
   type CampoStat,
   type FonteStats,
   type LeituraStats,
+  teveReparo,
 } from './estatisticas';
 
 export const LIMITE_DIVERGENCIA_FONTES = 0.15;
@@ -46,7 +47,7 @@ export function consolidar(
     for (const time of ['casa', 'fora'] as const) {
       const porFonte: ValorConsolidado['porFonte'] = {};
       const avisos: string[] = [];
-      /** fonte cujo valor deste time passou por correção de OCR (aviso marcado com o time) */
+      /** fonte cujo valor deste time passou por reparo de OCR (teveReparo; a rotina não conta) */
       const corrigida = new Set<FonteStats>();
       for (const f of ['sofascore', 'superscore'] as const) {
         const v = leituras[f]?.campos[def.campo];
@@ -54,7 +55,7 @@ export function consolidar(
         if (n !== undefined) {
           porFonte[f] = n;
           avisos.push(...avisosDoTime(v?.avisos ?? [], time).map((a) => `${f}: ${a}`));
-          if ((v?.avisos ?? []).some((a) => a.startsWith(`[${time}] `))) corrigida.add(f);
+          if (teveReparo(v?.avisos ?? [], time)) corrigida.add(f);
         }
       }
       const manual = correcoes[`${def.campo}.${time}`];
@@ -67,8 +68,7 @@ export function consolidar(
         const base = Math.max(Math.abs(a), Math.abs(b));
         divergente = base > 0 && Math.abs(a - b) / base > LIMITE_DIVERGENCIA_FONTES;
         if (divergente) {
-          // só uma das duas teve o valor corrigido pelo OCR: a outra, lida limpa, é a confiável
-          // (no Remo, "2080(811%)" do SofaScore virou 208 e ganhava do 298 certo do SuperScore)
+          // só uma das duas teve o valor reparado pelo OCR: a outra, lida limpa, é a confiável
           const limpa =
             corrigida.size === 1
               ? (['sofascore', 'superscore'] as const).find((f) => !corrigida.has(f))
@@ -76,7 +76,7 @@ export function consolidar(
           fonte = limpa ?? PREFERENCIA[def.campo] ?? 'sofascore';
           valor = porFonte[fonte];
           const motivo = limpa
-            ? ` (o valor do ${limpa === 'sofascore' ? 'superscore' : 'sofascore'} teve correção de OCR)`
+            ? ` (o valor do ${limpa === 'sofascore' ? 'superscore' : 'sofascore'} teve reparo de OCR)`
             : '';
           avisos.push(`fontes divergem > 15% (${a} × ${b}): usando ${fonte}${motivo}, conferir`);
         } else {
