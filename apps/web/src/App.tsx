@@ -18,6 +18,7 @@ import {
   gravarGaleria,
   type Figurinhas,
 } from './figurinhas';
+import { registrarEvidencia } from './armazemEvidencias';
 import { derivar, temTextoFlashscore } from './dados';
 import { abaDoExemplo, ehExemplo, rascunhoExemplo } from './exemplo';
 import { carregarRascunho, rascunhoNovo, salvarRascunho, type Rascunho } from './estado';
@@ -126,7 +127,23 @@ export function App() {
       }),
     [historico, r.jogo.casa, r.jogo.fora, r.jogo.data],
   );
-  const d = useMemo(() => derivar(r, travas, registradasNoJogo), [r, travas, registradasNoJogo]);
+  // o motor lê a hora atual: os instantes do cálculo vão na evidência para reproduzi-lo depois
+  const calculo = useMemo(() => {
+    const inicio = new Date().toISOString();
+    const resultado = derivar(r, travas, registradasNoJogo);
+    return { d: resultado, calculadoEm: { inicio, fim: new Date().toISOString() } };
+  }, [r, travas, registradasNoJogo]);
+  const d = calculo.d;
+  const [avisoEvidencia, setAvisoEvidencia] = useState<string | null>(null);
+  /** Fase 0: fotografia da análise salva. Roda depois do histórico e nunca o impede. */
+  const evidenciar = (id: string) => {
+    if (demo) return;
+    void registrarEvidencia(id, r, d, {
+      travas,
+      registradasNoJogo,
+      calculadoEm: calculo.calculadoEm,
+    }).then(setAvisoEvidencia);
+  };
   useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {
     setHistoricoState(h);
@@ -153,6 +170,7 @@ export function App() {
         : 'Não consegui gravar o histórico neste aparelho: exporte o backup.',
     );
     setR((x) => ({ ...x, idHistorico: id, naoSalvarSozinho: undefined }));
+    evidenciar(id);
   }
 
   // salva sozinho, com uma folga para não gravar a cada tecla
@@ -164,6 +182,7 @@ export function App() {
       const { lista, id } = salvarNoHistorico(historico, r, d);
       setHistorico(lista);
       setR((x) => ({ ...x, idHistorico: id }));
+      evidenciar(id);
     }, 1500);
     return () => clearTimeout(espera);
   }, [r, d, historico, demo]);
@@ -458,6 +477,7 @@ export function App() {
         )}
         {aba.id === 'promocoes' && <AbaPromocoes {...props} />}
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
+        {avisoEvidencia && <div className="caixa alerta">{avisoEvidencia}</div>}
         {rascunhoCheio && (
           <div className="caixa alerta">
             O navegador não deixou guardar esta análise: se fechar a página, ela se perde. Exporte
