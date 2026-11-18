@@ -112,6 +112,8 @@ export interface MetaEvidencia {
   calculadoEm: { inicio: string; fim: string };
   /** revisão que chegou por importação com número já ocupado por outro conteúdo */
   importacao?: { revisaoOriginal: number; importadoEm: string };
+  /** importação (diário em armazemEvidencias) que gravou esta revisão: permite desfazer só ela */
+  loteImportacao?: string;
 }
 
 export interface Evidencia {
