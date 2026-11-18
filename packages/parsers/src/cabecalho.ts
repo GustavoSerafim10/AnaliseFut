@@ -31,7 +31,10 @@ function corDeFundo(img: ImagemRgba): [number, number, number] {
 
 const DIFERENCA_DO_FUNDO = 45;
 
-function componentes(img: ImagemRgba): (Caixa & { area: number })[] {
+/** `cheia`: área com o que o componente cerca, calculada só quando pedida (ver areaCheia). */
+type Componente = Caixa & { area: number; cheia: () => number };
+
+function componentes(img: ImagemRgba): Componente[] {
   const { largura: w, altura: h } = img;
   const fundo = corDeFundo(img);
   const frente = new Uint8Array(w * h);
@@ -48,13 +51,15 @@ function componentes(img: ImagemRgba): (Caixa & { area: number })[] {
         frente[y * w + x] = 1;
     }
   // junta o que está a 2 px (letra do escudo, estrela colada), sem misturar com o texto ao lado
-  const visitado = new Uint8Array(w * h);
-  const saida: (Caixa & { area: number })[] = [];
+  // rótulo de cada pixel (componente + 1): a área cheia precisa saber de quem é cada pixel
+  const visitado = new Int32Array(w * h);
+  const saida: Componente[] = [];
   const pilha: number[] = [];
   for (let ini = 0; ini < w * h; ini++) {
     if (!frente[ini] || visitado[ini]) continue;
-    const c = { x0: w, y0: h, x1: 0, y1: 0, area: 0 };
-    visitado[ini] = 1;
+    const c = { x0: w, y0: h, x1: 0, y1: 0, area: 0, cheia: () => 0 };
+    const rotulo = saida.length + 1;
+    visitado[ini] = rotulo;
     pilha.push(ini);
     while (pilha.length) {
       const p = pilha.pop()!;
@@ -71,14 +76,53 @@ function componentes(img: ImagemRgba): (Caixa & { area: number })[] {
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
           const q = ny * w + nx;
           if (frente[q] && !visitado[q]) {
-            visitado[q] = 1;
+            visitado[q] = rotulo;
             pilha.push(q);
           }
         }
     }
     saida.push(c);
   }
+  saida.forEach((c, k) => (c.cheia = () => areaCheia(visitado, w, c, k + 1)));
   return saida;
+}
+
+/**
+ * Área do componente com o que ele cerca: escudo só de contorno claro com miolo escuro da cor do
+ * fundo (Botafogo) tem pouco pixel aceso, mas a forma fechada é cheia como a de qualquer escudo.
+ * Conta como fora o que, dentro da caixa, chega à borda dela sem passar pelo componente.
+ */
+function areaCheia(rot: Int32Array, w: number, c: Caixa, id: number): number {
+  const lw = c.x1 - c.x0 + 1;
+  const lh = c.y1 - c.y0 + 1;
+  const fora = new Uint8Array(lw * lh);
+  const pilha: number[] = [];
+  const empurra = (x: number, y: number) => {
+    const k = y * lw + x;
+    if (fora[k] || rot[(y + c.y0) * w + x + c.x0] === id) return;
+    fora[k] = 1;
+    pilha.push(k);
+  };
+  for (let x = 0; x < lw; x++) {
+    empurra(x, 0);
+    empurra(x, lh - 1);
+  }
+  for (let y = 0; y < lh; y++) {
+    empurra(0, y);
+    empurra(lw - 1, y);
+  }
+  while (pilha.length) {
+    const k = pilha.pop()!;
+    const x = k % lw;
+    const y = (k - x) / lw;
+    if (x > 0) empurra(x - 1, y);
+    if (x < lw - 1) empurra(x + 1, y);
+    if (y > 0) empurra(x, y - 1);
+    if (y < lh - 1) empurra(x, y + 1);
+  }
+  let n = 0;
+  for (const v of fora) if (!v) n++;
+  return n;
 }
 
 /**
@@ -96,8 +140,8 @@ export function acharEscudos(img: ImagemRgba): { casa: Caixa; fora: Caixa } | nu
       alt(c) <= img.largura * 0.3 &&
       proporcao >= 0.55 &&
       proporcao <= 1.45 &&
-      c.area / (larg(c) * alt(c)) >= 0.3 &&
-      c.y0 < img.altura * 0.55
+      c.y0 < img.altura * 0.55 &&
+      c.cheia() / (larg(c) * alt(c)) >= 0.3
     );
   });
   const pares: { casa: Caixa; fora: Caixa; nota: number; y: number; alt: number }[] = [];

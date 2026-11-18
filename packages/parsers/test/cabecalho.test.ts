@@ -37,6 +37,24 @@ describe('achar os escudos', () => {
     expect(r.casa).toMatchObject(casa);
     expect(r.fora).toMatchObject(fora);
   });
+  it('escudo só com contorno claro e miolo escuro como o fundo (Botafogo) conta', () => {
+    // contorno branco de 2 px; o miolo preto fica igual ao fundo, a estrela solta no meio
+    const contorno = (c: Caixa) => [
+      { c: { ...c, y1: c.y0 + 1 }, cor: [235, 235, 235] },
+      { c: { ...c, y0: c.y1 - 1 }, cor: [235, 235, 235] },
+      { c: { ...c, x1: c.x0 + 1 }, cor: [235, 235, 235] },
+      { c: { ...c, x0: c.x1 - 1 }, cor: [235, 235, 235] },
+    ];
+    const r = acharEscudos(
+      imagem([
+        { c: casa, cor: vermelho },
+        ...contorno(fora),
+        { c: { x0: 492, y0: 46, x1: 508, y1: 62 }, cor: [235, 235, 235] },
+      ]),
+    );
+    expect(r?.casa).toMatchObject(casa);
+    expect(r?.fora).toMatchObject(fora);
+  });
   it('foto maior mais abaixo não ganha do escudo', () => {
     const r = acharEscudos(
       imagem([
