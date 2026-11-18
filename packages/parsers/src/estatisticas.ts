@@ -50,7 +50,21 @@ export type CampoStat =
   | 'tirosDeMeta'
   | 'laterais'
   | 'passesCertos'
-  | 'bolasLongas';
+  | 'bolasLongas'
+  // SuperScore (e duelos também no SofaScore): antes ficavam em "outros", fora da tabela
+  | 'passesCampoDefesa'
+  | 'passesCampoAtaque'
+  | 'passesTercoFinal'
+  | 'bolasLongasCertas'
+  | 'lancamentos'
+  | 'bolaNaTrave'
+  | 'driblesVencidos'
+  | 'possesPerdidas'
+  | 'errosFinalizacao'
+  | 'bloqueios'
+  | 'duelosVencidos'
+  | 'duelosNoChao'
+  | 'duelosAereos';
 
 interface DefCampo {
   campo: CampoStat;
@@ -307,6 +321,27 @@ export const CAMPOS_STATS: DefCampo[] = [
     faixa: [5, 40],
   },
   {
+    campo: 'passesCampoDefesa',
+    rotulo: 'Passes certos no campo de defesa',
+    re: /passes certos no campo de defesa/,
+    formato: 'decimal1',
+    faixa: [10, 700],
+  },
+  {
+    campo: 'passesCampoAtaque',
+    rotulo: 'Passes certos no campo de ataque',
+    re: /passes certos no campo de ataque/,
+    formato: 'decimal1',
+    faixa: [10, 700],
+  },
+  {
+    campo: 'passesTercoFinal',
+    rotulo: 'Passes no terço final',
+    re: /passes no terco final/,
+    formato: 'decimal1',
+    faixa: [5, 300],
+  },
+  {
     campo: 'passesCertos',
     rotulo: 'Passes certos por jogo',
     // "passes certos no campo de defesa/ataque" (SuperScore) é outro dado
@@ -320,6 +355,78 @@ export const CAMPOS_STATS: DefCampo[] = [
     re: /bolas longas/,
     formato: 'decimal1',
     faixa: [3, 80],
+  },
+  // a do SuperScore tem o mesmo nome e é outra métrica (4,6 × 16,3 do SofaScore): campo à parte,
+  // escolhido pela fonte em lerEstatisticas (o padrão nunca casa sozinho)
+  {
+    campo: 'bolasLongasCertas',
+    rotulo: 'Bolas longas certas (SuperScore)',
+    re: /^$a/,
+    formato: 'decimal1',
+    faixa: [0, 40],
+  },
+  {
+    campo: 'lancamentos',
+    rotulo: 'Lançamentos por jogo',
+    re: /lancamentos/,
+    formato: 'decimal1',
+    faixa: [2, 80],
+  },
+  {
+    campo: 'bolaNaTrave',
+    rotulo: 'Bola na trave por jogo',
+    re: /bola na trave/,
+    formato: 'decimal1',
+    faixa: [0, 3],
+  },
+  {
+    campo: 'driblesVencidos',
+    rotulo: 'Dribles vencidos por jogo',
+    re: /dribles/,
+    formato: 'decimal1',
+    faixa: [0, 30],
+  },
+  {
+    campo: 'possesPerdidas',
+    rotulo: 'Posses perdidas por jogo',
+    re: /posses perdidas/,
+    formato: 'decimal1',
+    faixa: [20, 250],
+  },
+  {
+    campo: 'errosFinalizacao',
+    rotulo: 'Erros que levaram à finalização',
+    re: /erros que levaram/,
+    formato: 'decimal1',
+    faixa: [0, 3],
+  },
+  {
+    campo: 'bloqueios',
+    rotulo: 'Bloqueios por jogo',
+    re: /^bloqueios/,
+    formato: 'decimal1',
+    faixa: [0, 15],
+  },
+  {
+    campo: 'duelosNoChao',
+    rotulo: 'Duelos no chão vencidos por jogo',
+    re: /duelos no chao/,
+    formato: 'decimal1',
+    faixa: [5, 100],
+  },
+  {
+    campo: 'duelosVencidos',
+    rotulo: 'Duelos vencidos por jogo',
+    re: /^duelos vencidos/,
+    formato: 'decimal1',
+    faixa: [15, 120],
+  },
+  {
+    campo: 'duelosAereos',
+    rotulo: 'Bolas aéreas vencidas por jogo',
+    re: /bolas aereas/,
+    formato: 'decimal1',
+    faixa: [1, 60],
   },
 ];
 
@@ -346,7 +453,9 @@ const FRASES: [CampoStat | null, string][] = [
   ['golsSofridosPorJogo', 'gols sofridos por jogo'],
   ['interceptacoes', 'interceptacoes por jogo'],
   ['desarmes', 'desarmes por jogo'],
-  [null, 'desarmes por partida'],
+  // o SofaScore escreve "Desarmes por partida 45.7 (50.2%)" na linha dos duelos vencidos: os
+  // números são os mesmos de "Duelos vencidos" do SuperScore (Remo 45,7 × 48,4)
+  ['duelosVencidos', 'desarmes por partida'],
   ['cortes', 'cortes por jogo'],
   ['penaltisConcedidos', 'gols de penalti concedidos'],
   ['defesasGoleiro', 'defesas por jogo'],
@@ -378,18 +487,18 @@ const FRASES_SUPERSCORE: [CampoStat | null, string][] = [
   ['toquesAreaAdversaria', 'toques na area adversaria'],
   ['defesasGoleiro', 'defesas do goleiro'],
   ['golsEvitados', 'gols evitados'],
-  [null, 'passes certos no campo de defesa'],
-  [null, 'passes certos no campo de ataque'],
-  [null, 'bola na trave'],
-  [null, 'dribles vencidos'],
-  [null, 'posses perdidas'],
-  [null, 'passes no terco final'],
-  [null, 'lancamentos'],
-  [null, 'erros que levaram a finalizacao'],
-  [null, 'bloqueios'],
-  [null, 'duelos vencidos'],
-  [null, 'duelos no chao vencidos'],
-  [null, 'bolas aereas vencidas'],
+  ['passesCampoDefesa', 'passes certos no campo de defesa'],
+  ['passesCampoAtaque', 'passes certos no campo de ataque'],
+  ['bolaNaTrave', 'bola na trave'],
+  ['driblesVencidos', 'dribles vencidos'],
+  ['possesPerdidas', 'posses perdidas'],
+  ['passesTercoFinal', 'passes no terco final'],
+  ['lancamentos', 'lancamentos'],
+  ['errosFinalizacao', 'erros que levaram a finalizacao'],
+  ['bloqueios', 'bloqueios'],
+  ['duelosVencidos', 'duelos vencidos'],
+  ['duelosNoChao', 'duelos no chao vencidos'],
+  ['duelosAereos', 'bolas aereas vencidas'],
 ];
 
 /** 0–1: 1 − distância de edição ÷ tamanho do maior. */
@@ -640,8 +749,8 @@ export function lerEstatisticas(texto: string, fonte: FonteStats, jogo: NomesTim
     }
     if (!esq && !dir) continue;
     // mesmo nome, outra métrica: "Bolas longas certas" do SuperScore (4,4) não é a do SofaScore
-    // (16,3 por jogo); fica em "outros" para não virar divergência falsa
-    if (fonte === 'superscore' && def?.campo === 'bolasLongas') def = null;
+    // (16,3 por jogo); campo próprio para não virar divergência falsa
+    if (fonte === 'superscore' && def?.campo === 'bolasLongas') def = DEF_CAMPO.bolasLongasCertas;
     filas.push({ bruto, rotulo: rot.txt, def, esq, dir, avisoPosicao });
   }
 

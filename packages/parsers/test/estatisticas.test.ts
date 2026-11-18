@@ -43,7 +43,10 @@ describe('SofaScore — comparação de equipes (OCR real)', () => {
     expect(c.golsMarcados!.avisos.join()).toContain('ilegível');
   });
   it('guarda as linhas não mapeadas em "outros"', () => {
-    expect(l.outros.length).toBeGreaterThan(0);
+    // o único "outro" deste print era "Desarmes por partida", que hoje é duelos vencidos
+    expect(l.campos.duelosVencidos?.casa).toBe(41.4);
+    const x = lerEstatisticas('Rebatidas de cabeca por jogo 12.5 13.1', 'sofascore', jogo);
+    expect(x.outros).toMatchObject([{ casa: 12.5, fora: 13.1 }]);
   });
 });
 
@@ -303,13 +306,11 @@ describe('SuperScore Remo × Botafogo (OCR real, Média)', () => {
   });
   it('"passes certos no campo de defesa" não some como repetido de "passes certos"', () => {
     expect(c.passesCertos).toMatchObject({ casa: 298, fora: 320.9 });
-    const o = (r: string) => l.outros.find((x) => x.rotulo.includes(r));
-    expect(o('campo de defesa')).toMatchObject({ casa: 139.8, fora: 170.4 });
+    expect(c.passesCampoDefesa).toMatchObject({ casa: 139.8, fora: 170.4 });
   });
-  it('"outros" com a casa decimal do site ("55" = 5,5) e sem lixo', () => {
-    const o = (r: string) => l.outros.find((x) => x.rotulo.includes(r));
-    expect(o('Dribles')).toMatchObject({ casa: 5.5, fora: 8.3 });
-    expect(o('chão')).toMatchObject({ casa: 32.5, fora: 35.5 });
+  it('dados só do SuperScore com a casa decimal do site ("55" = 5,5) e sem lixo', () => {
+    expect(c.driblesVencidos).toMatchObject({ casa: 5.5, fora: 8.3 });
+    expect(c.duelosNoChao).toMatchObject({ casa: 32.5, fora: 35.5 });
     expect(l.outros.some((x) => /OITO/.test(x.rotulo))).toBe(false);
   });
 });
@@ -341,10 +342,7 @@ describe('prints maiores (zoom), parte de baixo das duas páginas', () => {
     const l = lerEstatisticas(fx('superscore-remo-zoom.txt'), 'superscore', j);
     expect(l.campos.interceptacoes).toMatchObject({ casa: 9.7, fora: 7.9 });
     expect(l.campos.golsEvitados).toMatchObject({ casa: 0.1, fora: -0.1 });
-    expect(l.outros.find((o) => o.rotulo.includes('finalização'))).toMatchObject({
-      casa: 0.6,
-      fora: 1.0,
-    });
+    expect(l.campos.errosFinalizacao).toMatchObject({ casa: 0.6, fora: 1.0 });
   });
 });
 

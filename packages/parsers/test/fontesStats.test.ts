@@ -116,3 +116,39 @@ describe('etapa 2: SofaScore × SuperScore divergem mais de 15%', () => {
     expect(t.passesCertos?.casa).toMatchObject({ valor: 298, fonte: 'superscore' });
   });
 });
+
+describe('etapa 3: nenhum dado do print fica de fora da tabela', () => {
+  const F = (n: string) => readFileSync(new URL(`./fixtures-reais/${n}`, import.meta.url), 'utf8');
+  const nomes = { casa: 'Remo', fora: 'Botafogo' };
+
+  it('SuperScore: os 13 dados que caíam em "outros" viram campos', () => {
+    const l = juntarLeiturasStats(
+      ['superscore-remo-1.txt', 'superscore-remo-2.txt', 'superscore-remo-3.txt'].map((a) =>
+        lerEstatisticasConsenso([F(a)], 'superscore', nomes),
+      ),
+    )!;
+    expect(l.outros.map((o) => o.rotulo)).toEqual([]);
+    expect(l.campos.passesCampoDefesa).toMatchObject({ casa: 139.8, fora: 170.4 });
+    expect(l.campos.passesCampoAtaque).toMatchObject({ casa: 158.3, fora: 150.5 });
+    expect(l.campos.passesTercoFinal).toMatchObject({ casa: 71, fora: 70.5 });
+    expect(l.campos.bolasLongasCertas).toMatchObject({ casa: 4.6, fora: 4.8 });
+    expect(l.campos.lancamentos).toMatchObject({ casa: 19.3, fora: 19.3 });
+    expect(l.campos.errosFinalizacao).toMatchObject({ casa: 0.6, fora: 1 });
+    expect(l.campos.bloqueios).toMatchObject({ casa: 3.1, fora: 4 });
+    expect(l.campos.duelosVencidos).toMatchObject({ casa: 45.7, fora: 48.4 });
+    expect(l.campos.duelosNoChao).toMatchObject({ casa: 32.5, fora: 35.5 });
+    expect(l.campos.duelosAereos).toMatchObject({ casa: 13.2, fora: 12.8 });
+    for (const c of ['bolaNaTrave', 'driblesVencidos', 'possesPerdidas'] as const)
+      expect(l.campos[c], c).toBeDefined();
+    // a "Bolas longas certas" do SuperScore é outra métrica: não vira a do SofaScore
+    expect(l.campos.bolasLongas).toBeUndefined();
+  });
+
+  it('SofaScore: "Desarmes por partida 45.7 (50.2%)" é duelos vencidos (os mesmos números do SuperScore)', () => {
+    const l = lerEstatisticasConsenso([F('sofascore-remo-zoom-2.txt')], 'sofascore', nomes);
+    expect(l.campos.duelosVencidos).toMatchObject({ casa: 45.7, fora: 48.4 });
+    expect(l.outros.map((o) => o.rotulo)).not.toContain('Desarmes por partida');
+    // e o "Desarmes por jogo" de verdade continua no lugar
+    expect(l.campos.desarmes).toMatchObject({ casa: 15.1, fora: 15.3 });
+  });
+});
