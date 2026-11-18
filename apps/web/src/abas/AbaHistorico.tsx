@@ -1,8 +1,9 @@
 import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
-import { NOMES_ESTRATEGIA, type Estrategia, type ParPlacar, type TravasBanca } from '@pe/engine';
+import { NOMES_ESTRATEGIA, type Estrategia, type TravasBanca } from '@pe/engine';
 import { useEffect, useState } from 'react';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
+import { lerOdd, lerOddsDosOutrosLados, lerParInteiro } from '../placar';
 import { EscolherAposta } from '../componentes/EscolherAposta';
 import { PainelMultiplas } from '../componentes/MontarMultipla';
 import { UploadPrints } from '../componentes/UploadPrints';
@@ -112,13 +113,7 @@ function LinhaBalanco({ titulo, b, dica }: { titulo: string; b: Balanco; dica?: 
   );
 }
 
-function par(c: string, f: string): ParPlacar | undefined {
-  const a = num(c);
-  const b = num(f);
-  return a === undefined || b === undefined ? undefined : { casa: a, fora: b };
-}
-
-function FormResultado({
+export function FormResultado({
   e,
   lido,
   onSalvar,
@@ -155,13 +150,31 @@ function FormResultado({
         carFora: lido.amarelos,
       }
     : {};
+  // validação do aplicativo (placar.ts): inteiros não negativos nos pares; odds finitas e maiores que 1
+  const placar = lerParInteiro(v.casa, v.fora);
+  const intervalo = lerParInteiro(v.htCasa, v.htFora);
+  const escanteios = lerParInteiro(v.escCasa, v.escFora);
+  const cartoes = lerParInteiro(v.carCasa, v.carFora);
+  const fechamento = lerOdd(v.fechamento);
+  const outros = lerOddsDosOutrosLados(v.outros);
+  const verificacoes: [string, { estado: string; motivo?: string }, (keyof typeof v)[]][] = [
+    ['Gols', placar, ['casa', 'fora']],
+    ['Intervalo', intervalo, ['htCasa', 'htFora']],
+    ['Escanteios', escanteios, ['escCasa', 'escFora']],
+    ['Amarelos', cartoes, ['carCasa', 'carFora']],
+    ['Fechamento', fechamento, ['fechamento']],
+    ['Outros lados', outros, ['outros']],
+  ];
+  const erros = verificacoes.filter(([, l]) => l.estado === 'invalido');
+  const invalidos = new Set<keyof typeof v>(erros.flatMap(([, , campos]) => campos));
+  const temErro = erros.length > 0;
   /** campo que o print devia trazer e veio vazio: borda vermelha para conferir */
   const faltou = (k: keyof typeof v) =>
     k in LIDOS &&
     v[k] === '' &&
     LIDOS[k]?.[k.endsWith('Fora') || k === 'fora' ? 'fora' : 'casa'] === undefined;
   const campo = (k: keyof typeof v, rotulo: string, dica?: string) => (
-    <label className={faltou(k) ? 'celula-duvida' : undefined}>
+    <label className={faltou(k) || invalidos.has(k) ? 'celula-duvida' : undefined}>
       {rotulo}
       <input
         inputMode="decimal"
@@ -171,12 +184,7 @@ function FormResultado({
       />
     </label>
   );
-  const placar = par(v.casa, v.fora);
   const [casa, fora] = e.resumo.jogo.split(' × ');
-  const outros = v.outros
-    .split(/[\s;]+/)
-    .map((x) => num(x))
-    .filter((x): x is number => x !== undefined && x > 1);
   return (
     <div className="grade2">
       {campo('casa', `Gols ${casa}`)}
@@ -192,16 +200,17 @@ function FormResultado({
       <div className="linha-acoes">
         <button
           className="primario"
-          disabled={!placar && num(v.fechamento) === undefined}
+          disabled={temErro || (placar.estado !== 'ok' && fechamento.estado !== 'ok')}
           onClick={() =>
             onSalvar({
-              casa: placar?.casa ?? Number.NaN,
-              fora: placar?.fora ?? Number.NaN,
-              intervalo: par(v.htCasa, v.htFora),
-              escanteios: par(v.escCasa, v.escFora),
-              cartoes: par(v.carCasa, v.carFora),
-              oddFechamento: num(v.fechamento),
-              fechamentoOutros: outros.length ? outros : undefined,
+              // sem placar (só o fechamento) continua NaN: não se inventa placar
+              casa: placar.estado === 'ok' ? placar.valor.casa : Number.NaN,
+              fora: placar.estado === 'ok' ? placar.valor.fora : Number.NaN,
+              intervalo: intervalo.estado === 'ok' ? intervalo.valor : undefined,
+              escanteios: escanteios.estado === 'ok' ? escanteios.valor : undefined,
+              cartoes: cartoes.estado === 'ok' ? cartoes.valor : undefined,
+              oddFechamento: fechamento.estado === 'ok' ? fechamento.valor : undefined,
+              fechamentoOutros: outros.estado === 'ok' ? outros.valor : undefined,
               registradoEm: isoLocal(new Date()),
             })
           }
@@ -214,6 +223,15 @@ function FormResultado({
           </button>
         )}
       </div>
+      {temErro && (
+        <div className="dica" role="alert">
+          {erros.map(([rotulo, l]) => (
+            <p key={rotulo}>
+              {rotulo}: {l.motivo}
+            </p>
+          ))}
+        </div>
+      )}
       <p className="dica">
         O fechamento é a odd de referência (o consenso das casas) logo antes do jogo. Com os outros
         lados, o CLV sai contra o preço justo, sem margem.
