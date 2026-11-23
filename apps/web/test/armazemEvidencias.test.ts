@@ -5,7 +5,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   avisoDeDescarte,
+  dependentesDoDesfazer,
+  importacoesVivas,
   lotesDoDesfazer,
+  motivoParaParar,
   registrarEvidencia,
   tentativasIncorporadas,
   type DiarioImportacao,
@@ -117,5 +120,51 @@ describe('limite de 50: descarte avisado', () => {
     expect(avisoDeDescarte('A × B', [2])).toContain('1 revisão(ões) antiga(s) de A × B');
     expect(avisoDeDescarte('A × B', [2])).toContain('(nº 2)');
     expect(avisoDeDescarte('A × B', [2, 5, 9])).toContain('(nº 2, 5 e 9)');
+  });
+});
+
+describe('concorrência entre abas (P2b)', () => {
+  it('tentativa do mesmo backup ainda VIVA em outra aba não é incorporada', () => {
+    const nova = diario('nova', { impressao: 'AAA' });
+    const todos = [
+      diario('viva', { impressao: 'AAA', estado: 'em-andamento', novas: 50 }),
+      diario('morta', { impressao: 'AAA', estado: 'em-andamento', novas: 20 }),
+      nova,
+    ];
+    expect(tentativasIncorporadas(todos, nova, new Set(['viva']))).toEqual(['morta']);
+    expect(tentativasIncorporadas(todos, nova)).toEqual(['viva', 'morta']);
+  });
+
+  it('um lote só grava se o diário no banco ainda está "em andamento"', () => {
+    expect(motivoParaParar(diario('x', { estado: 'em-andamento' }))).toBeNull();
+    expect(motivoParaParar(diario('x', { estado: 'desfeita' }))).toMatch(/desfeita em outra aba/);
+    expect(motivoParaParar(diario('x', { estado: 'concluida', completadaPor: 'y' }))).toMatch(
+      /já completou esta/,
+    );
+    expect(motivoParaParar(diario('x', { estado: 'concluida' }))).toMatch(/já está "concluida"/);
+    expect(motivoParaParar(undefined)).toMatch(/não existe mais/);
+  });
+
+  it('sem Web Locks (Node, navegador antigo): nenhuma importação é tida como viva', async () => {
+    expect(await importacoesVivas()).toEqual(new Set());
+  });
+});
+
+describe('desfazer: importações que dependiam das revisões removidas (caso C)', () => {
+  const todos = [
+    diario('f1', { estado: 'falhou', novas: 50 }),
+    diario('f2', { novas: 100, jaExistiam: 50, apoio: { f1: 50 } }),
+    diario('f3', { novas: 10, apoio: { outra: 4 } }),
+    diario('f4-desfeita', { estado: 'desfeita', apoio: { f1: 9 } }),
+  ];
+  it('lista quem perde revisões e quantas; ignora as desfeitas e as que não dependem', () => {
+    expect(dependentesDoDesfazer(todos, ['f1'])).toEqual([
+      { id: 'f2', arquivo: 'backup.json.gz', revisoes: 50 },
+    ]);
+    expect(dependentesDoDesfazer(todos, ['f2'])).toEqual([]);
+  });
+  it('a própria operação (ela e as tentativas incorporadas) não é dependente de si', () => {
+    const op = [diario('ret', { incorpora: ['t'], apoio: { t: 30 } }), diario('t', {})];
+    expect(dependentesDoDesfazer(op, ['ret', 't'])).toEqual([]);
   });
 });

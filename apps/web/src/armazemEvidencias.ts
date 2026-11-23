@@ -74,7 +74,7 @@ function abrir(): Promise<IDBDatabase> {
 async function transacao<T>(
   tabelas: string[],
   modo: IDBTransactionMode,
-  corpo: (tx: IDBTransaction, saida: { valor?: T }) => void,
+  corpo: (tx: IDBTransaction, saida: { valor?: T }, abortar: (e: Error) => void) => void,
   /** conexão fixa (exportação): se ela fechar, a transação falha em vez de abrir outra */
   conexaoFixa?: IDBDatabase,
 ): Promise<T> {
@@ -83,9 +83,14 @@ async function transacao<T>(
     const tx = db.transaction(tabelas, modo);
     const saida: { valor?: T } = {};
     tx.oncomplete = () => ok(saida.valor as T);
-    tx.onabort = () => falha(tx.error ?? new Error('operação no banco de evidências abortada'));
+    let motivo: Error | null = null;
+    tx.onabort = () =>
+      falha(motivo ?? tx.error ?? new Error('operação no banco de evidências abortada'));
     tx.onerror = () => falha(tx.error ?? new Error('erro no banco de evidências'));
-    corpo(tx, saida);
+    corpo(tx, saida, (e) => {
+      motivo = e;
+      tx.abort();
+    });
   });
 }
 
@@ -186,6 +191,15 @@ export interface DiarioImportacao {
   completadaPor?: string;
   /** tentativas interrompidas do mesmo backup que esta importação completou: o desfazer as leva */
   incorpora?: string[];
+  /**
+   * Revisões que esta importação encontrou já gravadas POR OUTRA importação (lote → quantas):
+   * se aquela for desfeita, estas somem também, e esta importação fica marcada (desfalques).
+   */
+  apoio?: Record<string, number>;
+  /** revisões que esta importação contava e que saíram ao desfazer outra (reimportar recompõe) */
+  desfalques?: { por: string; arquivo: string; revisoes: number; em: string }[];
+  /** reimportação do mesmo backup que recompôs os desfalques */
+  recompostaPor?: string;
 }
 
 export interface ResultadoImportacao {
@@ -197,6 +211,9 @@ export interface ResultadoImportacao {
   incorporadas: string[];
 }
 
+/** A importação foi desfeita ou completada por outra aba enquanto rodava: parou sem gravar mais. */
+export class ImportacaoEncerrada extends Error {}
+
 const novoLote = () => `imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 function gravarDiario(d: DiarioImportacao): Promise<void> {
@@ -207,14 +224,42 @@ function gravarDiario(d: DiarioImportacao): Promise<void> {
 
 const pendente = (d: DiarioImportacao) => d.estado === 'em-andamento' || d.estado === 'falhou';
 
+/* Trava por importação (Web Locks, vale entre abas da mesma origem): diz se uma importação
+ * "em andamento" está VIVA (alguma aba rodando) ou morreu (aba fechada no meio). */
+const PREFIXO_TRAVA = 'pe-evidencias-importacao:';
+const travas = (): LockManager | undefined =>
+  typeof navigator !== 'undefined' ? navigator.locks : undefined;
+
+/** Ids das importações rodando agora em alguma aba (vazio se o navegador não tem Web Locks). */
+export async function importacoesVivas(): Promise<Set<string>> {
+  const l = travas();
+  if (!l) return new Set();
+  try {
+    const { held = [] } = await l.query();
+    return new Set(
+      held
+        .map((x) => x.name ?? '')
+        .filter((n) => n.startsWith(PREFIXO_TRAVA))
+        .map((n) => n.slice(PREFIXO_TRAVA.length)),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * Tentativas interrompidas do MESMO backup (mesma impressão digital SHA-256, nunca só o mesmo
- * nome ou a mesma contagem) que a importação `d`, ao concluir, incorpora.
+ * nome ou a mesma contagem) que a importação `d`, ao concluir, incorpora. Uma tentativa ainda
+ * VIVA em outra aba não é incorporada: ela termina por conta própria.
  */
-export function tentativasIncorporadas(diarios: DiarioImportacao[], d: DiarioImportacao): string[] {
+export function tentativasIncorporadas(
+  diarios: DiarioImportacao[],
+  d: DiarioImportacao,
+  vivas: Set<string> = new Set(),
+): string[] {
   if (!d.impressao) return [];
   return diarios
-    .filter((v) => v.id !== d.id && pendente(v) && v.impressao === d.impressao)
+    .filter((v) => v.id !== d.id && pendente(v) && !vivas.has(v.id) && v.impressao === d.impressao)
     .map((v) => v.id);
 }
 
@@ -233,21 +278,53 @@ export function lotesDoDesfazer(diarios: DiarioImportacao[], lote: string): stri
 }
 
 /**
- * Marca a importação como concluída e, na mesma transação, dá por completadas as tentativas
- * interrompidas do MESMO backup (tentativasIncorporadas): esta passou por todas as revisões
- * dele, então o que elas gravaram faz parte do resultado e passa a ser desfeito junto com ela
- * (`incorpora`). Sem isso o aviso continuaria e o desfazer ficaria pela metade. Nada é apagado.
+ * Outras importações que contaram revisões destes lotes como "já existiam": desfazer os lotes
+ * as deixa sem essas revisões. Servem para o aviso antes de desfazer e para marcá-las depois.
  */
-function concluirComTentativas(d: DiarioImportacao): Promise<DiarioImportacao> {
-  return transacao<DiarioImportacao>([DIARIO], 'readwrite', (tx, saida) => {
+export function dependentesDoDesfazer(
+  diarios: DiarioImportacao[],
+  lotes: string[],
+): { id: string; arquivo: string; revisoes: number }[] {
+  return diarios
+    .filter((d) => !lotes.includes(d.id) && d.estado !== 'desfeita' && d.apoio)
+    .map((d) => ({
+      id: d.id,
+      arquivo: d.arquivo,
+      revisoes: lotes.reduce((a, l) => a + (d.apoio?.[l] ?? 0), 0),
+    }))
+    .filter((x) => x.revisoes > 0);
+}
+
+/** O diário desta importação ainda permite gravar? Senão, por quê. */
+export function motivoParaParar(atual: DiarioImportacao | undefined): string | null {
+  if (!atual) return 'o diário desta importação não existe mais';
+  if (atual.estado === 'em-andamento') return null;
+  if (atual.estado === 'desfeita') return 'esta importação foi desfeita em outra aba';
+  if (atual.completadaPor)
+    return 'outra importação do mesmo backup já completou esta (em outra aba)';
+  return `esta importação já está "${atual.estado}"`;
+}
+
+/**
+ * Marca a importação como concluída e, na mesma transação, dá por completadas as tentativas
+ * interrompidas (e mortas) do MESMO backup: esta passou por todas as revisões dele, então o que
+ * elas gravaram faz parte do resultado e passa a ser desfeito junto com ela (`incorpora`).
+ * Importações concluídas do mesmo backup que tinham desfalques ficam recompostas por esta.
+ * Se o diário desta já não estiver "em andamento" (desfeita ou incorporada por outra aba),
+ * nada é gravado e a importação para com ImportacaoEncerrada. Nada é apagado.
+ */
+function concluirComTentativas(d: DiarioImportacao, vivas: Set<string>): Promise<DiarioImportacao> {
+  return transacao<DiarioImportacao>([DIARIO], 'readwrite', (tx, saida, abortar) => {
     const loja = tx.objectStore(DIARIO);
     const pedido = loja.getAll();
     pedido.onsuccess = () => {
       const todos = pedido.result as DiarioImportacao[];
-      const incorpora = tentativasIncorporadas(todos, d);
+      const parar = motivoParaParar(todos.find((x) => x.id === d.id));
+      if (parar) return abortar(new ImportacaoEncerrada(parar));
+      const incorpora = tentativasIncorporadas(todos, d, vivas);
       const final: DiarioImportacao = incorpora.length ? { ...d, incorpora } : d;
       loja.put(final);
-      for (const v of todos)
+      for (const v of todos) {
         if (incorpora.includes(v.id))
           loja.put({
             ...v,
@@ -255,51 +332,99 @@ function concluirComTentativas(d: DiarioImportacao): Promise<DiarioImportacao> {
             completadaPor: d.id,
             atualizadaEm: d.atualizadaEm,
           });
+        else if (
+          v.id !== d.id &&
+          v.estado === 'concluida' &&
+          v.desfalques?.length &&
+          d.impressao &&
+          v.impressao === d.impressao
+        )
+          loja.put({
+            ...v,
+            desfalques: undefined,
+            recompostaPor: d.id,
+            // agora ela depende do que esta gravou: desfazer esta volta a desfalcá-la
+            apoio: { ...v.apoio, [d.id]: d.novas },
+            atualizadaEm: d.atualizadaEm,
+          });
+      }
       saida.valor = final;
     };
   });
 }
 
-/** Um lote: revisões novas + diário atualizado, na MESMA transação (tudo ou nada). */
+/**
+ * Um lote: revisões novas + diário atualizado, na MESMA transação (tudo ou nada). Antes de
+ * gravar, confere no próprio banco que esta importação continua "em andamento": desfeita ou
+ * completada por outra aba, o lote é abortado inteiro e a importação para (ImportacaoEncerrada),
+ * em vez de regravar o diário com a cópia da memória e esconder o que a outra aba fez.
+ */
 function gravarLote(lote: Evidencia[], diario: DiarioImportacao): Promise<DiarioImportacao> {
-  return transacao<DiarioImportacao>([TABELA, DIARIO], 'readwrite', (tx, saida) => {
+  return transacao<DiarioImportacao>([TABELA, DIARIO], 'readwrite', (tx, saida, abortar) => {
     const t = tx.objectStore(TABELA);
-    const porJogo = new Map<string, Evidencia[]>();
-    for (const e of lote) porJogo.set(e.meta.idJogo, [...(porJogo.get(e.meta.idJogo) ?? []), e]);
-    const novo = { ...diario };
-    let faltam = porJogo.size;
-    const terminar = () => {
-      novo.processadas += lote.length;
-      novo.atualizadaEm = new Date().toISOString();
-      tx.objectStore(DIARIO).put(novo);
-      saida.valor = novo;
-    };
-    if (!faltam) return terminar();
-    for (const [id, vindas] of porJogo) {
-      const pedido = t.index(POR_JOGO).getAll(id);
-      pedido.onsuccess = () => {
-        const existentes = (pedido.result as Evidencia[]).map((e) => ({
-          revisao: e.meta.revisao,
-          hash: e.meta.hash,
-          gravadoEm: e.meta.gravadoEm,
-        }));
-        for (const p of planejarImportacao(existentes, vindas)) {
-          if (p.acao === 'ja-existe') novo.jaExistiam++;
-          else {
-            t.add({ ...p.evidencia, meta: { ...p.evidencia.meta, loteImportacao: diario.id } });
-            novo.novas++;
-            if (p.evidencia.meta.importacao) novo.renumeradas++;
-          }
-        }
-        if (--faltam === 0) terminar();
+    const estado = tx.objectStore(DIARIO).get(diario.id);
+    estado.onsuccess = () => {
+      const parar = motivoParaParar(estado.result as DiarioImportacao | undefined);
+      if (parar) return abortar(new ImportacaoEncerrada(parar));
+      const porJogo = new Map<string, Evidencia[]>();
+      for (const e of lote) porJogo.set(e.meta.idJogo, [...(porJogo.get(e.meta.idJogo) ?? []), e]);
+      const apoio: Record<string, number> = { ...diario.apoio };
+      const novo: DiarioImportacao = { ...diario };
+      let faltam = porJogo.size;
+      const terminar = () => {
+        novo.processadas += lote.length;
+        novo.atualizadaEm = new Date().toISOString();
+        if (Object.keys(apoio).length) novo.apoio = apoio;
+        tx.objectStore(DIARIO).put(novo);
+        saida.valor = novo;
       };
-    }
+      if (!faltam) return terminar();
+      for (const [id, vindas] of porJogo) {
+        const pedido = t.index(POR_JOGO).getAll(id);
+        pedido.onsuccess = () => {
+          const guardadas = pedido.result as Evidencia[];
+          const loteDe = new Map(guardadas.map((e) => [e.meta.revisao, e.meta.loteImportacao]));
+          const existentes = guardadas.map((e) => ({
+            revisao: e.meta.revisao,
+            hash: e.meta.hash,
+            gravadoEm: e.meta.gravadoEm,
+          }));
+          for (const p of planejarImportacao(existentes, vindas)) {
+            if (p.acao === 'ja-existe') {
+              novo.jaExistiam++;
+              // já gravada por OUTRA importação: esta passa a depender dela
+              const de = loteDe.get(p.revisao);
+              if (de && de !== diario.id) apoio[de] = (apoio[de] ?? 0) + 1;
+            } else {
+              t.add({ ...p.evidencia, meta: { ...p.evidencia.meta, loteImportacao: diario.id } });
+              novo.novas++;
+              if (p.evidencia.meta.importacao) novo.renumeradas++;
+            }
+          }
+          if (--faltam === 0) terminar();
+        };
+      }
+    };
+  });
+}
+
+/** Marca "falhou" só se o diário ainda está "em andamento" (nunca desmancha um "desfeita"). */
+function marcarFalha(d: DiarioImportacao, erro: string): Promise<void> {
+  return transacao<void>([DIARIO], 'readwrite', (tx) => {
+    const loja = tx.objectStore(DIARIO);
+    const atual = loja.get(d.id);
+    atual.onsuccess = () => {
+      if ((atual.result as DiarioImportacao | undefined)?.estado === 'em-andamento')
+        loja.put({ ...d, estado: 'falhou', erro, atualizadaEm: new Date().toISOString() });
+    };
   });
 }
 
 /**
  * Importa revisões JÁ CONFERIDAS (SHA-256) em lotes. Cada lote é atômico com o diário; se algo
- * falhar no meio, o diário fica "falhou" com o erro e a contagem exata, e o erro sobe.
+ * falhar no meio, o diário fica "falhou" com o erro e a contagem exata, e o erro sobe. A
+ * importação inteira roda segurando a trava dela (Web Locks): as outras abas sabem que ela está
+ * viva e não a incorporam nem a desfazem no meio.
  */
 export async function importarEvidenciasEmLotes(
   fonte: AsyncIterable<Evidencia> | Iterable<Evidencia>,
@@ -307,9 +432,22 @@ export async function importarEvidenciasEmLotes(
   aoProgredir?: (d: DiarioImportacao) => void,
   tamanho = TAMANHO_LOTE,
 ): Promise<ResultadoImportacao> {
+  const id = novoLote();
+  const rodar = () => rodarImportacao(id, fonte, info, aoProgredir, tamanho);
+  const l = travas();
+  return l ? l.request(PREFIXO_TRAVA + id, rodar) : rodar();
+}
+
+async function rodarImportacao(
+  id: string,
+  fonte: AsyncIterable<Evidencia> | Iterable<Evidencia>,
+  info: { arquivo: string; esperadas: number; impressao: string },
+  aoProgredir: ((d: DiarioImportacao) => void) | undefined,
+  tamanho: number,
+): Promise<ResultadoImportacao> {
   const agora = new Date().toISOString();
   let diario: DiarioImportacao = {
-    id: novoLote(),
+    id,
     arquivo: info.arquivo,
     impressao: info.impressao,
     iniciadaEm: agora,
@@ -338,7 +476,8 @@ export async function importarEvidenciasEmLotes(
         `processadas ${diario.processadas} de ${diario.esperadas} revisões esperadas`,
       );
     diario = { ...diario, estado: 'concluida', atualizadaEm: new Date().toISOString() };
-    diario = await concluirComTentativas(diario);
+    const vivas = await importacoesVivas();
+    diario = await concluirComTentativas(diario, vivas);
     aoProgredir?.(diario);
     return {
       lote: diario.id,
@@ -349,12 +488,11 @@ export async function importarEvidenciasEmLotes(
     };
   } catch (e) {
     const erro = (e as Error)?.message ?? String(e);
-    await gravarDiario({
-      ...diario,
-      estado: 'falhou',
-      erro,
-      atualizadaEm: new Date().toISOString(),
-    }).catch(() => undefined);
+    if (e instanceof ImportacaoEncerrada)
+      throw new ImportacaoEncerrada(
+        `importação parada: ${erro}. Ela não gravou mais nada; o diário guarda o que a outra aba fez.`,
+      );
+    await marcarFalha(diario, erro).catch(() => undefined);
     throw new Error(
       `importação interrompida: ${diario.processadas} de ${diario.esperadas} revisões tratadas (${diario.novas} gravadas). ${erro}`,
     );
@@ -392,14 +530,21 @@ export async function importacoesPendentes(): Promise<DiarioImportacao[]> {
  * Desfaz uma importação inteira (lotesDoDesfazer: ela e as tentativas interrompidas do mesmo
  * backup que ela completou). Apaga SÓ as revisões marcadas com esses lotes — nunca as gravadas
  * pelo aparelho nem as de outra importação — na mesma transação que marca cada diário como
- * "desfeita", com quantas revisões saíram de cada um.
+ * "desfeita", com quantas revisões saíram de cada um. Importações que contavam essas revisões
+ * como "já existiam" (dependentesDoDesfazer) ficam marcadas com o desfalque, nunca caladas.
+ * Recusa se alguma parte da operação ainda está rodando (nesta ou em outra aba).
  */
-export function desfazerImportacao(lote: string): Promise<number> {
-  return transacao<number>([TABELA, DIARIO], 'readwrite', (tx, saida) => {
+export async function desfazerImportacao(lote: string): Promise<number> {
+  const vivas = await importacoesVivas();
+  return transacao<number>([TABELA, DIARIO], 'readwrite', (tx, saida, abortar) => {
     const diarios = tx.objectStore(DIARIO).getAll();
     diarios.onsuccess = () => {
       const todos = diarios.result as DiarioImportacao[];
       const lotes = lotesDoDesfazer(todos, lote);
+      if (lotes.some((l) => vivas.has(l)))
+        return abortar(
+          new Error('esta importação ainda está rodando (nesta ou em outra aba): espere terminar'),
+        );
       const porLote = new Map(lotes.map((l) => [l, 0]));
       const cursor = tx.objectStore(TABELA).openCursor();
       cursor.onsuccess = () => {
@@ -414,14 +559,33 @@ export function desfazerImportacao(lote: string): Promise<number> {
           return;
         }
         const agora = new Date().toISOString();
+        const raiz = todos.find((d) => d.id === lotes[0]);
+        const loja = tx.objectStore(DIARIO);
         for (const d of todos)
           if (porLote.has(d.id))
-            tx.objectStore(DIARIO).put({
+            loja.put({
               ...d,
               estado: 'desfeita',
               removidas: porLote.get(d.id),
               atualizadaEm: agora,
             });
+        for (const dep of dependentesDoDesfazer(todos, lotes)) {
+          const d = todos.find((x) => x.id === dep.id);
+          if (!d) continue;
+          loja.put({
+            ...d,
+            desfalques: [
+              ...(d.desfalques ?? []),
+              {
+                por: lotes[0],
+                arquivo: raiz?.arquivo ?? lotes[0],
+                revisoes: dep.revisoes,
+                em: agora,
+              },
+            ],
+            atualizadaEm: agora,
+          });
+        }
         saida.valor = [...porLote.values()].reduce((a, b) => a + b, 0);
       };
     };

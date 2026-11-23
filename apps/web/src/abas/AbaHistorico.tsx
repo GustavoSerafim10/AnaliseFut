@@ -6,6 +6,8 @@ import {
   desfazerImportacao,
   importarEvidencias,
   importarEvidenciasEmLotes,
+  dependentesDoDesfazer,
+  importacoesVivas,
   lerDiarios,
   lotesDoDesfazer,
   paginasDeEvidencias,
@@ -351,11 +353,18 @@ export function AbaHistorico({
     : null;
 
   const [diarios, setDiarios] = useState<DiarioImportacao[]>([]);
+  // importações rodando agora (nesta ou em outra aba): não se oferece desfazer no meio delas
+  const [vivas, setVivas] = useState<Set<string>>(new Set());
   const lerPendentes = () =>
-    void lerDiarios()
-      .then(setDiarios)
+    void Promise.all([lerDiarios(), importacoesVivas()])
+      .then(([d, v]) => {
+        setDiarios(d);
+        setVivas(v);
+      })
       .catch(() => setDiarios([]));
   useEffect(lerPendentes, []);
+  // importações que perderam revisões porque outra foi desfeita: aviso até reimportar
+  const desfalcadas = diarios.filter((d) => d.estado === 'concluida' && d.desfalques?.length);
   const pendentes = diarios.filter((d) => d.estado === 'em-andamento' || d.estado === 'falhou');
   // concluídas que podem ser desfeitas (as tentativas incorporadas vão junto com a que as completou)
   const concluidas = diarios
@@ -492,9 +501,14 @@ export function AbaHistorico({
     // a operação inteira: ela e as tentativas interrompidas do mesmo backup que ela completou
     const lotes = lotesDoDesfazer(diarios, d.id);
     const total = diarios.filter((x) => lotes.includes(x.id)).reduce((a, x) => a + x.novas, 0);
+    // outras importações que contaram estas revisões como "já existiam" ficam desfalcadas
+    const afetadas = dependentesDoDesfazer(diarios, lotes);
+    const aviso = afetadas.length
+      ? ` ATENÇÃO: ${afetadas.map((a) => `a importação de "${a.arquivo}" contou ${a.revisoes} delas como já existentes e ficará desfalcada (reimporte esse arquivo para recompor)`).join('; ')}.`
+      : '';
     if (
       !confirm(
-        `Desfazer a importação de "${d.arquivo}"? Saem só as ${total} revisão(ões) que ela gravou${lotes.length > 1 ? ` (somando ${lotes.length - 1} tentativa(s) interrompida(s) que ela completou)` : ''}; o que já existia neste aparelho e o de outras importações fica.`,
+        `Desfazer a importação de "${d.arquivo}"? Saem só as ${total} revisão(ões) que ela gravou${lotes.length > 1 ? ` (somando ${lotes.length - 1} tentativa(s) interrompida(s) que ela completou)` : ''}; o que foi gravado por este aparelho fica.${aviso}`,
       )
     )
       return;
@@ -932,11 +946,26 @@ export function AbaHistorico({
             timeStyle: 'short',
           })}
           ) não terminou: {d.processadas} de {d.esperadas} revisões tratadas, {d.novas} gravada(s)
-          {d.erro ? ` — ${d.erro}` : ' (interrompida)'}. Importe o mesmo arquivo de novo para
-          completar (nada duplica) ou desfaça só o que ela gravou.{' '}
-          <button className="mini" onClick={() => void desfazer(d)}>
-            Desfazer esta importação
-          </button>
+          {vivas.has(d.id) ? (
+            ' — ainda está rodando (nesta ou em outra aba). Espere terminar para desfazer.'
+          ) : (
+            <>
+              {d.erro ? ` — ${d.erro}` : ' (interrompida)'}. Importe o mesmo arquivo de novo para
+              completar (nada duplica) ou desfaça só o que ela gravou.{' '}
+              <button className="mini" onClick={() => void desfazer(d)}>
+                Desfazer esta importação
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+      {desfalcadas.map((d) => (
+        <div key={`desfalque-${d.id}`} className="caixa alerta">
+          A importação de <strong>{d.arquivo}</strong> ficou desfalcada:{' '}
+          {d
+            .desfalques!.map((x) => `${x.revisoes} revisão(ões) saíram ao desfazer "${x.arquivo}"`)
+            .join('; ')}
+          . Importe <strong>{d.arquivo}</strong> de novo para recompor (nada duplica).
         </div>
       ))}
       {concluidas.length > 0 && (
