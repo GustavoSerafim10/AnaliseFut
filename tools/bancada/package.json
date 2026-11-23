@@ -1,0 +1,11 @@
+{
+  "name": "@pe/bancada",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fase 1 — bancada de inteligência: lê backups da Fase 0 e normaliza (só leitura).",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  }
+}
