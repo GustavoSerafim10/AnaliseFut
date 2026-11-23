@@ -477,7 +477,7 @@ export function AbaHistorico({
       });
     try {
       const e = await importarEvidenciasEmLotes(
-        evidenciasDoBackupGz(() => f.stream(), v.hashes),
+        evidenciasDoBackupGz(() => f.stream(), v.chaves),
         { arquivo: f.name, esperadas: v.revisoes, impressao: v.impressao },
         (d) =>
           setMsg({
@@ -968,7 +968,11 @@ export function AbaHistorico({
         <div key={`desfalque-${d.id}`} className="caixa alerta">
           A importação de <strong>{d.arquivo}</strong> ficou desfalcada:{' '}
           {d
-            .desfalques!.map((x) => `${x.revisoes} revisão(ões) saíram ao desfazer "${x.arquivo}"`)
+            .desfalques!.map((x) =>
+              x.motivo
+                ? `${x.revisoes} revisão(ões): ${x.motivo}`
+                : `${x.revisoes} revisão(ões) saíram ao desfazer "${x.arquivo}"`,
+            )
             .join('; ')}
           . Importe <strong>{d.arquivo}</strong> de novo para recompor (nada duplica).
         </div>

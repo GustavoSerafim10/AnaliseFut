@@ -11,12 +11,17 @@
  * da importação na mesma transação. Interrompida no meio (aba fechada, erro), o diário diz
  * exatamente quantas revisões entraram; reimportar o mesmo arquivo completa sem duplicar, e
  * "desfazer" apaga só as revisões marcadas com o lote daquela importação.
+ *
+ * Versão 3 do banco: índice de IDENTIDADE (jogo + hash + horário original) nas revisões, para a
+ * conclusão de uma importação conferir, dentro da própria transação, que cada revisão do backup
+ * está de fato no banco — sem ler o conteúdo delas.
  */
 import type { Derivado } from './dados';
 import type { Rascunho } from './estado';
 import {
   antesDoApito,
   chaveRevisao,
+  impressaoDigital,
   impressaoDoBackup,
   LIMITE_REVISOES,
   montarEvidencia,
@@ -27,9 +32,21 @@ import {
 } from './evidencias';
 
 const NOME_BANCO = 'pe-evidencias';
-const VERSAO_BANCO = 2;
+const VERSAO_BANCO = 3;
 const TABELA = 'revisoes';
 const POR_JOGO = 'porJogo';
+const POR_IDENTIDADE = 'porIdentidade';
+/**
+ * Identidade de presença de uma revisão: jogo + hash do conteúdo + horário ORIGINAL de gravação
+ * (meta.gravadoEm, nunca o horário da importação). O número da revisão fica de fora porque a
+ * importação pode renumerar (conflito); é a mesma identidade que planejarImportacao usa para
+ * reconhecer uma revisão já gravada, e os mesmos campos de chaveRevisao (que inclui o número e
+ * forma a impressão digital do arquivo e a conferência linha a linha da 2ª leitura).
+ */
+const CAMPOS_IDENTIDADE = ['meta.idJogo', 'meta.hash', 'meta.gravadoEm'];
+export const identidadePresenca = (
+  meta: Pick<Evidencia['meta'], 'idJogo' | 'hash' | 'gravadoEm'>,
+): [string, string, string] => [meta.idJogo, meta.hash, meta.gravadoEm];
 const DIARIO = 'importacoes';
 export const TAMANHO_LOTE = 50;
 
@@ -45,11 +62,13 @@ function abrir(): Promise<IDBDatabase> {
     const pedido = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
     pedido.onupgradeneeded = () => {
       const db = pedido.result;
-      // versão 1 → 2 só acrescenta o diário: as revisões existentes ficam como estão
-      if (!db.objectStoreNames.contains(TABELA)) {
-        const t = db.createObjectStore(TABELA, { keyPath: ['meta.idJogo', 'meta.revisao'] });
-        t.createIndex(POR_JOGO, 'meta.idJogo');
-      }
+      // 1 → 2 acrescenta o diário; 2 → 3 acrescenta o índice de identidade (o navegador indexa
+      // as revisões que já existem). Nada é apagado nem regravado.
+      const t = db.objectStoreNames.contains(TABELA)
+        ? pedido.transaction!.objectStore(TABELA)
+        : db.createObjectStore(TABELA, { keyPath: ['meta.idJogo', 'meta.revisao'] });
+      if (!t.indexNames.contains(POR_JOGO)) t.createIndex(POR_JOGO, 'meta.idJogo');
+      if (!t.indexNames.contains(POR_IDENTIDADE)) t.createIndex(POR_IDENTIDADE, CAMPOS_IDENTIDADE);
       if (!db.objectStoreNames.contains(DIARIO)) db.createObjectStore(DIARIO, { keyPath: 'id' });
     };
     pedido.onsuccess = () => {
@@ -197,7 +216,16 @@ export interface DiarioImportacao {
    */
   apoio?: Record<string, number>;
   /** revisões que esta importação contava e que saíram ao desfazer outra (reimportar recompõe) */
-  desfalques?: { por: string; arquivo: string; revisoes: number; em: string }[];
+  desfalques?: {
+    por: string;
+    arquivo: string;
+    revisoes: number;
+    em: string;
+    /** por que faltam (ex.: conferência de presença na conclusão); sem motivo: outra desfeita */
+    motivo?: string;
+    /** algumas das identidades ausentes (jogo · horário original), para conferir */
+    exemplos?: string[];
+  }[];
   /** reimportação do mesmo backup que recompôs os desfalques */
   recompostaPor?: string;
 }
@@ -343,6 +371,7 @@ export function aplicarLote(
  * número, horário original e hash) e cada uma foi gravada por ela ou achada já gravada pela
  * mesma identidade (hash + horário original). Se, desde então, alguma das achadas saiu porque
  * outra importação foi desfeita, `d` já tem desfalques próprios — e então nada está comprovado.
+ * Na conclusão, ainda se exige a conferência de presença (avaliarPresenca) sem nenhuma ausente.
  */
 export function recomposicaoComprovada(d: DiarioImportacao): boolean {
   return (
@@ -351,6 +380,46 @@ export function recomposicaoComprovada(d: DiarioImportacao): boolean {
     d.processadas === d.esperadas &&
     !d.desfalques?.length
   );
+}
+
+/**
+ * Identidades do backup ausentes do banco: `esperadas` são as identidades de presença (sem
+ * repetição) e `contagens[i]` quantas revisões do banco têm a identidade `esperadas[i]`.
+ * Identidade repetida no arquivo é a mesma revisão (mesmo conteúdo, mesmo horário): conta uma vez.
+ */
+export function avaliarPresenca(
+  esperadas: [string, string, string][],
+  contagens: number[],
+): { ausentes: [string, string, string][] } {
+  return { ausentes: esperadas.filter((_, i) => !(contagens[i] > 0)) };
+}
+
+/** Identidades de presença sem repetição, na ordem em que aparecem. */
+export function identidadesUnicas(lista: [string, string, string][]): [string, string, string][] {
+  const vistas = new Set<string>();
+  return lista.filter((x) => {
+    const k = JSON.stringify(x);
+    if (vistas.has(k)) return false;
+    vistas.add(k);
+    return true;
+  });
+}
+
+/** Desfalque registrado quando a conferência de presença da conclusão acha revisões ausentes. */
+export function desfalqueDeConferencia(
+  d: DiarioImportacao,
+  ausentes: [string, string, string][],
+  agora: string,
+): NonNullable<DiarioImportacao['desfalques']>[number] {
+  return {
+    por: d.id,
+    arquivo: d.arquivo,
+    revisoes: ausentes.length,
+    em: agora,
+    motivo:
+      'ausentes do banco na conclusão (conferência por jogo + hash + horário original); a recomposição não foi comprovada — reimporte o arquivo',
+    exemplos: ausentes.slice(0, 3).map(([jogo, , gravadoEm]) => `${jogo} · ${gravadoEm}`),
+  };
 }
 
 /**
@@ -390,8 +459,14 @@ export function desfalcadasParaTela(diarios: DiarioImportacao[]): DiarioImportac
  * mesmo backup só perdem a marca de desfalque com a recomposição comprovada. Se o diário desta
  * já não estiver "em andamento", nada é gravado e a importação para com ImportacaoEncerrada.
  */
-function concluirComTentativas(id: string, vivas: Set<string>): Promise<DiarioImportacao> {
-  return transacao<DiarioImportacao>([DIARIO], 'readwrite', (tx, saida, abortar) => {
+function concluirComTentativas(
+  id: string,
+  vivas: Set<string>,
+  identidades: [string, string, string][],
+): Promise<DiarioImportacao> {
+  // escopo com as revisões: a conferência de presença e a decisão acontecem numa transação de
+  // escrita que nenhuma gravação local (poda do limite de 50) nem desfazer consegue intercalar
+  return transacao<DiarioImportacao>([TABELA, DIARIO], 'readwrite', (tx, saida, abortar) => {
     const loja = tx.objectStore(DIARIO);
     const pedido = loja.getAll();
     pedido.onsuccess = () => {
@@ -399,33 +474,57 @@ function concluirComTentativas(id: string, vivas: Set<string>): Promise<DiarioIm
       const atual = todos.find((x) => x.id === id);
       const parar = motivoParaParar(atual);
       if (parar || !atual) return abortar(new ImportacaoEncerrada(parar ?? 'sem diário'));
-      const agora = new Date().toISOString();
-      const comprovada = recomposicaoComprovada(atual);
-      const incorpora = tentativasIncorporadas(todos, atual, vivas);
-      const final: DiarioImportacao = {
-        ...atual,
-        estado: 'concluida',
-        atualizadaEm: agora,
-        ...(incorpora.length ? { incorpora: [...(atual.incorpora ?? []), ...incorpora] } : {}),
+      const esperadas = identidadesUnicas(identidades);
+      const contagens: number[] = new Array(esperadas.length).fill(0);
+      let faltam = esperadas.length;
+      const decidir = () => {
+        const agora = new Date().toISOString();
+        const { ausentes } = avaliarPresenca(esperadas, contagens);
+        // comprovada só com: mesmo backup, tudo processado, sem desfalque próprio E tudo presente
+        const comprovada = recomposicaoComprovada(atual) && ausentes.length === 0;
+        const incorpora = tentativasIncorporadas(todos, atual, vivas);
+        const final: DiarioImportacao = {
+          ...atual,
+          estado: 'concluida',
+          atualizadaEm: agora,
+          ...(incorpora.length ? { incorpora: [...(atual.incorpora ?? []), ...incorpora] } : {}),
+          ...(ausentes.length
+            ? {
+                desfalques: [
+                  ...(atual.desfalques ?? []),
+                  desfalqueDeConferencia(atual, ausentes, agora),
+                ],
+              }
+            : {}),
+        };
+        loja.put(final);
+        for (const v of todos) {
+          if (incorpora.includes(v.id))
+            loja.put({
+              ...reconciliar(v, atual, comprovada, agora),
+              estado: 'concluida',
+              completadaPor: id,
+            });
+          else if (
+            v.id !== id &&
+            v.estado === 'concluida' &&
+            v.desfalques?.length &&
+            atual.impressao &&
+            v.impressao === atual.impressao
+          )
+            loja.put(reconciliar(v, atual, comprovada, agora));
+        }
+        saida.valor = final;
       };
-      loja.put(final);
-      for (const v of todos) {
-        if (incorpora.includes(v.id))
-          loja.put({
-            ...reconciliar(v, atual, comprovada, agora),
-            estado: 'concluida',
-            completadaPor: id,
-          });
-        else if (
-          v.id !== id &&
-          v.estado === 'concluida' &&
-          v.desfalques?.length &&
-          atual.impressao &&
-          v.impressao === atual.impressao
-        )
-          loja.put(reconciliar(v, atual, comprovada, agora));
-      }
-      saida.valor = final;
+      if (!faltam) return decidir();
+      const indice = tx.objectStore(TABELA).index(POR_IDENTIDADE);
+      esperadas.forEach((ident, i) => {
+        const conta = indice.count(ident);
+        conta.onsuccess = () => {
+          contagens[i] = conta.result;
+          if (--faltam === 0) decidir();
+        };
+      });
     };
   });
 }
@@ -532,6 +631,21 @@ export async function importarEvidenciasEmLotes(
   );
 }
 
+/**
+ * Recalcula o SHA-256 do conteúdo de cada revisão e exige que seja o meta.hash dela. Roda antes
+ * da transação do lote (o cálculo é assíncrono e fecharia a transação): se uma não confere, o
+ * lote inteiro não é gravado.
+ */
+export async function conferirConteudos(lote: Evidencia[]): Promise<void> {
+  const calculados = await Promise.all(lote.map((ev) => impressaoDigital(ev.conteudo)));
+  calculados.forEach((h, i) => {
+    if (h !== lote[i].meta.hash)
+      throw new Error(
+        `conteúdo diferente do hash na 2ª leitura (jogo ${lote[i].meta.idJogo}, revisão ${lote[i].meta.revisao}): lote não gravado`,
+      );
+  });
+}
+
 async function rodarImportacao(
   id: string,
   fonte: AsyncIterable<Evidencia> | Iterable<Evidencia>,
@@ -554,23 +668,40 @@ async function rodarImportacao(
     estado: 'em-andamento',
   };
   await gravarDiario(diario);
+  // identidades efetivamente processadas, na ordem: a impressão digital é recalculada com elas
+  const chaves: string[] = [];
+  const identidades: [string, string, string][] = [];
+  /** SHA-256 de cada conteúdo recalculado ANTES do lote: conteúdo ≠ hash, o lote não grava */
+  const conferirEGravar = async (lote: Evidencia[]) => {
+    await conferirConteudos(lote);
+    for (const ev of lote) {
+      chaves.push(chaveRevisao(ev.meta));
+      identidades.push(identidadePresenca(ev.meta));
+    }
+    return gravarLote(lote, id);
+  };
   try {
     let lote: Evidencia[] = [];
     for await (const ev of fonte) {
       lote.push(ev);
       if (lote.length >= tamanho) {
-        diario = await gravarLote(lote, id);
+        diario = await conferirEGravar(lote);
         aoProgredir?.(diario);
         lote = [];
       }
     }
-    if (lote.length) diario = await gravarLote(lote, id);
+    if (lote.length) diario = await conferirEGravar(lote);
     if (diario.processadas !== diario.esperadas)
       throw new Error(
         `processadas ${diario.processadas} de ${diario.esperadas} revisões esperadas`,
       );
+    // identidade: as revisões processadas são exatamente as do arquivo conferido na 1ª leitura
+    if ((await impressaoDoBackup(chaves)) !== info.impressao)
+      throw new Error(
+        'identidades processadas diferentes do arquivo conferido (impressão digital recalculada não confere): nada foi comprovado',
+      );
     const vivas = await importacoesVivas();
-    diario = await concluirComTentativas(id, vivas);
+    diario = await concluirComTentativas(id, vivas, identidades);
     aoProgredir?.(diario);
     return {
       lote: diario.id,

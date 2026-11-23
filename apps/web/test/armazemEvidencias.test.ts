@@ -5,6 +5,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   aplicarLote,
+  avaliarPresenca,
+  conferirConteudos,
+  desfalqueDeConferencia,
+  identidadePresenca,
+  identidadesUnicas,
   avisoDeDescarte,
   dependentesDoDesfazer,
   desfalcadasParaTela,
@@ -271,5 +276,70 @@ describe('P2c: desfazer recusado diz qual importação precisa terminar', () => 
       ['raiz', 't'],
     );
     expect(m).toContain('"f.json.gz" (parte desta importação)');
+  });
+});
+
+describe('P2d: identidade e presença', () => {
+  const meta = (
+    o: Partial<{ idJogo: string; revisao: number; hash: string; gravadoEm: string }>,
+  ) => ({
+    idJogo: 'j',
+    revisao: 1,
+    hash: 'H',
+    gravadoEm: '2026-11-20T10:00:00.000Z',
+    ...o,
+  });
+  it('identidade de presença = jogo + hash + horário ORIGINAL; o número fica de fora', () => {
+    expect(identidadePresenca(meta({}))).toEqual(['j', 'H', '2026-11-20T10:00:00.000Z']);
+    // renumerada na importação: mesma identidade de presença
+    expect(identidadePresenca(meta({ revisao: 7 }))).toEqual(identidadePresenca(meta({})));
+    // conflito de conteúdo (mesmo número, outro hash): outra identidade
+    expect(identidadePresenca(meta({ hash: 'H2' }))).not.toEqual(identidadePresenca(meta({})));
+    // horário diferente: outra identidade (nunca o horário da importação)
+    expect(identidadePresenca(meta({ gravadoEm: 'x' }))).not.toEqual(identidadePresenca(meta({})));
+  });
+  it('tudo presente: nenhuma ausente', () => {
+    const e = [identidadePresenca(meta({})), identidadePresenca(meta({ hash: 'H2' }))];
+    expect(avaliarPresenca(e, [1, 2]).ausentes).toEqual([]);
+  });
+  it('uma ausente: aparece na lista', () => {
+    const e = [identidadePresenca(meta({})), identidadePresenca(meta({ hash: 'H2' }))];
+    expect(avaliarPresenca(e, [1, 0]).ausentes).toEqual([['j', 'H2', '2026-11-20T10:00:00.000Z']]);
+  });
+  it('identidade repetida no arquivo (mesmo conteúdo e horário) conta uma vez, compatível', () => {
+    const a = identidadePresenca(meta({ revisao: 1 }));
+    const b = identidadePresenca(meta({ revisao: 2 }));
+    expect(identidadesUnicas([a, b])).toEqual([a]);
+  });
+  it('desfalque da conferência traz motivo e exemplos', () => {
+    const d = desfalqueDeConferencia(
+      diario('y', { arquivo: 'f.json.gz' }),
+      [['j', 'H', '2026-11-20T10:00:00.000Z']],
+      't',
+    );
+    expect(d).toMatchObject({ por: 'y', arquivo: 'f.json.gz', revisoes: 1, em: 't' });
+    expect(d.motivo).toMatch(/ausentes do banco na conclusão/);
+    expect(d.exemplos).toEqual(['j · 2026-11-20T10:00:00.000Z']);
+  });
+});
+
+describe('P2d: conteúdo recalculado na 2ª leitura', () => {
+  const ev = async (tag: string, hashDe?: string) => {
+    const { impressaoDigital } = await import('../src/evidencias');
+    const conteudo = { tag } as never;
+    const hash = await impressaoDigital((hashDe ? { tag: hashDe } : conteudo) as never);
+    return {
+      esquema: 'evidencia-v1',
+      meta: { idJogo: 'j', revisao: 1, hash, gravadoEm: 't' },
+      conteudo,
+    } as never;
+  };
+  it('conteúdo igual ao hash: passa', async () => {
+    await expect(conferirConteudos([await ev('a'), await ev('b')])).resolves.toBeUndefined();
+  });
+  it('conteúdo trocado com o hash mantido: recusa o lote inteiro', async () => {
+    await expect(conferirConteudos([await ev('a'), await ev('b', 'outro')])).rejects.toThrow(
+      /conteúdo diferente do hash na 2ª leitura.*lote não gravado/,
+    );
   });
 });

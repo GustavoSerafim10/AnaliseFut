@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+  ArquivoDivergente,
   ehGzip,
   escreverBackupGz,
   evidenciasDoBackupGz,
@@ -93,7 +94,8 @@ describe('ida e volta', () => {
     expect(v.cabecalho).toEqual(cabecalho);
     expect(v.hashes).toEqual(revs.map((r) => r.meta.hash));
     const voltaram: Evidencia[] = [];
-    for await (const e of evidenciasDoBackupGz(abrirBytes(b), v.hashes)) voltaram.push(e);
+    expect(v.chaves).toHaveLength(revs.length);
+    for await (const e of evidenciasDoBackupGz(abrirBytes(b), v.chaves)) voltaram.push(e);
     expect(voltaram.map(canonico)).toEqual(revs.map(canonico));
   });
 
@@ -189,7 +191,7 @@ describe('arquivo corrompido ou incompleto: recusado inteiro, com motivo', () =>
       JSON.stringify({ fim: true, revisoes: 1 }),
     ]);
     const ler = async () => {
-      for await (const e of evidenciasDoBackupGz(abrirBytes(outro), v.hashes)) void e;
+      for await (const e of evidenciasDoBackupGz(abrirBytes(outro), v.chaves)) void e;
     };
     await expect(ler()).rejects.toThrow(/o arquivo mudou/);
   });
@@ -280,5 +282,59 @@ describe('exportação: nunca um arquivo incompleto que pareça completo', () =>
     const v = await verificarBackupGz(abrirBytes(b));
     expect(v.ok).toBe(false);
     if (!v.ok) expect(v.problemas[0].motivo).toMatch(/saiu sem evidências, mas ele tem revisões/);
+  });
+});
+
+describe('P2d: 2ª leitura confere a identidade completa de cada linha', () => {
+  const ler = async (b: Uint8Array, chaves: string[]) => {
+    const vieram: Evidencia[] = [];
+    try {
+      for await (const e of evidenciasDoBackupGz(abrirBytes(b), chaves)) vieram.push(e);
+      return { vieram, erro: null as Error | null };
+    } catch (e) {
+      return { vieram, erro: e as Error };
+    }
+  };
+  const conferido = async () => {
+    const b = await bytes((await escreverBackupGz(cabecalho, paginas(revs))).blob);
+    const v = await verificarBackupGz(abrirBytes(b));
+    if (!v.ok) throw new Error('deveria verificar');
+    return v;
+  };
+  it('arquivo igual: todas as revisões, na ordem', async () => {
+    const v = await conferido();
+    const b = await bytes((await escreverBackupGz(cabecalho, paginas(revs))).blob);
+    const r = await ler(b, v.chaves);
+    expect(r.erro).toBeNull();
+    expect(r.vieram.map((e) => e.meta.revisao)).toEqual(revs.map((e) => e.meta.revisao));
+  });
+  it('mesmo hash, horário original diferente na 2ª leitura: para ANTES de entregar a linha', async () => {
+    const v = await conferido();
+    const outras = revs.map((e, i) =>
+      i === 1 ? { ...e, meta: { ...e.meta, gravadoEm: '2030-01-01T00:00:00.000Z' } } : e,
+    );
+    const b = await gzLinhas([
+      JSON.stringify(cabecalho),
+      ...outras.map((e) => JSON.stringify(e)),
+      JSON.stringify({ fim: true, revisoes: outras.length }),
+    ]);
+    const r = await ler(b, v.chaves);
+    expect(r.erro).toBeInstanceOf(ArquivoDivergente);
+    expect(r.erro?.message).toMatch(/linha 3: jogo, número, horário original ou hash diferentes/);
+    expect(r.vieram).toHaveLength(1); // só a linha anterior à divergente
+  });
+  it('mesmo hash, jogo diferente: também diverge', async () => {
+    const v = await conferido();
+    const outras = revs.map((e, i) =>
+      i === 0 ? { ...e, meta: { ...e.meta, idJogo: 'outro-jogo' } } : e,
+    );
+    const b = await gzLinhas([
+      JSON.stringify(cabecalho),
+      ...outras.map((e) => JSON.stringify(e)),
+      JSON.stringify({ fim: true, revisoes: outras.length }),
+    ]);
+    const r = await ler(b, v.chaves);
+    expect(r.erro).toBeInstanceOf(ArquivoDivergente);
+    expect(r.vieram).toHaveLength(0);
   });
 });

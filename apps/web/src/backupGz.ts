@@ -175,6 +175,11 @@ export type VerificacaoBackupGz =
       revisoes: number;
       /** hash de cada revisão, na ordem do arquivo: a 2ª passada confere que é o mesmo arquivo */
       hashes: string[];
+      /**
+       * identidade completa de cada revisão (chaveRevisao: jogo, número, horário original e
+       * hash), na ordem do arquivo: a 2ª passada confere cada linha contra ela
+       */
+      chaves: string[];
       /** impressão digital do backup (impressaoDoBackup): identifica a importação no diário */
       impressao: string;
     }
@@ -258,31 +263,42 @@ export async function verificarBackupGz(
     cabecalho,
     revisoes: hashes.length,
     hashes,
+    chaves,
     impressao: await impressaoDoBackup(chaves),
   };
 }
 
+/** A 2ª leitura trouxe uma revisão diferente da conferida na 1ª: nada dela é entregue. */
+export class ArquivoDivergente extends Error {}
+
 /**
- * 2ª passada: entrega as revisões já verificadas, conferindo que cada hash é o da 1ª passada,
- * na mesma posição (o arquivo não mudou entre as duas leituras).
+ * 2ª passada: entrega as revisões já verificadas, conferindo que a IDENTIDADE COMPLETA de cada
+ * uma (jogo, número, horário original e hash: chaveRevisao) é a da 1ª passada, na mesma
+ * posição. A linha divergente nunca é entregue: a importação para antes de gravá-la. (O
+ * conteúdo de cada revisão entregue tem o SHA-256 recalculado na importação, antes do lote.)
  */
 export async function* evidenciasDoBackupGz(
   abrir: () => ReadableStream<Uint8Array>,
-  hashesVerificados: string[],
+  chavesVerificadas: string[],
 ): AsyncGenerator<Evidencia> {
   let i = 0;
   for await (const { n, texto } of linhasGz(abrir())) {
     if (n === 1 || !texto.trim()) continue;
     const obj = JSON.parse(texto) as Evidencia | RodapeBackupGz;
-    if ((obj as RodapeBackupGz).fim === true) break;
-    const ev = obj as Evidencia;
-    if (hashesVerificados[i] !== ev.meta.hash)
-      throw new Error(`o arquivo mudou entre a conferência e a gravação (linha ${n})`);
+    if ((obj as RodapeBackupGz)?.fim === true) break;
+    if (!pareceEvidencia(obj))
+      throw new ArquivoDivergente(`linha ${n} não é mais uma revisão na 2ª leitura`);
+    if (chaveRevisao(obj.meta) !== chavesVerificadas[i])
+      throw new ArquivoDivergente(
+        `o arquivo mudou entre a conferência e a gravação (linha ${n}: jogo, número, horário original ou hash diferentes)`,
+      );
     i++;
-    yield ev;
+    yield obj;
   }
-  if (i !== hashesVerificados.length)
-    throw new Error(`a 2ª leitura trouxe ${i} revisões, a conferência ${hashesVerificados.length}`);
+  if (i !== chavesVerificadas.length)
+    throw new ArquivoDivergente(
+      `a 2ª leitura trouxe ${i} revisões, a conferência ${chavesVerificadas.length}`,
+    );
 }
 
 /** Backups antigos (.json versão 2 com "evidencias"): mesma conferência de SHA-256. */
