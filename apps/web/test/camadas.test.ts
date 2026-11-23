@@ -264,11 +264,16 @@ describe('varredura: texto para o Claude e margem da dupla chance', () => {
     const r = rascunhoExemplo();
     const falsa = { ...r.odds[0], mercado: 'total', lado: 'over', linha: 2.15, odd: 7.77 } as never;
     const comFalsa = { ...r, odds: [...r.odds, falsa] };
-    const texto = montarPromptClaude(comFalsa, derivar(comFalsa));
+    const dFalsa = derivar(comFalsa);
+    const texto = montarPromptClaude(comFalsa, dFalsa);
+    // a odd reprovada não entra em nenhuma forma (ponto ou vírgula decimal)
     expect(texto).not.toContain('7.77');
-    expect(texto).toContain('ficaram de fora');
-    expect(texto).toContain('# Melhores entradas');
-    expect(texto).toContain('duas camadas');
+    expect(texto).not.toContain('7,77');
+    expect(dFalsa.errosOdds).toBeGreaterThan(0);
+    expect(texto).toContain(`Odds excluídas por erro de leitura: ${dFalsa.errosOdds}`);
+    // prompt A1–A4: a V4 é a decisão oficial e a lista vem separada, só informativa
+    expect(texto).toContain('1 · DECISÃO OFICIAL V4.0');
+    expect(texto).toContain('6 · LISTA "MELHORES ENTRADAS" — EXCLUSIVAMENTE INFORMATIVA');
     expect(texto).not.toContain('Pinnacle/Betfair sem margem');
   });
   it('margem da DC é relativa a 2 (Botosani: 1,29 / 1,25 / 1,62 ≈ 9,6%)', () => {
