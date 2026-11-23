@@ -9,6 +9,7 @@ import {
   escreverBackupGz,
   evidenciasDoBackupGz,
   FORMATO_BACKUP,
+  montarBackupGz,
   verificarBackupGz,
   verificarEvidencias,
   type CabecalhoBackupGz,
@@ -202,5 +203,82 @@ describe('backup antigo (.json versão 2 com evidências)', () => {
     const p = await verificarEvidencias([revs[1], alterada]);
     expect(p).toHaveLength(1);
     expect(p[0].motivo).toMatch(/evidência 2 \(jogo jogo-1, revisão 1\): SHA-256 não confere/);
+  });
+});
+
+describe('impressão digital do backup (identifica a importação no diário)', () => {
+  it('o mesmo arquivo dá sempre a mesma impressão', async () => {
+    const b = await bytes((await escreverBackupGz(cabecalho, paginas(revs))).blob);
+    const v1 = await verificarBackupGz(abrirBytes(b));
+    const v2 = await verificarBackupGz(abrirBytes(b));
+    if (!v1.ok || !v2.ok) throw new Error('deveria verificar');
+    expect(v1.impressao).toMatch(/^[0-9a-f]{64}$/);
+    expect(v2.impressao).toBe(v1.impressao);
+  });
+  it('mesmo nome e mesma contagem, revisões diferentes: impressões diferentes', async () => {
+    const outras = revs.map((r) => ({ ...r, meta: { ...r.meta, idJogo: 'jogo-2' } }));
+    const a = await verificarBackupGz(
+      abrirBytes(await bytes((await escreverBackupGz(cabecalho, paginas(revs))).blob)),
+    );
+    const b = await verificarBackupGz(
+      abrirBytes(await bytes((await escreverBackupGz(cabecalho, paginas(outras))).blob)),
+    );
+    if (!a.ok || !b.ok) throw new Error('deveria verificar');
+    expect(b.revisoes).toBe(a.revisoes);
+    expect(b.impressao).not.toBe(a.impressao);
+  });
+});
+
+describe('exportação: nunca um arquivo incompleto que pareça completo', () => {
+  const base = { ...cabecalho };
+  it('banco aberto: leva todas e diz isso no cabeçalho', async () => {
+    const r = await montarBackupGz(base, {
+      abrir: async () => undefined,
+      paginas: () => paginas(revs),
+    });
+    expect(r.semEvidencias).toBeNull();
+    const v = await verificarBackupGz(abrirBytes(await bytes(r.blob)));
+    if (!v.ok) throw new Error('deveria verificar');
+    expect(v.cabecalho.evidenciasNoArquivo).toBe('todas');
+    expect(v.revisoes).toBe(revs.length);
+  });
+  it('banco indisponível ANTES de começar: só o histórico, dito no arquivo', async () => {
+    const lidas = vi.fn();
+    const r = await montarBackupGz(base, {
+      abrir: async () => {
+        throw new Error('este navegador não tem banco (IndexedDB)');
+      },
+      paginas: () => {
+        lidas();
+        return paginas(revs);
+      },
+    });
+    expect(lidas).not.toHaveBeenCalled();
+    expect(r.semEvidencias).toMatch(/não tem banco/);
+    expect(r.revisoes).toBe(0);
+    const v = await verificarBackupGz(abrirBytes(await bytes(r.blob)));
+    if (!v.ok) throw new Error('deveria verificar');
+    expect(v.cabecalho.evidenciasNoArquivo).toBe('indisponiveis');
+    expect(v.cabecalho.motivoSemEvidencias).toMatch(/não tem banco/);
+    expect(v.cabecalho.historico).toEqual(cabecalho.historico);
+  });
+  it('leitura falha NO MEIO: backup cancelado, nenhum arquivo', async () => {
+    async function* quebra() {
+      yield revs.slice(0, 2);
+      throw new Error('banco fechou no meio da leitura');
+    }
+    await expect(
+      montarBackupGz(base, { abrir: async () => undefined, paginas: () => quebra() }),
+    ).rejects.toThrow(/backup cancelado, nenhum arquivo gerado.*banco fechou no meio/);
+  });
+  it('cabeçalho "sem evidências" com revisões dentro: recusado', async () => {
+    const b = await gzLinhas([
+      JSON.stringify({ ...cabecalho, evidenciasNoArquivo: 'indisponiveis' }),
+      JSON.stringify(revs[0]),
+      JSON.stringify({ fim: true, revisoes: 1 }),
+    ]);
+    const v = await verificarBackupGz(abrirBytes(b));
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.problemas[0].motivo).toMatch(/saiu sem evidências, mas ele tem revisões/);
   });
 });

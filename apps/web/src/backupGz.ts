@@ -10,7 +10,13 @@
  * gzip pelo CompressionStream nativo (navegador e Node): sem dependência, e o .json.gz abre em
  * qualquer descompactador. Backups antigos (.json, versões 1 e 2) seguem pelo caminho antigo.
  */
-import { impressaoDigital, pareceEvidencia, type Evidencia } from './evidencias';
+import {
+  chaveRevisao,
+  impressaoDigital,
+  impressaoDoBackup,
+  pareceEvidencia,
+  type Evidencia,
+} from './evidencias';
 
 export const FORMATO_BACKUP = 'pricing-engine-backup';
 export const VERSAO_BACKUP_GZ = 3;
@@ -21,6 +27,13 @@ export interface CabecalhoBackupGz {
   versao: typeof VERSAO_BACKUP_GZ;
   exportadoEm: string;
   historico: unknown[];
+  /**
+   * 'todas': o arquivo leva todas as revisões que o banco tinha na exportação. 'indisponiveis':
+   * o banco de evidências não abriu antes da exportação; só o histórico foi salvo (motivo junto).
+   * Ausente: arquivo anterior a este campo.
+   */
+  evidenciasNoArquivo?: 'todas' | 'indisponiveis';
+  motivoSemEvidencias?: string;
   [extra: string]: unknown;
 }
 
@@ -51,6 +64,8 @@ export async function escreverBackupGz(
   const gz = new CompressionStream('gzip');
   const escritor = gz.writable.getWriter();
   const resultado = new Response(gz.readable).blob();
+  // se a escrita abortar, esta promessa também falha: o erro que sobe é o da escrita
+  resultado.catch(() => undefined);
   const cod = new TextEncoder();
   let bytesBrutos = 0;
   let revisoes = 0;
@@ -77,6 +92,48 @@ export async function escreverBackupGz(
     revisoes,
     bytesBrutos,
   };
+}
+
+export interface FonteEvidencias {
+  /** abre o banco; se falhar, o backup sai só com o histórico, dito no arquivo e na tela */
+  abrir: () => Promise<unknown>;
+  paginas: () => AsyncIterable<Evidencia[]>;
+}
+
+export interface ResultadoBackup extends ResultadoEscrita {
+  /** motivo, quando o banco não abriu e o arquivo saiu sem evidências; null quando foram todas */
+  semEvidencias: string | null;
+}
+
+async function* nenhuma(): AsyncGenerator<Evidencia[]> {}
+
+/**
+ * Backup completo. O banco de evidências é aberto ANTES de escrever qualquer linha: se não abrir,
+ * o arquivo sai só com o histórico e o cabeçalho diz isso (evidenciasNoArquivo 'indisponiveis').
+ * Se abriu e a leitura falhar no meio, o backup é CANCELADO (nenhum arquivo): nunca sai um
+ * arquivo com parte das evidências e rodapé de completo.
+ */
+export async function montarBackupGz(
+  base: CabecalhoBackupGz,
+  fonte: FonteEvidencias,
+): Promise<ResultadoBackup> {
+  let semEvidencias: string | null = null;
+  try {
+    await fonte.abrir();
+  } catch (e) {
+    semEvidencias = (e as Error)?.message || String(e);
+  }
+  const cabecalho: CabecalhoBackupGz = semEvidencias
+    ? { ...base, evidenciasNoArquivo: 'indisponiveis', motivoSemEvidencias: semEvidencias }
+    : { ...base, evidenciasNoArquivo: 'todas' };
+  try {
+    const r = await escreverBackupGz(cabecalho, semEvidencias ? nenhuma() : fonte.paginas());
+    return { ...r, semEvidencias };
+  } catch (e) {
+    throw new Error(
+      `backup cancelado, nenhum arquivo gerado: a leitura das evidências falhou no meio (${(e as Error)?.message ?? e})`,
+    );
+  }
 }
 
 /** Linhas do arquivo descompactado, uma a uma (número começando em 1). */
@@ -118,6 +175,8 @@ export type VerificacaoBackupGz =
       revisoes: number;
       /** hash de cada revisão, na ordem do arquivo: a 2ª passada confere que é o mesmo arquivo */
       hashes: string[];
+      /** impressão digital do backup (impressaoDoBackup): identifica a importação no diário */
+      impressao: string;
     }
   | { ok: false; problemas: ProblemaBackup[] };
 
@@ -144,6 +203,7 @@ export async function verificarBackupGz(
   let cabecalho: CabecalhoBackupGz | null = null;
   let rodape: RodapeBackupGz | null = null;
   const hashes: string[] = [];
+  const chaves: string[] = [];
   try {
     for await (const { n, texto } of linhasGz(abrir())) {
       if (rodape) {
@@ -180,6 +240,7 @@ export async function verificarBackupGz(
           `SHA-256 não confere (jogo ${obj.meta.idJogo}, revisão ${obj.meta.revisao}): conteúdo alterado`,
         );
       hashes.push(obj.meta.hash);
+      chaves.push(chaveRevisao(obj.meta));
     }
   } catch (e) {
     falha(null, motivoDoFluxo(e));
@@ -189,8 +250,16 @@ export async function verificarBackupGz(
   if (!rodape) falha(null, 'sem rodapé: arquivo incompleto (cortado na cópia ou no download)');
   else if (rodape.revisoes !== hashes.length)
     falha(null, `rodapé diz ${rodape.revisoes} revisões, o arquivo tem ${hashes.length}`);
+  else if (cabecalho?.evidenciasNoArquivo === 'indisponiveis' && hashes.length)
+    falha(1, 'cabeçalho diz que o arquivo saiu sem evidências, mas ele tem revisões');
   if (problemas.length || !cabecalho) return { ok: false, problemas };
-  return { ok: true, cabecalho, revisoes: hashes.length, hashes };
+  return {
+    ok: true,
+    cabecalho,
+    revisoes: hashes.length,
+    hashes,
+    impressao: await impressaoDoBackup(chaves),
+  };
 }
 
 /**

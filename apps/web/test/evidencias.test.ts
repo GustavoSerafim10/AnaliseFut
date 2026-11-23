@@ -312,6 +312,65 @@ describe('importação', () => {
       evidencia: { meta: { revisao: 4, hash: 'D', importacao: { revisaoOriginal: 3 } } },
     });
   });
+  // P1: a identidade de uma revisão é o conteúdo E o momento em que foi gravada
+  const evT = (revisao: number, hash: string, gravadoEm: string): Evidencia =>
+    ({
+      esquema: 'evidencia-v1',
+      meta: { idJogo: 'j', revisao, hash, gravadoEm },
+      conteudo: {},
+    }) as Evidencia;
+  const xyx = () => [
+    evT(1, 'X', '2026-11-23T10:00:00.000Z'),
+    evT(2, 'Y', '2026-11-23T10:05:00.000Z'),
+    evT(3, 'X', '2026-11-23T10:10:00.000Z'),
+  ];
+  const gravadas = (p: ReturnType<typeof planejarImportacao>) =>
+    p.flatMap((x) => (x.acao === 'gravar' ? [x.evidencia.meta] : []));
+
+  it('X → Y → X restaurado num aparelho vazio: as três revisões, com os horários', () => {
+    const metas = gravadas(planejarImportacao([], xyx(), AGORA));
+    expect(metas.map((m) => [m.revisao, m.hash, m.gravadoEm])).toEqual([
+      [1, 'X', '2026-11-23T10:00:00.000Z'],
+      [2, 'Y', '2026-11-23T10:05:00.000Z'],
+      [3, 'X', '2026-11-23T10:10:00.000Z'],
+    ]);
+  });
+  it('reimportar o mesmo backup não duplica nada', () => {
+    const noBanco = gravadas(planejarImportacao([], xyx(), AGORA)).map((m) => ({
+      revisao: m.revisao,
+      hash: m.hash,
+      gravadoEm: m.gravadoEm,
+    }));
+    const p = planejarImportacao(noBanco, xyx(), AGORA);
+    expect(p.every((x) => x.acao === 'ja-existe')).toBe(true);
+    expect(p.map((x) => x.acao === 'ja-existe' && x.revisao)).toEqual([1, 2, 3]);
+  });
+  it('revisão renumerada por conflito: reimportar também não duplica', () => {
+    const daqui = [{ revisao: 1, hash: 'L', gravadoEm: '2026-11-23T09:00:00.000Z' }];
+    const primeira = gravadas(planejarImportacao(daqui, xyx(), AGORA));
+    // a 1 está ocupada pela L daqui: X vira 2, e daí Y e o segundo X sobem para 3 e 4
+    expect(primeira.map((m) => [m.revisao, m.importacao?.revisaoOriginal])).toEqual([
+      [2, 1],
+      [3, 2],
+      [4, 3],
+    ]);
+    const noBanco = [
+      ...daqui,
+      ...primeira.map((m) => ({ revisao: m.revisao, hash: m.hash, gravadoEm: m.gravadoEm })),
+    ];
+    expect(noBanco).toHaveLength(4);
+    expect(planejarImportacao(noBanco, xyx(), AGORA).every((x) => x.acao === 'ja-existe')).toBe(
+      true,
+    );
+  });
+  it('mesmo conteúdo gravado neste aparelho em outro momento não engole a revisão do backup', () => {
+    const daqui = [{ revisao: 1, hash: 'X', gravadoEm: '2026-11-22T08:00:00.000Z' }];
+    const metas = gravadas(
+      planejarImportacao(daqui, [evT(1, 'X', '2026-11-23T10:00:00.000Z')], AGORA),
+    );
+    expect(metas).toHaveLength(1);
+    expect(metas[0]).toMatchObject({ revisao: 2, gravadoEm: '2026-11-23T10:00:00.000Z' });
+  });
   it('forma mínima: rejeita o que não parece evidência', () => {
     expect(pareceEvidencia(ev(1, 'A'))).toBe(true);
     expect(pareceEvidencia({ esquema: 'x', meta: { idJogo: 'j', revisao: 0, hash: 'h' } })).toBe(

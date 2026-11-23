@@ -16,6 +16,9 @@ import type { Derivado } from './dados';
 import type { Rascunho } from './estado';
 import {
   antesDoApito,
+  chaveRevisao,
+  impressaoDoBackup,
+  LIMITE_REVISOES,
   montarEvidencia,
   planejarImportacao,
   planejarRevisao,
@@ -72,8 +75,10 @@ async function transacao<T>(
   tabelas: string[],
   modo: IDBTransactionMode,
   corpo: (tx: IDBTransaction, saida: { valor?: T }) => void,
+  /** conexão fixa (exportação): se ela fechar, a transação falha em vez de abrir outra */
+  conexaoFixa?: IDBDatabase,
 ): Promise<T> {
-  const db = await abrir();
+  const db = conexaoFixa ?? (await abrir());
   return new Promise<T>((ok, falha) => {
     const tx = db.transaction(tabelas, modo);
     const saida: { valor?: T } = {};
@@ -121,19 +126,28 @@ export function lerEvidencias(): Promise<Evidencia[]> {
 
 /**
  * Revisões em páginas, na ordem da chave (jogo, revisão), cada página numa leitura própria:
- * a memória guarda uma página por vez, não o banco inteiro.
+ * a memória guarda uma página por vez, não o banco inteiro. Todas as páginas usam a MESMA
+ * conexão: se o banco for fechado, apagado ou atualizado no meio (outra aba, "limpar dados do
+ * site"), a leitura falha — e o backup é cancelado — em vez de continuar num banco novo e vazio
+ * e entregar um arquivo com parte das revisões e rodapé de completo.
  */
 export async function* paginasDeEvidencias(tamanho = TAMANHO_LOTE): AsyncGenerator<Evidencia[]> {
+  const db = await abrir();
   let depoisDe: IDBValidKey | null = null;
   for (;;) {
     const faixa: IDBKeyRange | null =
       depoisDe === null ? null : IDBKeyRange.lowerBound(depoisDe, true);
-    const pagina = await transacao<Evidencia[]>([TABELA], 'readonly', (tx, saida) => {
-      const pedido = tx.objectStore(TABELA).getAll(faixa, tamanho);
-      pedido.onsuccess = () => {
-        saida.valor = pedido.result as Evidencia[];
-      };
-    });
+    const pagina = await transacao<Evidencia[]>(
+      [TABELA],
+      'readonly',
+      (tx, saida) => {
+        const pedido = tx.objectStore(TABELA).getAll(faixa, tamanho);
+        pedido.onsuccess = () => {
+          saida.valor = pedido.result as Evidencia[];
+        };
+      },
+      db,
+    );
     if (!pagina.length) return;
     yield pagina;
     const ultima = pagina[pagina.length - 1];
@@ -163,8 +177,15 @@ export interface DiarioImportacao {
   erro?: string;
   /** desfazer: revisões removidas */
   removidas?: number;
-  /** tentativa interrompida que uma reimportação completa do mesmo arquivo terminou */
+  /**
+   * SHA-256 da lista (jogo, revisão, horário original, hash) de todas as revisões do arquivo,
+   * na ordem: identifica o backup pelo conteúdo, não pelo nome nem pela contagem.
+   */
+  impressao?: string;
+  /** tentativa interrompida que uma reimportação completa do mesmo backup terminou */
   completadaPor?: string;
+  /** tentativas interrompidas do mesmo backup que esta importação completou: o desfazer as leva */
+  incorpora?: string[];
 }
 
 export interface ResultadoImportacao {
@@ -172,6 +193,8 @@ export interface ResultadoImportacao {
   novas: number;
   jaExistiam: number;
   renumeradas: number;
+  /** tentativas interrompidas deste mesmo backup que esta importação completou */
+  incorporadas: string[];
 }
 
 const novoLote = () => `imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -182,31 +205,57 @@ function gravarDiario(d: DiarioImportacao): Promise<void> {
   });
 }
 
+const pendente = (d: DiarioImportacao) => d.estado === 'em-andamento' || d.estado === 'falhou';
+
+/**
+ * Tentativas interrompidas do MESMO backup (mesma impressão digital SHA-256, nunca só o mesmo
+ * nome ou a mesma contagem) que a importação `d`, ao concluir, incorpora.
+ */
+export function tentativasIncorporadas(diarios: DiarioImportacao[], d: DiarioImportacao): string[] {
+  if (!d.impressao) return [];
+  return diarios
+    .filter((v) => v.id !== d.id && pendente(v) && v.impressao === d.impressao)
+    .map((v) => v.id);
+}
+
+/**
+ * O que "desfazer" leva: a operação lógica inteira. Pedido sobre uma tentativa incorporada vale
+ * para a importação que a completou; a importação leva as tentativas que incorporou. Nunca
+ * entram lotes de outras importações nem revisões sem lote (as gravadas pelo aparelho).
+ */
+export function lotesDoDesfazer(diarios: DiarioImportacao[], lote: string): string[] {
+  const pedido = diarios.find((x) => x.id === lote);
+  const raiz = pedido?.completadaPor
+    ? (diarios.find((x) => x.id === pedido.completadaPor) ?? pedido)
+    : pedido;
+  if (!raiz) return [lote];
+  return [raiz.id, ...(raiz.incorpora ?? [])];
+}
+
 /**
  * Marca a importação como concluída e, na mesma transação, dá por completadas as tentativas
- * interrompidas do MESMO arquivo (mesmo nome e mesma contagem): esta passou por todas as
- * revisões dele, então tudo o que elas gravaram já faz parte do resultado. Sem isso o aviso
- * continuaria, e "desfazer" a tentativa velha apagaria revisões que agora valem. Nada é apagado.
+ * interrompidas do MESMO backup (tentativasIncorporadas): esta passou por todas as revisões
+ * dele, então o que elas gravaram faz parte do resultado e passa a ser desfeito junto com ela
+ * (`incorpora`). Sem isso o aviso continuaria e o desfazer ficaria pela metade. Nada é apagado.
  */
-function concluirComTentativas(d: DiarioImportacao): Promise<void> {
-  return transacao<void>([DIARIO], 'readwrite', (tx) => {
+function concluirComTentativas(d: DiarioImportacao): Promise<DiarioImportacao> {
+  return transacao<DiarioImportacao>([DIARIO], 'readwrite', (tx, saida) => {
     const loja = tx.objectStore(DIARIO);
-    loja.put(d);
     const pedido = loja.getAll();
     pedido.onsuccess = () => {
-      for (const v of pedido.result as DiarioImportacao[])
-        if (
-          v.id !== d.id &&
-          (v.estado === 'em-andamento' || v.estado === 'falhou') &&
-          v.arquivo === d.arquivo &&
-          v.esperadas === d.esperadas
-        )
+      const todos = pedido.result as DiarioImportacao[];
+      const incorpora = tentativasIncorporadas(todos, d);
+      const final: DiarioImportacao = incorpora.length ? { ...d, incorpora } : d;
+      loja.put(final);
+      for (const v of todos)
+        if (incorpora.includes(v.id))
           loja.put({
             ...v,
             estado: 'concluida',
             completadaPor: d.id,
             atualizadaEm: d.atualizadaEm,
           });
+      saida.valor = final;
     };
   });
 }
@@ -232,6 +281,7 @@ function gravarLote(lote: Evidencia[], diario: DiarioImportacao): Promise<Diario
         const existentes = (pedido.result as Evidencia[]).map((e) => ({
           revisao: e.meta.revisao,
           hash: e.meta.hash,
+          gravadoEm: e.meta.gravadoEm,
         }));
         for (const p of planejarImportacao(existentes, vindas)) {
           if (p.acao === 'ja-existe') novo.jaExistiam++;
@@ -253,7 +303,7 @@ function gravarLote(lote: Evidencia[], diario: DiarioImportacao): Promise<Diario
  */
 export async function importarEvidenciasEmLotes(
   fonte: AsyncIterable<Evidencia> | Iterable<Evidencia>,
-  info: { arquivo: string; esperadas: number },
+  info: { arquivo: string; esperadas: number; impressao: string },
   aoProgredir?: (d: DiarioImportacao) => void,
   tamanho = TAMANHO_LOTE,
 ): Promise<ResultadoImportacao> {
@@ -261,6 +311,7 @@ export async function importarEvidenciasEmLotes(
   let diario: DiarioImportacao = {
     id: novoLote(),
     arquivo: info.arquivo,
+    impressao: info.impressao,
     iniciadaEm: agora,
     atualizadaEm: agora,
     esperadas: info.esperadas,
@@ -287,13 +338,14 @@ export async function importarEvidenciasEmLotes(
         `processadas ${diario.processadas} de ${diario.esperadas} revisões esperadas`,
       );
     diario = { ...diario, estado: 'concluida', atualizadaEm: new Date().toISOString() };
-    await concluirComTentativas(diario);
+    diario = await concluirComTentativas(diario);
     aoProgredir?.(diario);
     return {
       lote: diario.id,
       novas: diario.novas,
       jaExistiam: diario.jaExistiam,
       renumeradas: diario.renumeradas,
+      incorporadas: diario.incorpora ?? [],
     };
   } catch (e) {
     const erro = (e as Error)?.message ?? String(e);
@@ -310,73 +362,128 @@ export async function importarEvidenciasEmLotes(
 }
 
 /** Lista já em memória (backup .json antigo): o mesmo caminho em lotes, com diário. */
-export function importarEvidencias(
+export async function importarEvidencias(
   vindas: Evidencia[],
   arquivo = 'backup .json',
 ): Promise<ResultadoImportacao> {
-  return importarEvidenciasEmLotes(vindas, { arquivo, esperadas: vindas.length });
+  return importarEvidenciasEmLotes(vindas, {
+    arquivo,
+    esperadas: vindas.length,
+    impressao: await impressaoDoBackup(vindas.map((e) => chaveRevisao(e.meta))),
+  });
 }
 
-/** Importações que não terminaram (interrompidas ou com falha), para avisar e oferecer saída. */
-export function importacoesPendentes(): Promise<DiarioImportacao[]> {
+/** Todas as importações registradas (pendentes, concluídas, desfeitas), para a tela. */
+export function lerDiarios(): Promise<DiarioImportacao[]> {
   return transacao<DiarioImportacao[]>([DIARIO], 'readonly', (tx, saida) => {
     const pedido = tx.objectStore(DIARIO).getAll();
     pedido.onsuccess = () => {
-      saida.valor = (pedido.result as DiarioImportacao[]).filter(
-        (d) => d.estado === 'em-andamento' || d.estado === 'falhou',
-      );
+      saida.valor = pedido.result as DiarioImportacao[];
     };
   });
 }
 
+/** Importações que não terminaram (interrompidas ou com falha), para avisar e oferecer saída. */
+export async function importacoesPendentes(): Promise<DiarioImportacao[]> {
+  return (await lerDiarios()).filter(pendente);
+}
+
 /**
- * Desfaz uma importação: apaga SÓ as revisões marcadas com o lote dela (nunca as gravadas pelo
- * aparelho nem as de outra importação), na mesma transação que marca o diário como "desfeita".
+ * Desfaz uma importação inteira (lotesDoDesfazer: ela e as tentativas interrompidas do mesmo
+ * backup que ela completou). Apaga SÓ as revisões marcadas com esses lotes — nunca as gravadas
+ * pelo aparelho nem as de outra importação — na mesma transação que marca cada diário como
+ * "desfeita", com quantas revisões saíram de cada um.
  */
 export function desfazerImportacao(lote: string): Promise<number> {
   return transacao<number>([TABELA, DIARIO], 'readwrite', (tx, saida) => {
-    let removidas = 0;
-    const cursor = tx.objectStore(TABELA).openCursor();
-    cursor.onsuccess = () => {
-      const c = cursor.result;
-      if (c) {
-        if ((c.value as Evidencia).meta.loteImportacao === lote) {
-          c.delete();
-          removidas++;
+    const diarios = tx.objectStore(DIARIO).getAll();
+    diarios.onsuccess = () => {
+      const todos = diarios.result as DiarioImportacao[];
+      const lotes = lotesDoDesfazer(todos, lote);
+      const porLote = new Map(lotes.map((l) => [l, 0]));
+      const cursor = tx.objectStore(TABELA).openCursor();
+      cursor.onsuccess = () => {
+        const c = cursor.result;
+        if (c) {
+          const dele = (c.value as Evidencia).meta.loteImportacao;
+          if (dele !== undefined && porLote.has(dele)) {
+            c.delete();
+            porLote.set(dele, (porLote.get(dele) ?? 0) + 1);
+          }
+          c.continue();
+          return;
         }
-        c.continue();
-        return;
-      }
-      const d = tx.objectStore(DIARIO).get(lote);
-      d.onsuccess = () => {
-        if (d.result)
-          tx.objectStore(DIARIO).put({
-            ...(d.result as DiarioImportacao),
-            estado: 'desfeita',
-            removidas,
-            atualizadaEm: new Date().toISOString(),
-          });
-        saida.valor = removidas;
+        const agora = new Date().toISOString();
+        for (const d of todos)
+          if (porLote.has(d.id))
+            tx.objectStore(DIARIO).put({
+              ...d,
+              estado: 'desfeita',
+              removidas: porLote.get(d.id),
+              atualizadaEm: agora,
+            });
+        saida.valor = [...porLote.values()].reduce((a, b) => a + b, 0);
       };
     };
   });
 }
 
+/** Abre o banco de evidências (ou falha): o backup decide ANTES de começar se elas vão junto. */
+export async function abrirBancoEvidencias(): Promise<void> {
+  await abrir();
+}
+
+export interface AvisoEvidencia {
+  /** falha: a evidência não foi gravada; descarte: gravou e o limite de 50 tirou revisões */
+  tipo: 'falha' | 'descarte';
+  texto: string;
+}
+
+/** "2 a 32", "2, 5 e 9" (até 10 números; depois, "…"). */
+function numeros(lista: number[]): string {
+  const o = [...lista].sort((a, b) => a - b);
+  if (o.length > 1 && o[o.length - 1] - o[0] === o.length - 1)
+    return `${o[0]} a ${o[o.length - 1]}`;
+  const mostra = o.slice(0, 10).map(String);
+  if (o.length > 10) return `${mostra.join(', ')}…`;
+  return mostra.length > 1
+    ? `${mostra.slice(0, -1).join(', ')} e ${mostra[mostra.length - 1]}`
+    : mostra.join('');
+}
+
+/** Texto do aviso quando uma gravação local descarta revisões pelo limite de 50 por jogo. */
+export function avisoDeDescarte(jogo: string, apagadas: number[]): string {
+  const n = apagadas.length;
+  return (
+    `Limite de ${LIMITE_REVISOES} revisões por jogo: ${n} revisão(ões) antiga(s) de ${jogo} ` +
+    `foram descartada(s) neste aparelho (nº ${numeros(apagadas)}). Ficam a 1ª e as ` +
+    `${LIMITE_REVISOES - 1} mais recentes; um backup exportado antes desta gravação ainda as tem.`
+  );
+}
+
 /**
- * Monta e grava a evidência da análise salva. Nunca lança: devolve um aviso (texto) quando não
- * conseguiu, e o histórico — já gravado antes desta chamada — não depende dela.
+ * Monta e grava a evidência da análise salva. Nunca lança: devolve um aviso quando não conseguiu
+ * gravar (o histórico — já gravado antes desta chamada — não depende dela) ou quando a gravação
+ * descartou revisões pelo limite de 50 (o descarte nunca acontece calado).
  */
 export async function registrarEvidencia(
   idJogo: string,
   r: Rascunho,
   d: Derivado,
   ctx: ContextoCalculo,
-): Promise<string | null> {
+): Promise<AvisoEvidencia | null> {
   try {
     if (!antesDoApito(r)) return null;
-    await gravarEvidencia(await montarEvidencia(idJogo, r, d, ctx));
+    const g = await gravarEvidencia(await montarEvidencia(idJogo, r, d, ctx));
+    if (g.acao === 'gravada' && g.apagadas.length) {
+      const jogo = `${r.jogo.casa || 'Mandante'} × ${r.jogo.fora || 'Visitante'}`;
+      return { tipo: 'descarte', texto: avisoDeDescarte(jogo, g.apagadas) };
+    }
     return null;
   } catch (e) {
-    return `A análise foi salva no histórico, mas a evidência não foi gravada: ${(e as Error).message}`;
+    return {
+      tipo: 'falha',
+      texto: `A análise foi salva no histórico, mas a evidência não foi gravada: ${(e as Error).message}`,
+    };
   }
 }

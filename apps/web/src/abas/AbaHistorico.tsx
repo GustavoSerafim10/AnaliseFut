@@ -2,22 +2,23 @@ import { lerResultado, type ParLido, type ResultadoLido } from '@pe/parsers';
 import { NOMES_ESTRATEGIA, type Estrategia, type TravasBanca } from '@pe/engine';
 import { useEffect, useState } from 'react';
 import {
+  abrirBancoEvidencias,
   desfazerImportacao,
-  importacoesPendentes,
   importarEvidencias,
   importarEvidenciasEmLotes,
+  lerDiarios,
+  lotesDoDesfazer,
   paginasDeEvidencias,
   type DiarioImportacao,
 } from '../armazemEvidencias';
 import {
   ehGzip,
-  escreverBackupGz,
   evidenciasDoBackupGz,
   FORMATO_BACKUP,
+  montarBackupGz,
   verificarBackupGz,
   verificarEvidencias,
   VERSAO_BACKUP_GZ,
-  type CabecalhoBackupGz,
 } from '../backupGz';
 import { identidadesSalvas, juntarIdentidades } from '../coresTimes';
 import { dec, isoLocal, num, pct, type Leitura, type Rascunho } from '../estado';
@@ -349,40 +350,41 @@ export function AbaHistorico({
     ? Math.floor((Date.now() - Date.parse(ultimoBackup)) / 86_400_000)
     : null;
 
-  const [pendentes, setPendentes] = useState<DiarioImportacao[]>([]);
+  const [diarios, setDiarios] = useState<DiarioImportacao[]>([]);
   const lerPendentes = () =>
-    void importacoesPendentes()
-      .then(setPendentes)
-      .catch(() => setPendentes([]));
+    void lerDiarios()
+      .then(setDiarios)
+      .catch(() => setDiarios([]));
   useEffect(lerPendentes, []);
+  const pendentes = diarios.filter((d) => d.estado === 'em-andamento' || d.estado === 'falhou');
+  // concluídas que podem ser desfeitas (as tentativas incorporadas vão junto com a que as completou)
+  const concluidas = diarios
+    .filter(
+      (d) => d.estado === 'concluida' && !d.completadaPor && (d.novas > 0 || !!d.incorpora?.length),
+    )
+    .sort((a, b) => b.atualizadaEm.localeCompare(a.atualizadaEm));
 
   /**
    * Backup versão 3 (.json.gz): histórico e extras na 1ª linha, uma revisão de evidência por
-   * linha, escrito em fluxo (nunca uma string única). Se o banco de evidências falhar, o
-   * histórico sai igual, com aviso.
+   * linha, escrito em fluxo (nunca uma string única). Banco de evidências que não abre: o
+   * histórico sai sozinho, dito no arquivo e aqui. Leitura que falha no meio: nenhum arquivo.
    */
   async function baixar() {
-    let semEvidencias = false;
-    async function* paginas() {
-      try {
-        yield* paginasDeEvidencias();
-      } catch {
-        semEvidencias = true;
-      }
-    }
     setMsg({ tipo: 'ok', texto: 'Montando o backup compactado…' });
     try {
-      const cabecalho: CabecalhoBackupGz = {
-        formato: FORMATO_BACKUP,
-        versao: VERSAO_BACKUP_GZ,
-        exportadoEm: isoLocal(new Date()),
-        historico,
-        banca: bancaInicial,
-        rascunho: rascunhoAtual,
-        ...identidadesSalvas(),
-        multiplas,
-      };
-      const { blob, revisoes } = await escreverBackupGz(cabecalho, paginas());
+      const { blob, revisoes, semEvidencias } = await montarBackupGz(
+        {
+          formato: FORMATO_BACKUP,
+          versao: VERSAO_BACKUP_GZ,
+          exportadoEm: isoLocal(new Date()),
+          historico,
+          banca: bancaInicial,
+          rascunho: rascunhoAtual,
+          ...identidadesSalvas(),
+          multiplas,
+        },
+        { abrir: abrirBancoEvidencias, paginas: () => paginasDeEvidencias() },
+      );
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `backup-pricing-engine-${isoLocal(new Date()).slice(0, 10)}.json.gz`;
@@ -396,7 +398,7 @@ export function AbaHistorico({
         semEvidencias
           ? {
               tipo: 'alerta',
-              texto: `Backup baixado (${mb} MB) SEM as evidências: o banco de evidências não abriu neste aparelho.`,
+              texto: `Backup baixado (${mb} MB) SEM as evidências: o banco de evidências não abriu neste aparelho (${semEvidencias}). O arquivo registra isso no cabeçalho.`,
             }
           : {
               tipo: 'ok',
@@ -457,10 +459,15 @@ export function AbaHistorico({
       });
     const veio = aplicarBackup(v.cabecalho);
     if (!veio) return;
+    if (v.cabecalho.evidenciasNoArquivo === 'indisponiveis')
+      return setMsg({
+        tipo: 'alerta',
+        texto: `Importado: ${veio.join(', ')}. Este backup foi gerado SEM evidências: o banco de evidências não abriu no aparelho de origem (${String(v.cabecalho.motivoSemEvidencias ?? 'motivo não registrado')}).`,
+      });
     try {
       const e = await importarEvidenciasEmLotes(
         evidenciasDoBackupGz(() => f.stream(), v.hashes),
-        { arquivo: f.name, esperadas: v.revisoes },
+        { arquivo: f.name, esperadas: v.revisoes, impressao: v.impressao },
         (d) =>
           setMsg({
             tipo: 'ok',
@@ -469,7 +476,7 @@ export function AbaHistorico({
       );
       setMsg({
         tipo: 'ok',
-        texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam. SHA-256 conferido em ${v.revisoes} revisão(ões).`,
+        texto: `Importado: ${veio.join(', ')}; evidências: ${e.novas} nova(s) (${e.renumeradas} com número novo por conflito), ${e.jaExistiam} já existiam${e.incorporadas.length ? `; completou ${e.incorporadas.length} tentativa(s) interrompida(s) deste mesmo backup` : ''}. SHA-256 conferido em ${v.revisoes} revisão(ões).`,
       });
     } catch (erro) {
       setMsg({
@@ -482,9 +489,12 @@ export function AbaHistorico({
   }
 
   async function desfazer(d: DiarioImportacao) {
+    // a operação inteira: ela e as tentativas interrompidas do mesmo backup que ela completou
+    const lotes = lotesDoDesfazer(diarios, d.id);
+    const total = diarios.filter((x) => lotes.includes(x.id)).reduce((a, x) => a + x.novas, 0);
     if (
       !confirm(
-        `Desfazer a importação de "${d.arquivo}"? Saem só as ${d.novas} revisão(ões) que ela gravou; o resto fica.`,
+        `Desfazer a importação de "${d.arquivo}"? Saem só as ${total} revisão(ões) que ela gravou${lotes.length > 1 ? ` (somando ${lotes.length - 1} tentativa(s) interrompida(s) que ela completou)` : ''}; o que já existia neste aparelho e o de outras importações fica.`,
       )
     )
       return;
@@ -929,6 +939,28 @@ export function AbaHistorico({
           </button>
         </div>
       ))}
+      {concluidas.length > 0 && (
+        <details>
+          <summary>Importações de evidências ({concluidas.length})</summary>
+          {concluidas.map((d) => (
+            <div key={d.id} className="caixa">
+              <strong>{d.arquivo}</strong> (
+              {new Date(d.atualizadaEm).toLocaleString('pt-BR', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
+              ): {d.novas} revisão(ões) gravada(s), {d.jaExistiam} já existiam
+              {d.incorpora?.length
+                ? `; completou ${d.incorpora.length} tentativa(s) interrompida(s) deste mesmo backup`
+                : ''}
+              .{' '}
+              <button className="mini" onClick={() => void desfazer(d)}>
+                Desfazer esta importação
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
     </section>
   );
 }

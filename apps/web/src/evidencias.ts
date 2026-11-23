@@ -361,6 +361,8 @@ export function antesDoApito(r: Rascunho, agora = Date.now()): boolean {
 export interface RevisaoExistente {
   revisao: number;
   hash: string;
+  /** horário original da revisão (meta.gravadoEm): com o hash, identifica a revisão */
+  gravadoEm?: string;
 }
 
 export type PlanoRevisao =
@@ -385,9 +387,11 @@ export type PlanoImportacao =
   { acao: 'ja-existe'; revisao: number } | { acao: 'gravar'; evidencia: Evidencia };
 
 /**
- * Importação de backup: conteúdo já guardado (mesmo hash) não duplica; número livre mantém o
- * número; número ocupado por OUTRO conteúdo ganha número novo, guardando o original em
- * meta.importacao. Nada é sobrescrito nem podado na importação.
+ * Importação de backup: a MESMA revisão já guardada (mesmo hash E mesmo horário original) não
+ * duplica; o mesmo conteúdo gravado em outro momento (X → Y → X) é outra revisão e entra.
+ * Número livre mantém o número; número ocupado por outra revisão ganha número novo, guardando o
+ * original em meta.importacao (o horário original fica em meta.gravadoEm, e por isso reimportar
+ * a renumerada também não duplica). Nada é sobrescrito nem podado na importação.
  */
 export function planejarImportacao(
   existentes: RevisaoExistente[],
@@ -397,7 +401,7 @@ export function planejarImportacao(
   const atuais = [...existentes];
   const planos: PlanoImportacao[] = [];
   for (const ev of [...vindas].sort((a, b) => a.meta.revisao - b.meta.revisao)) {
-    const igual = atuais.find((e) => e.hash === ev.meta.hash);
+    const igual = atuais.find((e) => e.hash === ev.meta.hash && e.gravadoEm === ev.meta.gravadoEm);
     if (igual) {
       planos.push({ acao: 'ja-existe', revisao: igual.revisao });
       continue;
@@ -407,10 +411,30 @@ export function planejarImportacao(
     const meta: MetaEvidencia = ocupado
       ? { ...ev.meta, revisao, importacao: { revisaoOriginal: ev.meta.revisao, importadoEm } }
       : ev.meta;
-    atuais.push({ revisao, hash: ev.meta.hash });
+    atuais.push({ revisao, hash: ev.meta.hash, gravadoEm: ev.meta.gravadoEm });
     planos.push({ acao: 'gravar', evidencia: { ...ev, meta } });
   }
   return planos;
+}
+
+/** Identidade de uma revisão num backup: jogo, número, horário original e hash do conteúdo. */
+export function chaveRevisao(
+  meta: Pick<MetaEvidencia, 'idJogo' | 'revisao' | 'gravadoEm' | 'hash'>,
+) {
+  return JSON.stringify([meta.idJogo, meta.revisao, meta.gravadoEm, meta.hash]);
+}
+
+/**
+ * Impressão digital (SHA-256) de um backup: a lista das chaves de todas as revisões, na ordem do
+ * arquivo. Dois arquivos com o mesmo nome e a mesma contagem, mas revisões diferentes, dão
+ * impressões diferentes.
+ */
+export async function impressaoDoBackup(chaves: string[]): Promise<string> {
+  const sutil = globalThis.crypto?.subtle;
+  if (!sutil) throw new Error('crypto.subtle indisponível: sem SHA-256 não há impressão do backup');
+  const bytes = new TextEncoder().encode(chaves.join('\n'));
+  const h = new Uint8Array(await sutil.digest('SHA-256', bytes));
+  return [...h].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Forma mínima de uma evidência vinda de fora (backup): o resto é conferido pelo hash. */

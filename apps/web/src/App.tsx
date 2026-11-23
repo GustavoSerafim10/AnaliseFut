@@ -135,6 +135,8 @@ export function App() {
   }, [r, travas, registradasNoJogo]);
   const d = calculo.d;
   const [avisoEvidencia, setAvisoEvidencia] = useState<string | null>(null);
+  // descarte pelo limite de 50: fica na tela (somando) até ser dispensado, nunca some sozinho
+  const [descartes, setDescartes] = useState<string[]>([]);
   /** Fase 0: fotografia da análise salva. Roda depois do histórico e nunca o impede. */
   const evidenciar = (id: string) => {
     if (demo) return;
@@ -142,7 +144,12 @@ export function App() {
       travas,
       registradasNoJogo,
       calculadoEm: calculo.calculadoEm,
-    }).then(setAvisoEvidencia);
+    }).then((aviso) => {
+      if (aviso?.tipo === 'descarte') {
+        setAvisoEvidencia(null);
+        setDescartes((x) => [...x, aviso.texto]);
+      } else setAvisoEvidencia(aviso?.texto ?? null);
+    });
   };
   useEffect(() => ouvirFalhaDeGravacao(setAvisoHistorico), []);
   const setHistorico = (h: EntradaHistorico[]) => {
@@ -478,6 +485,16 @@ export function App() {
         {aba.id === 'promocoes' && <AbaPromocoes {...props} />}
         {avisoHistorico && <div className="caixa alerta">{avisoHistorico}</div>}
         {avisoEvidencia && <div className="caixa alerta">{avisoEvidencia}</div>}
+        {descartes.length > 0 && (
+          <div className="caixa alerta">
+            {descartes.map((t, i) => (
+              <p key={i}>{t}</p>
+            ))}
+            <button className="mini" onClick={() => setDescartes([])}>
+              Entendi
+            </button>
+          </div>
+        )}
         {rascunhoCheio && (
           <div className="caixa alerta">
             O navegador não deixou guardar esta análise: se fechar a página, ela se perde. Exporte

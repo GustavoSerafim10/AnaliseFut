@@ -3,7 +3,13 @@
  * e a gravação real foram conferidas num Chrome de verdade: o Node não tem IndexedDB.)
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { registrarEvidencia } from '../src/armazemEvidencias';
+import {
+  avisoDeDescarte,
+  lotesDoDesfazer,
+  registrarEvidencia,
+  tentativasIncorporadas,
+  type DiarioImportacao,
+} from '../src/armazemEvidencias';
 import { derivar } from '../src/dados';
 import { rascunhoExemplo } from '../src/exemplo';
 import { salvarNoHistorico } from '../src/historico';
@@ -18,7 +24,8 @@ describe('falha do banco de evidências', () => {
     const { lista, id } = salvarNoHistorico([], r, d);
     const antes = JSON.stringify(lista);
     const aviso = await registrarEvidencia(id, r, d, { calculadoEm: { inicio: 'a', fim: 'b' } });
-    expect(aviso).toMatch(/salva no histórico, mas a evidência não foi gravada/);
+    expect(aviso?.tipo).toBe('falha');
+    expect(aviso?.texto).toMatch(/salva no histórico, mas a evidência não foi gravada/);
     expect(JSON.stringify(lista)).toBe(antes);
     expect(lista).toHaveLength(1);
   });
@@ -30,5 +37,85 @@ describe('falha do banco de evidências', () => {
     expect(await registrarEvidencia('x', r, d, { calculadoEm: { inicio: 'a', fim: 'b' } })).toBe(
       null,
     );
+  });
+});
+
+const diario = (id: string, o: Partial<DiarioImportacao> = {}): DiarioImportacao => ({
+  id,
+  arquivo: 'backup.json.gz',
+  iniciadaEm: 't',
+  atualizadaEm: 't',
+  esperadas: 150,
+  processadas: 0,
+  novas: 0,
+  jaExistiam: 0,
+  renumeradas: 0,
+  estado: 'concluida',
+  ...o,
+});
+
+describe('importação retomada: qual tentativa a conclusão incorpora', () => {
+  const nova = diario('nova', { impressao: 'AAA' });
+
+  it('só a do MESMO backup (mesma impressão SHA-256) e que não terminou', () => {
+    const todos = [
+      diario('mesma-falhou', { impressao: 'AAA', estado: 'falhou', novas: 100 }),
+      diario('mesma-andamento', { impressao: 'AAA', estado: 'em-andamento', novas: 20 }),
+      diario('mesma-concluida', { impressao: 'AAA', estado: 'concluida' }),
+      diario('mesma-desfeita', { impressao: 'AAA', estado: 'desfeita' }),
+      nova,
+    ];
+    expect(tentativasIncorporadas(todos, nova)).toEqual(['mesma-falhou', 'mesma-andamento']);
+  });
+
+  it('mesmo nome e mesma contagem, conteúdo diferente: NÃO incorpora', () => {
+    const outra = diario('outro-arquivo', { impressao: 'BBB', estado: 'falhou', novas: 100 });
+    expect(outra.arquivo).toBe(nova.arquivo);
+    expect(outra.esperadas).toBe(nova.esperadas);
+    expect(tentativasIncorporadas([outra, nova], nova)).toEqual([]);
+  });
+
+  it('diário sem impressão (anterior a ela) nunca é casado por nome e contagem', () => {
+    const antiga = diario('antiga', { estado: 'falhou' });
+    expect(tentativasIncorporadas([antiga, nova], nova)).toEqual([]);
+    expect(tentativasIncorporadas([antiga], diario('sem', {}))).toEqual([]);
+  });
+});
+
+describe('desfazer: a operação lógica inteira, nada além dela', () => {
+  const todos = [
+    diario('tentativa', { estado: 'concluida', completadaPor: 'retomada', novas: 100 }),
+    diario('retomada', { incorpora: ['tentativa'], novas: 50 }),
+    diario('outra-importacao', { novas: 7 }),
+  ];
+  it('desfazer a retomada leva as tentativas que ela completou', () => {
+    expect(lotesDoDesfazer(todos, 'retomada')).toEqual(['retomada', 'tentativa']);
+  });
+  it('pedir pela tentativa incorporada desfaz a operação inteira', () => {
+    expect(lotesDoDesfazer(todos, 'tentativa')).toEqual(['retomada', 'tentativa']);
+  });
+  it('outras importações não entram', () => {
+    expect(lotesDoDesfazer(todos, 'outra-importacao')).toEqual(['outra-importacao']);
+    expect(lotesDoDesfazer(todos, 'retomada')).not.toContain('outra-importacao');
+  });
+  it('lote desconhecido: só ele (nunca "tudo")', () => {
+    expect(lotesDoDesfazer(todos, 'xyz')).toEqual(['xyz']);
+  });
+});
+
+describe('limite de 50: descarte avisado', () => {
+  it('diz o jogo, quantas e quais revisões saíram', () => {
+    const t = avisoDeDescarte(
+      'Remo × Paysandu',
+      Array.from({ length: 31 }, (_, i) => i + 2),
+    );
+    expect(t).toContain(
+      'Limite de 50 revisões por jogo: 31 revisão(ões) antiga(s) de Remo × Paysandu',
+    );
+    expect(t).toMatch(/nº 2 a 32/);
+    expect(t).toMatch(/Ficam a 1ª e as 49 mais recentes/);
+    expect(avisoDeDescarte('A × B', [2])).toContain('1 revisão(ões) antiga(s) de A × B');
+    expect(avisoDeDescarte('A × B', [2])).toContain('(nº 2)');
+    expect(avisoDeDescarte('A × B', [2, 5, 9])).toContain('(nº 2, 5 e 9)');
   });
 });
