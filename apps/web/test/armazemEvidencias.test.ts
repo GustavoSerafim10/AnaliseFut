@@ -4,8 +4,13 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  aplicarLote,
   avisoDeDescarte,
   dependentesDoDesfazer,
+  desfalcadasParaTela,
+  motivoRecusaDesfazer,
+  reconciliar,
+  recomposicaoComprovada,
   importacoesVivas,
   lotesDoDesfazer,
   motivoParaParar,
@@ -166,5 +171,105 @@ describe('desfazer: importações que dependiam das revisões removidas (caso C)
   it('a própria operação (ela e as tentativas incorporadas) não é dependente de si', () => {
     const op = [diario('ret', { incorpora: ['t'], apoio: { t: 30 } }), diario('t', {})];
     expect(dependentesDoDesfazer(op, ['ret', 't'])).toEqual([]);
+  });
+});
+
+describe('P2c / G1: o lote parte do diário do banco e preserva o desfalque', () => {
+  const desfalque = { por: 'x', arquivo: 'f1.json.gz', revisoes: 100, em: 't' };
+  it('desfalque marcado por outra aba sobrevive ao lote seguinte; só as contagens mudam', () => {
+    const noBanco = diario('y', {
+      estado: 'em-andamento',
+      processadas: 100,
+      jaExistiam: 100,
+      apoio: { x: 100 },
+      desfalques: [desfalque],
+    });
+    const depois = aplicarLote(
+      noBanco,
+      { processadas: 50, novas: 50, jaExistiam: 0, renumeradas: 0, apoio: {} },
+      't2',
+    );
+    expect(depois.desfalques).toEqual([desfalque]);
+    expect(depois).toMatchObject({
+      processadas: 150,
+      novas: 50,
+      jaExistiam: 100,
+      apoio: { x: 100 },
+    });
+    expect(depois.estado).toBe('em-andamento');
+    expect(depois.atualizadaEm).toBe('t2');
+  });
+  it('apoio soma por lote, sem perder o que já havia', () => {
+    const d = aplicarLote(
+      diario('y', { apoio: { a: 2 } }),
+      { processadas: 5, novas: 0, jaExistiam: 5, renumeradas: 0, apoio: { a: 3, b: 2 } },
+      't',
+    );
+    expect(d.apoio).toEqual({ a: 5, b: 2 });
+  });
+  it('importação que terminou com desfalque continua aparecendo na tela', () => {
+    expect(
+      desfalcadasParaTela([diario('y', { estado: 'concluida', desfalques: [desfalque] })]),
+    ).toHaveLength(1);
+  });
+});
+
+describe('P2c / G2: a marca só sai com a recomposição comprovada', () => {
+  const desfalque = { por: 'x', arquivo: 'f1.json.gz', revisoes: 100, em: 't' };
+  const completa = diario('b', {
+    estado: 'em-andamento',
+    impressao: 'AAA',
+    esperadas: 150,
+    processadas: 150,
+    novas: 150,
+  });
+  it('comprovada: mesmo backup, todas as revisões tratadas e nenhum desfalque próprio', () => {
+    expect(recomposicaoComprovada(completa)).toBe(true);
+    expect(recomposicaoComprovada({ ...completa, processadas: 149 })).toBe(false);
+    expect(recomposicaoComprovada({ ...completa, impressao: undefined })).toBe(false);
+    expect(recomposicaoComprovada({ ...completa, desfalques: [desfalque] })).toBe(false);
+    expect(recomposicaoComprovada({ ...completa, estado: 'desfeita' })).toBe(false);
+  });
+  it('tentativa incorporada com desfalque: comprovada → limpa e registra quem recompôs', () => {
+    const a1 = diario('a1', { estado: 'falhou', impressao: 'AAA', desfalques: [desfalque] });
+    const r = reconciliar(a1, completa, true, 't2');
+    expect(r.desfalques).toBeUndefined();
+    expect(r.recompostaPor).toBe('b');
+    expect(r.apoio).toEqual({ b: 150 });
+  });
+  it('sem comprovação a marca fica', () => {
+    const a1 = diario('a1', { estado: 'falhou', desfalques: [desfalque] });
+    expect(reconciliar(a1, completa, false, 't2').desfalques).toEqual([desfalque]);
+  });
+  it('a tela nunca mostra tentativa incorporada como desfalcada', () => {
+    const incorporada = diario('a1', {
+      estado: 'concluida',
+      completadaPor: 'b',
+      desfalques: [desfalque],
+    });
+    expect(desfalcadasParaTela([incorporada])).toEqual([]);
+  });
+});
+
+describe('P2c: desfazer recusado diz qual importação precisa terminar', () => {
+  const todos = [
+    diario('raiz', { incorpora: ['t'] }),
+    diario('t', { estado: 'concluida', completadaPor: 'raiz' }),
+    diario('dep', { arquivo: 'dep.json.gz', estado: 'em-andamento', apoio: { raiz: 3 } }),
+    diario('outra', { arquivo: 'outra.json.gz', estado: 'em-andamento' }),
+  ];
+  it('nomeia cada importação rodando e o papel dela', () => {
+    const m = motivoRecusaDesfazer(todos, new Set(['dep', 'outra']), ['raiz', 't']);
+    expect(m).toContain('"dep.json.gz" (depende das revisões desta)');
+    expect(m).toContain('"outra.json.gz" (pode passar a depender delas até terminar)');
+    expect(m).toContain('nada foi apagado');
+  });
+  it('parte da própria operação rodando também é nomeada', () => {
+    const m = motivoRecusaDesfazer(
+      [...todos.slice(0, 1), diario('t', { arquivo: 'f.json.gz', estado: 'em-andamento' })],
+      new Set(['t']),
+      ['raiz', 't'],
+    );
+    expect(m).toContain('"f.json.gz" (parte desta importação)');
   });
 });

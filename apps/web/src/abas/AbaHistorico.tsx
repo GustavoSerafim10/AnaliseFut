@@ -7,6 +7,7 @@ import {
   importarEvidencias,
   importarEvidenciasEmLotes,
   dependentesDoDesfazer,
+  desfalcadasParaTela,
   importacoesVivas,
   lerDiarios,
   lotesDoDesfazer,
@@ -364,7 +365,8 @@ export function AbaHistorico({
       .catch(() => setDiarios([]));
   useEffect(lerPendentes, []);
   // importações que perderam revisões porque outra foi desfeita: aviso até reimportar
-  const desfalcadas = diarios.filter((d) => d.estado === 'concluida' && d.desfalques?.length);
+  // (tentativas incorporadas não aparecem: a importação que as completou responde por elas)
+  const desfalcadas = desfalcadasParaTela(diarios);
   const pendentes = diarios.filter((d) => d.estado === 'em-andamento' || d.estado === 'falhou');
   // concluídas que podem ser desfeitas (as tentativas incorporadas vão junto com a que as completou)
   const concluidas = diarios
@@ -946,6 +948,9 @@ export function AbaHistorico({
             timeStyle: 'short',
           })}
           ) não terminou: {d.processadas} de {d.esperadas} revisões tratadas, {d.novas} gravada(s)
+          {d.desfalques?.length
+            ? ` (e perdeu ${d.desfalques.reduce((a, x) => a + x.revisoes, 0)} revisão(ões) que contava, ao desfazer outra importação)`
+            : ''}
           {vivas.has(d.id) ? (
             ' — ainda está rodando (nesta ou em outra aba). Espere terminar para desfazer.'
           ) : (
