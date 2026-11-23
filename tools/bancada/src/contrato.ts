@@ -46,7 +46,9 @@ export type CategoriaExclusao =
   /** revisão com esquema diferente do conhecido */
   | 'esquema-desconhecido'
   /** análise sem times ou sem horário de início: não dá para formar o jogo */
-  | 'jogo-sem-chave';
+  | 'jogo-sem-chave'
+  /** revisão íntegra cuja análise ficou fora por 'jogo-sem-chave': registrada uma a uma */
+  | 'evidencia-de-analise-sem-chave';
 
 export interface Exclusao {
   categoria: CategoriaExclusao;

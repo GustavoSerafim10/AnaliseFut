@@ -29,14 +29,30 @@ export interface Cenario {
   inicio: string;
 }
 
-let cache: Cenario | null = null;
+const cache = new Map<string, Cenario>();
 
 /** O jogo de exemplo salvo no histórico, com revisões de evidência reais. */
-export async function cenario(): Promise<Cenario> {
-  if (cache) return structuredClone(cache);
+export const cenario = () => gerarCenario('exemplo', 'jogo-1');
+
+/**
+ * O mesmo jogo, mas com a Superbet pagando 1,90 no over 2,5 (era 1,84): com essa odd o
+ * próprio derivar() do site põe a seleção na lista "Melhores entradas" (o modelo dá 53,2%,
+ * acima do mínimo de 1/1,90). A lista sai do fluxo real de gravação, não é montada à mão.
+ */
+export const cenarioComLista = () => gerarCenario('lista', 'jogo-lista', 1.9);
+
+async function gerarCenario(nome: string, id: string, overSuperbet?: number): Promise<Cenario> {
+  const ja = cache.get(nome);
+  if (ja) return structuredClone(ja);
   vi.useFakeTimers({ now: AGORA, toFake: ['Date'] });
   try {
-    const r = { ...rascunhoExemplo(), idHistorico: 'jogo-1' };
+    const r = { ...rascunhoExemplo(), idHistorico: id };
+    if (overSuperbet !== undefined)
+      r.odds = r.odds.map((l) =>
+        l.casa === 'Superbet' && l.mercado === 'total' && l.lado === 'over'
+          ? { ...l, odd: overSuperbet }
+          : l,
+      );
     const d = derivar(r);
     const { lista } = salvarNoHistorico([], r, d, undefined, AGORA.getTime());
     const base = lista[0];
@@ -46,7 +62,7 @@ export async function cenario(): Promise<Cenario> {
     const revisoes: Evidencia[] = [];
     for (const [i, g] of quando.entries()) {
       const e = await montarEvidencia(
-        'jogo-1',
+        id,
         r,
         d,
         { calculadoEm: { inicio: g, fim: g } },
@@ -55,8 +71,9 @@ export async function cenario(): Promise<Cenario> {
       );
       revisoes.push({ ...e, meta: { ...e.meta, revisao: i + 1 } });
     }
-    cache = { entrada: base, revisoes, inicio };
-    return structuredClone(cache);
+    const c = { entrada: base, revisoes, inicio };
+    cache.set(nome, c);
+    return structuredClone(c);
   } finally {
     vi.useRealTimers();
   }

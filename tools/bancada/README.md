@@ -35,7 +35,8 @@ navegador.
 | `v1-json` | `.json` antigo, sem `versao`: só o histórico | **formato anterior à estrutura de evidências** — não é perda |
 
 Arquivo defeituoso (gzip truncado, SHA divergente, JSON inválido, versão desconhecida, sem
-`historico`) é **recusado inteiro**, com motivo, e nada dele é aproveitado. Um `v3` exportado com
+`historico` ou com `historico` que não é lista) é **recusado inteiro**, com motivo, e nada dele é
+aproveitado — nunca vira lista vazia. Um `v3` exportado com
 o banco de evidências fechado sai marcado `evidenciasIndisponiveisNaOrigem`.
 
 ## Conservação: nada some sem rastro
@@ -47,13 +48,18 @@ em exatamente uma categoria, e a soma é verificada (erro se não fechar):
 
 - **duplicata**: a mesma identidade já vista (evidência: `[idJogo, hash, gravadoEm]`; histórico:
   mesmo id e mesmo conteúdo canônico).
-- **substituído**: versão mais antiga de uma entrada que mudou entre backups (a canônica é a mais
-  recente por resultado → aposta → salvamento); listada em `substituidas`.
+- **substituído**: versão mais antiga de uma entrada que mudou entre backups; listada em
+  `substituidas` com as datas originais. A canônica é a mais recente por resultado → aposta →
+  salvamento, comparando o **instante** (`Date.parse`), nunca o texto. Cada entrada canônica diz
+  o `criterio`: `unica`, `recencia` ou `desempate-por-conteudo` — este quando alguma data é
+  ilegível ou as datas empatam; a escolha continua determinística, mas sai com `alerta` e motivo.
 - **excluído**: com categoria em `exclusoes` — `fonte-recusada`, `entrada-malformada`,
   `evidencia-malformada`, `evidencia-orfa`, `esquema-desconhecido`, `jogo-sem-chave`.
 
 Depois da normalização: `entradasCanonicas = analises + semChaveDeJogo` e
-`evidenciasCanonicas = evidenciasEmAnalises + evidenciasDeAnaliseExcluida`.
+`evidenciasCanonicas = evidenciasEmAnalises + evidenciasDeAnaliseExcluida`. Cada revisão de uma
+análise sem chave de jogo também é registrada **individualmente** em `exclusoes`
+(`evidencia-de-analise-sem-chave`, com identidade, arquivo de origem e motivo).
 
 ## O que sai (`Conjunto`, contrato versão 1)
 

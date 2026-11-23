@@ -5,7 +5,12 @@
 import { canonico } from '../../../apps/web/src/evidencias';
 import type { Evidencia } from '../../../apps/web/src/evidencias';
 import { VERSAO_CONTRATO, type Exclusao, type FonteLida } from './contrato';
-import { juntarBackups, type Juncao, type VersaoSubstituida } from './leitura/juntarBackups';
+import {
+  identidadeEvidencia,
+  juntarBackups,
+  type Juncao,
+  type VersaoSubstituida,
+} from './leitura/juntarBackups';
 import { lerBackup } from './leitura/lerBackup';
 import { montarAposta, type Aposta } from './normalizar/apostas';
 import { FAIXAS, type IdFaixa } from './normalizar/faixas';
@@ -73,6 +78,7 @@ export function normalizar(j: Juncao): Omit<Conjunto, 'impressao'> {
   const analises: Analise[] = [];
   const selecoes: Selecao[] = [];
   const apostas: Aposta[] = [];
+  const revisoesSemChave: Exclusao[] = [];
   let evidenciasEmAnalises = 0;
   let evidenciasDeAnaliseExcluida = 0;
   for (const { entrada } of j.entradas) {
@@ -80,6 +86,15 @@ export function normalizar(j: Juncao): Omit<Conjunto, 'impressao'> {
     const chave = chavePorId.get(entrada.id);
     if (!chave) {
       evidenciasDeAnaliseExcluida += evs.length;
+      for (const ev of evs) {
+        const id = identidadeEvidencia(ev);
+        revisoesSemChave.push({
+          categoria: 'evidencia-de-analise-sem-chave',
+          fonte: (j.fontesDaEvidencia.get(id) ?? [])[0] ?? '',
+          id,
+          motivo: `revisão ${ev.meta.revisao} não aproveitada: a análise ${entrada.id} não tem mandante, visitante ou início válido (jogo-sem-chave)`,
+        });
+      }
       continue;
     }
     evidenciasEmAnalises += evs.length;
@@ -99,7 +114,10 @@ export function normalizar(j: Juncao): Omit<Conjunto, 'impressao'> {
   };
   if (normalizacao.analises + normalizacao.semChaveDeJogo !== normalizacao.entradasCanonicas)
     throw new Error('conservação violada na normalização: entradas canônicas sem destino');
-  if (evidenciasEmAnalises + evidenciasDeAnaliseExcluida !== j.evidencias.length)
+  if (
+    evidenciasEmAnalises + evidenciasDeAnaliseExcluida !== j.evidencias.length ||
+    revisoesSemChave.length !== evidenciasDeAnaliseExcluida
+  )
     throw new Error('conservação violada na normalização: revisões sem destino');
 
   return {
@@ -112,7 +130,7 @@ export function normalizar(j: Juncao): Omit<Conjunto, 'impressao'> {
     ),
     apostas: apostas.sort((a, b) => a.idHistorico.localeCompare(b.idHistorico)),
     substituidas: j.substituidas,
-    exclusoes: [...j.exclusoes, ...semChave].sort(
+    exclusoes: [...j.exclusoes, ...semChave, ...revisoesSemChave].sort(
       (a, b) =>
         a.categoria.localeCompare(b.categoria) ||
         a.fonte.localeCompare(b.fonte) ||

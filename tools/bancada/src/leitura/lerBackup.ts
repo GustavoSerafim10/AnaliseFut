@@ -64,13 +64,18 @@ export async function lerBackup(nome: string, bytes: Uint8Array): Promise<Leitur
         'v3-gz',
         v.problemas.map((p) => (p.linha ? `linha ${p.linha}: ${p.motivo}` : p.motivo)),
       );
+    // sem lista de histórico não há como saber o que o arquivo trazia: recusa, nunca lista vazia
+    if (!Array.isArray(v.cabecalho.historico))
+      return recusar('v3-gz', [
+        `cabeçalho com "historico" que não é lista (${v.cabecalho.historico === null ? 'null' : typeof v.cabecalho.historico})`,
+      ]);
     const evidencias: Evidencia[] = [];
     try {
       for await (const ev of evidenciasDoBackupGz(fluxo(bytes), v.chaves)) evidencias.push(ev);
     } catch (e) {
       return recusar('v3-gz', [`2ª leitura: ${(e as Error).message}`]);
     }
-    const historico = Array.isArray(v.cabecalho.historico) ? v.cabecalho.historico : [];
+    const historico = v.cabecalho.historico;
     return {
       fonte: {
         ...base,

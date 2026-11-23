@@ -18,11 +18,29 @@ export interface EntradaCanonica {
   fontes: string[];
   /** versões diferentes vistas (1 = nunca mudou) */
   versoes: number;
+  /**
+   * Como a canônica foi escolhida: 'unica' (só uma versão), 'recencia' (pelo instante das datas)
+   * ou 'desempate-por-conteudo' (datas inválidas ou empatadas: a ordem no tempo não pôde ser
+   * provada; a escolha é determinística, mas fica marcada com o motivo em `alerta`)
+   */
+  criterio: CriterioCanonica;
+  alerta: string | null;
+}
+
+export type CriterioCanonica = 'unica' | 'recencia' | 'desempate-por-conteudo';
+
+/** As datas que decidem a recência, como vieram no arquivo (valor original preservado). */
+export interface DatasVersao {
+  registradoEm: string | null;
+  feitaEm: string | null;
+  salvoEm: string | null;
 }
 
 export interface VersaoSubstituida {
   id: string;
   fonte: string;
+  datas: DatasVersao;
+  criterio: Exclude<CriterioCanonica, 'unica'>;
   motivo: string;
 }
 
@@ -30,6 +48,8 @@ export interface Juncao {
   fontes: FonteLida[];
   entradas: EntradaCanonica[];
   evidencias: Evidencia[];
+  /** arquivos em que cada revisão canônica apareceu (por identidade), para rastrear exclusões */
+  fontesDaEvidencia: Map<string, string[]>;
   substituidas: VersaoSubstituida[];
   exclusoes: Exclusao[];
   conservacao: {
@@ -59,9 +79,37 @@ export function pareceEntrada(x: unknown): x is EntradaHistorico {
 export const identidadeEvidencia = (e: Evidencia) =>
   JSON.stringify([e.meta.idJogo, e.meta.hash, e.meta.gravadoEm]);
 
-/** Recência de uma versão de entrada: resultado, aposta, salvamento; desempate pelo conteúdo. */
-const recencia = (e: EntradaHistorico): string =>
-  [e.resultado?.registradoEm ?? '', e.aposta?.feitaEm ?? '', e.salvoEm ?? ''].join('|');
+/**
+ * Recência de uma versão de entrada: resultado, depois aposta, depois salvamento — comparados
+ * pelo INSTANTE (Date.parse), nunca como texto: "-03:00" e "Z" do mesmo instante empatam.
+ * Campo ausente vale "antes de tudo" (versão sem resultado é anterior à que tem). Campo
+ * presente mas ilegível é marcado como inválido: não entra em comparação silenciosa.
+ */
+interface Recencia {
+  datas: DatasVersao;
+  instantes: number[];
+  invalidas: string[];
+}
+export function recencia(e: EntradaHistorico): Recencia {
+  const datas: DatasVersao = {
+    registradoEm: e.resultado?.registradoEm ?? null,
+    feitaEm: e.aposta?.feitaEm ?? null,
+    salvoEm: e.salvoEm ?? null,
+  };
+  const invalidas: string[] = [];
+  const instantes = (Object.keys(datas) as (keyof DatasVersao)[]).map((k) => {
+    const v = datas[k];
+    if (v === null) return -Infinity;
+    const t = typeof v === 'string' ? Date.parse(v) : Number.NaN;
+    if (!Number.isFinite(t)) invalidas.push(`${k}=${JSON.stringify(v)}`);
+    return t;
+  });
+  return { datas, instantes, invalidas };
+}
+const compararInstantes = (a: number[], b: number[]) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  return 0;
+};
 
 function verificarConservacao(nome: string, c: Conservacao): void {
   const soma = c.canonicos + c.duplicatas + c.substituidos + c.excluidos;
@@ -130,11 +178,29 @@ export function juntarBackups(leituras: LeituraBackup[]): Juncao {
   }
   const entradas: EntradaCanonica[] = [];
   for (const [id, versoes] of versoesPorId) {
-    const ordenadas = [...versoes].sort(
+    const rs = versoes.map((v) => ({ ...v, r: recencia(v.entrada) }));
+    const invalidas = rs.flatMap((v) => v.r.invalidas);
+    // com data ilegível em qualquer versão, a ordem no tempo não é provável: só desempate
+    const ordenadas = rs.sort(
       (a, b) =>
-        recencia(b.entrada).localeCompare(recencia(a.entrada)) || b.texto.localeCompare(a.texto),
+        (invalidas.length ? 0 : compararInstantes(b.r.instantes, a.r.instantes)) ||
+        b.texto.localeCompare(a.texto),
     );
     const [canonica, ...antigas] = ordenadas;
+    const empate =
+      antigas.length > 0 && compararInstantes(canonica.r.instantes, antigas[0].r.instantes) === 0;
+    const criterio: CriterioCanonica =
+      versoes.length === 1
+        ? 'unica'
+        : invalidas.length || empate
+          ? 'desempate-por-conteudo'
+          : 'recencia';
+    const alerta =
+      criterio !== 'desempate-por-conteudo'
+        ? null
+        : invalidas.length
+          ? `data inválida (${invalidas.join(', ')}): ordem no tempo não comprovada; canônica escolhida pelo conteúdo`
+          : 'versões com as mesmas datas: ordem no tempo não comprovada; canônica escolhida pelo conteúdo';
     hist.canonicos++;
     hist.duplicatas += canonica.copias - 1;
     for (const v of antigas) {
@@ -143,13 +209,20 @@ export function juntarBackups(leituras: LeituraBackup[]): Juncao {
       substituidas.push({
         id,
         fonte: v.fontes[0],
-        motivo: `versão mais antiga (${recencia(v.entrada)}) que a canônica (${recencia(canonica.entrada)})`,
+        datas: v.r.datas,
+        criterio: criterio === 'recencia' ? 'recencia' : 'desempate-por-conteudo',
+        motivo:
+          criterio === 'recencia'
+            ? `versão anterior (${JSON.stringify(v.r.datas)}) à canônica (${JSON.stringify(canonica.r.datas)})`
+            : alerta!,
       });
     }
     entradas.push({
       entrada: canonica.entrada,
       fontes: [...(fontesPorId.get(id) ?? [])].sort(),
       versoes: versoes.length,
+      criterio,
+      alerta,
     });
   }
   entradas.sort((a, b) => a.entrada.id.localeCompare(b.entrada.id));
@@ -157,7 +230,12 @@ export function juntarBackups(leituras: LeituraBackup[]): Juncao {
 
   // ---------- evidências ----------
   const vistas = new Map<string, Evidencia>();
+  const fontesEv = new Map<string, Set<string>>();
   for (const l of ordem) {
+    for (const ev of l.evidencias) {
+      const k = identidadeEvidencia(ev);
+      fontesEv.set(k, (fontesEv.get(k) ?? new Set()).add(l.fonte.nome));
+    }
     evid.fisicos += l.fisicos.evidencias;
     for (const x of l.exclusoes.filter((e) => e.categoria === 'evidencia-malformada')) {
       evid.excluidos++;
@@ -210,6 +288,12 @@ export function juntarBackups(leituras: LeituraBackup[]): Juncao {
     fontes: ordem.map((l) => l.fonte),
     entradas,
     evidencias,
+    fontesDaEvidencia: new Map(
+      evidencias.map((ev) => {
+        const k = identidadeEvidencia(ev);
+        return [k, [...(fontesEv.get(k) ?? [])].sort()];
+      }),
+    ),
     substituidas: substituidas.sort(
       (a, b) => a.id.localeCompare(b.id) || a.fonte.localeCompare(b.fonte),
     ),

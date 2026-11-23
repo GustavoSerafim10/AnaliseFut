@@ -136,8 +136,8 @@ describe('jogo', () => {
     sem.id = 'sem';
     sem.resumo.inicio = 'quando?';
     const r = montarJogos([
-      { entrada: e, fontes: ['a'], versoes: 1 },
-      { entrada: sem, fontes: ['a'], versoes: 1 },
+      { entrada: e, fontes: ['a'], versoes: 1, criterio: 'unica', alerta: null },
+      { entrada: sem, fontes: ['a'], versoes: 1, criterio: 'unica', alerta: null },
     ]);
     expect(r.jogos).toHaveLength(1);
     expect(r.exclusoes).toEqual([
@@ -150,8 +150,8 @@ describe('jogo', () => {
     const a = comApostaEResultado(e, { placar: [2, 1] });
     const b = { ...comApostaEResultado(e, { placar: [0, 0] }), id: 'jogo-2', irmaDe: 'jogo-1' };
     const r = montarJogos([
-      { entrada: a, fontes: ['x'], versoes: 1 },
-      { entrada: b, fontes: ['x'], versoes: 1 },
+      { entrada: a, fontes: ['x'], versoes: 1, criterio: 'unica', alerta: null },
+      { entrada: b, fontes: ['x'], versoes: 1, criterio: 'unica', alerta: null },
     ]);
     expect(r.jogos).toHaveLength(1);
     expect(r.jogos[0].idsHistorico).toEqual(['jogo-1', 'jogo-2']);
