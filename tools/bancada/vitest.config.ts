@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
     testTimeout: 30_000,
+    // F1.2: fuso fixado explicitamente; o harness confere o EFETIVO, não só a variável
+    env: { TZ: 'America/Sao_Paulo' },
   },
 });

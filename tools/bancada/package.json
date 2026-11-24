@@ -6,6 +6,7 @@
   "description": "Fase 1 — bancada de inteligência: lê backups da Fase 0 e normaliza (só leitura).",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "test:reproducao": "vitest run --config vitest.reproducao.config.ts"
   }
 }

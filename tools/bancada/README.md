@@ -104,3 +104,49 @@ de qualquer comparação confirmatória.
   juntam (apelidos não são resolvidos).
 - O CLV "no papel" de uma seleção só existe para a entrada registrada, porque o fechamento é
   informado só para ela.
+
+## F1.2a — reprodução histórica (orquestrador, área isolada, harness)
+
+Reproduz cada revisão de evidência **no build que a gerou** e diz, com motivo, se a decisão se
+reproduz. Valida a capacidade de reproduzir decisões históricas; não altera nem "melhora"
+probabilidade alguma do motor. Reprocessamento (F1.2b) e backups reais (F1.2c) ainda não.
+
+```sh
+npm --prefix tools/bancada run test             # suíte rápida (build falso, executor no processo)
+npm --prefix tools/bancada run test:reproducao  # suíte lenta: builds reais na área isolada
+```
+
+**Área isolada** (D5): `%LOCALAPPDATA%\pe-bancada\` — `builds/<commit>/` (código por
+`git archive` + `npm ci --ignore-scripts` com o lockfile do commit, cache com `build.json`) e
+`execucoes/<id>/` (`entradas/`, `saidas/`, `registros/`, `conteudos/<sha>.json`,
+`resultados.jsonl`, `manifesto.json`). Caminho dentro do repositório é recusado. O repositório
+principal só é lido (`git cat-file`, `git archive`, com `GIT_OPTIONAL_LOCKS=0`).
+
+**Harness**: `src/reproducao/harness/` é copiado para `<build>/apps/web/test/` e roda com o
+vitest **daquele commit**, um processo por revisão, com tempo limite (60 s; a árvore inteira é
+encerrada), `TZ=America/Sao_Paulo`, rede desviada (proxy morto + `fetch` bloqueado) e relógio
+parado em `meta.calculadoEm.inicio`. Antes de calcular, confere o fuso **efetivo** (nome e
+deslocamento medido) e, quando o código usa localidade padrão (`localeCompare` sem localidade —
+caso atual), a localidade efetiva (`pt-BR`). Números marcados `{$invalido}` voltam à entrada só
+se listados em `conteudo.invalidos` no mesmo caminho.
+
+**Comparação**: hash → estrutura (ausente, null, NaN, ±Infinity e `{$invalido}` são tipos
+distintos) → campos de decisão sem tolerância. Tolerância D3:
+`|a−b| ≤ max(1e-12, 1e-12·max(|a|,|b|))`.
+
+**Classes**: `original-exata`, `original-equivalente`, `original-divergente`,
+`nao-reproduzivel` (subcausas: `commit-ausente`, `build-nao-elegivel`,
+`dependencias-indisponiveis`, `api-ausente`, `entrada-irrecuperavel`, `relogio-desconhecido`,
+`erro-execucao`, `tempo-esgotado`, e os acréscimos `ambiente-invalido`,
+`evidencia-inconsistente`). `reprocessamento` só na F1.2b. Marcas da F1.1 (ex.:
+`cronologiaNaoComprovada`) seguem em cada resultado.
+
+**Limitações aprovadas da F1.2a**
+
+- A evidência do teste demonstrativo (suíte real, teste 1) foi gerada pela árvore de trabalho
+  atual, conferida no próprio teste como idêntica a `8964bf4` em `apps/`, `packages/`,
+  `package.json` e `package-lock.json`. Ela demonstra a capacidade de reprodução, mas **não é
+  uma evidência histórica original de produção**.
+- Commits que existem apenas no GitHub ainda não são recuperados automaticamente (não há
+  clone da origem nesta etapa): um commit ausente do repositório local resulta em
+  `nao-reproduzivel/commit-ausente`.
