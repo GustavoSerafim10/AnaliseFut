@@ -5,7 +5,7 @@
 import { NOMES_ESTRATEGIA, NOMES_REFERENCIA, type ResultadoV4 } from '@pe/engine';
 import type { Derivado } from '../dados';
 import type { Rascunho } from '../estado';
-import { avisoLigaPrincipal, evSoMercado } from '../leituraDecisao';
+import { avisoLigaDoJogo, evSoMercado } from '../leituraDecisao';
 import { Dica, Icone, Numero, type NomeIcone } from './ui';
 
 type Decisao = ResultadoV4['decisao'];
@@ -81,7 +81,7 @@ export function CentroDecisao({ d, r }: { d: Derivado; r?: Rascunho }) {
   const evMercado = m ? evSoMercado(m) : null;
   const avisoLiga =
     m && r && m.nivel === 'R3' && m.nivelMercado !== 3
-      ? avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop)
+      ? avisoLigaDoJogo(r.jogo.competicao, d.contextoAmostra.competicaoPrincipal, r.config.ligaTop)
       : null;
   const alertas = [
     ...(avisoLiga ? [avisoLiga] : []),

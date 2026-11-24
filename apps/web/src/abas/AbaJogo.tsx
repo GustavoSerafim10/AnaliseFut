@@ -6,7 +6,8 @@ import type { PrintDoJogo } from '../ocr';
 import { EditorFigurinhas } from '../componentes/Figurinhas';
 import { Icone, type NomeIcone } from '../componentes/ui';
 import type { Rascunho } from '../estado';
-import { avisoLigaPrincipal } from '../leituraDecisao';
+import { avisoLigaDoJogo } from '../leituraDecisao';
+import { descreverContexto } from '../contextoDaAmostra';
 import type { PropsAba } from './tipos';
 
 const OPCOES: [keyof Rascunho['config'], string, string][] = [
@@ -127,7 +128,9 @@ export function AbaJogo({
     },
     {
       nome: 'Estatísticas',
-      detalhe: 'SofaScore / SuperScore',
+      detalhe:
+        (descreverContexto(d.contextoAmostra) ?? 'SofaScore / SuperScore') +
+        (d.contextoAmostra.item3d === 'SIM' ? ' · ⚠️ amostra mista' : ''),
       icone: 'barras',
       estado: temStats ? 'ok' : algumaStat ? 'parcial' : 'pendente',
       ir: abrir && (() => abrir('sofascore')),
@@ -355,10 +358,18 @@ export function AbaJogo({
             </label>
           ))}
         </div>
-        {avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop) && (
+        {avisoLigaDoJogo(
+          r.jogo.competicao,
+          d.contextoAmostra.competicaoPrincipal,
+          r.config.ligaTop,
+        ) && (
           <div className="caixa alerta miudo aviso-liga">
             <Icone nome="alerta" tamanho={16} />{' '}
-            {avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop)}
+            {avisoLigaDoJogo(
+              r.jogo.competicao,
+              d.contextoAmostra.competicaoPrincipal,
+              r.config.ligaTop,
+            )}
           </div>
         )}
 

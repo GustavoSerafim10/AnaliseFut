@@ -25,6 +25,7 @@ export * from './camisa';
 export * from './cabecalho';
 export * from './conferirPrint';
 export * from './ultimas';
+export * from './contextoAmostra';
 
 export interface LeituraPrint extends ResultadoParser {
   fonte: FonteDetectada;

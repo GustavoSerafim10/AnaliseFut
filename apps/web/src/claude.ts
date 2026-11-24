@@ -26,6 +26,7 @@ import {
 import { CAMPOS_STATS, type CampoStat } from '@pe/parsers';
 import { temTextoFlashscore, type Derivado } from './dados';
 import type { Rascunho } from './estado';
+import { descreverContexto, type ContextoAmostra } from './contextoDaAmostra';
 
 export const INDISPONIVEL = 'DADO INDISPONÍVEL';
 export const ORIGEM_INDISPONIVEL = 'ORIGEM INDISPONÍVEL';
@@ -349,7 +350,7 @@ const PEDIDO = [
   '   a) o EV depende de uma única casa fora da faixa das outras?',
   '   b) a diferença de horário entre a coleta e a referência pode explicar o preço?',
   '   c) há notícia que a referência pode já ter e as estatísticas não?',
-  '   d) a amostra é curta ou mistura temporadas e competições?',
+  '   d) a amostra é curta ou mistura temporadas e competições? (use a linha "Amostra mistura competições ou temporadas" da seção 3 e não a contradiga)',
   '   e) a tese usa alguma estatística do CONTEXTO como argumento de valor?',
   '   f) é mercado de nicho com preço vindo do modelo?',
   '4. Incerteza: como a conclusão muda se o λ estiver 15 a 20% errado (a faixa de ±10% é parâmetro, não medida).',
@@ -458,7 +459,7 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
   };
   l.push(
     `- Amostra: ${nJogos('casa')} jogos de ${nomes.casa} e ${nJogos('fora')} de ${nomes.fora}`,
-    '- Período e competição: NÃO INFORMADO (não há campo estruturado; o cabeçalho do print não é interpretado)',
+    ...linhasContexto(d.contextoAmostra),
   );
   const linhaStat = (campo: CampoStat, rotulo: string) => {
     const v = d.tabela[campo];
@@ -591,4 +592,38 @@ export function montarPromptClaude(r: Rascunho, d: Derivado): string {
 
   l.push('', ...PEDIDO);
   return l.join('\n');
+}
+
+/** Seção 3: competição e temporada lidas do cabeçalho dos prints (só exibição; Parte A). */
+function linhasContexto(c: ContextoAmostra): string[] {
+  const desc = descreverContexto(c);
+  if (!desc)
+    return [
+      '- Período e competição: NÃO INFORMADO (cabeçalho dos prints ilegível ou ausente)',
+      `- Amostra mistura competições ou temporadas (checklist 3d): ${INDISPONIVEL}`,
+    ];
+  const ladosSofa = [
+    ...new Set(
+      c.leituras
+        .filter((l) => l.fonte === 'sofascore')
+        .map((l) => (l.lado === 'casa' ? 'mandante' : 'visitante')),
+    ),
+  ];
+  const onde = [
+    ladosSofa.length ? `SofaScore (${ladosSofa.join(' e ')})` : null,
+    c.leituras.some((l) => l.fonte === 'superscore') ? 'SuperScore (os dois times)' : null,
+  ].filter(Boolean);
+  const jogo =
+    c.coincideComJogo === true
+      ? ' · mesma competição do jogo'
+      : c.coincideComJogo === false
+        ? ' · DIFERENTE da competição cadastrada do jogo'
+        : '';
+  const reconstruida = c.leituras.some((l) => l.confianca === 'reconstruida')
+    ? ' · temporada reconstruída do OCR (barra perdida)'
+    : '';
+  return [
+    `- Período e competição: ${desc}${jogo}${reconstruida} — lido no cabeçalho dos prints: ${onde.join('; ')}`,
+    `- Amostra mistura competições ou temporadas (checklist 3d): ${c.item3d}${c.motivos.length ? ` — ${c.motivos.join('; ')}` : ''}`,
+  ];
 }

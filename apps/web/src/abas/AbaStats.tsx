@@ -3,6 +3,7 @@ import { RaioX } from '../componentes/RaioX';
 import { conferirPrintEstatisticas } from '@pe/parsers';
 import { UploadPrints } from '../componentes/UploadPrints';
 import { acoesPrints, type PropsAba } from './tipos';
+import { descreverContexto } from '../contextoDaAmostra';
 
 const INFO: Record<FonteStats, { titulo: string; dica: string }> = {
   sofascore: {
@@ -14,6 +15,24 @@ const INFO: Record<FonteStats, { titulo: string; dica: string }> = {
     dica: 'Aba Estatísticas → "Estatísticas do time" com "Média" selecionado. Vários prints rolando a página.',
   },
 };
+
+/**
+ * Competição e temporada lidas do cabeçalho dos prints (só exibição: não entra no λ nem na DQ).
+ * Alerta quando a amostra mistura competições/temporadas ou não bate com o jogo.
+ */
+export function AmostraLida({ d }: { d: PropsAba['d'] }) {
+  const c = d.contextoAmostra;
+  const desc = descreverContexto(c);
+  if (!desc && !c.leituras.length) return null;
+  return (
+    <div className={`caixa miudo amostra-lida${c.item3d === 'SIM' ? ' alerta' : ''}`}>
+      <strong>Amostra:</strong> {desc ?? 'cabeçalho do print ilegível'}
+      {c.leituras.some((l) => l.confianca === 'reconstruida') && ' (temporada reconstruída do OCR)'}
+      {c.item3d === 'SIM' && <> · ⚠️ {c.motivos.join('; ')}</>}
+      {c.item3d === 'DADO INDISPONÍVEL' && c.motivos.length > 0 && <> · {c.motivos.join('; ')}</>}
+    </div>
+  );
+}
 
 export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }) {
   const leitura = fonte === 'sofascore' ? d.sofa : d.sup;
@@ -38,6 +57,7 @@ export function AbaStats({ r, setR, d, fonte }: PropsAba & { fonte: FonteStats }
         releituras={[130, 90]}
         {...acoesPrints(setR, fonte)}
       />
+      <AmostraLida d={d} />
 
       <RaioX
         d={d}

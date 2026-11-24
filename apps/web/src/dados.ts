@@ -61,6 +61,7 @@ import {
   type TabelaConsolidada,
 } from '@pe/parsers';
 import { FATOR_DESFALQUE, inicioIso, num, ROTULO_DESFALQUE, type Rascunho } from './estado';
+import { contextoDoRascunho, type ContextoAmostra } from './contextoDaAmostra';
 
 export interface EscalacaoTime {
   titulares: string[];
@@ -123,6 +124,8 @@ export interface Derivado {
   /** travas da banca recebidas do histórico (só repassadas para a tela) */
   travas?: TravasBanca;
   resultado: ResultadoAnalise | null;
+  /** competição e temporada lidas do cabeçalho dos prints: SÓ exibição (não entra no λ nem na DQ) */
+  contextoAmostra: ContextoAmostra;
   relatorio: Relatorio | null;
   /** 1X2 do mercado sem margem, direto das odds válidas: não depende das estatísticas do modelo */
   mercado1x2: Prob1X2 | null;
@@ -364,6 +367,7 @@ export function derivar(
     sofa,
     sup,
     tabela,
+    contextoAmostra: contextoDoRascunho(r),
     modeloCasa,
     modeloFora,
     lambda,

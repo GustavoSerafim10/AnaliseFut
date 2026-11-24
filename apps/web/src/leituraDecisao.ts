@@ -41,3 +41,20 @@ export function avisoLigaPrincipal(
   if (ligaTop || !pareceLigaPrincipal(competicao)) return null;
   return `"${competicao}" parece liga principal, mas "Liga bem coberta" está desmarcada: sem ela o motor pode precificar 1X2 e gols só com o modelo e poucas casas (R3). Marque a caixinha no Contexto da aba Partida.`;
 }
+
+/**
+ * P2: o aviso usa a competição cadastrada do jogo; vazia, usa a lida nos prints de estatística
+ * (nunca "Todas as competições"), dizendo de onde veio. Só exibição.
+ */
+export function avisoLigaDoJogo(
+  competicaoJogo: string | undefined | null,
+  competicaoAmostra: string | null | undefined,
+  ligaTop: boolean | undefined,
+): string | null {
+  if (competicaoJogo?.trim()) return avisoLigaPrincipal(competicaoJogo, ligaTop);
+  if (!competicaoAmostra) return null;
+  const a = avisoLigaPrincipal(competicaoAmostra, ligaTop);
+  return (
+    a && `${a} (competição lida nos prints de estatística: o jogo está sem competição cadastrada)`
+  );
+}
