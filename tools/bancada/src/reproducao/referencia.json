@@ -1,0 +1,5 @@
+{
+  "sha": null,
+  "registradoEm": null,
+  "motivo": "D4: o build de referência oficial é o SHA exato do primeiro commit PUBLICADO com a Fase 0. A Fase 0 ainda não foi publicada; este campo só pode ser preenchido por commit autorizado depois da publicação."
+}

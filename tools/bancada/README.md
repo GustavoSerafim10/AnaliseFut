@@ -153,3 +153,54 @@ distintos) → campos de decisão sem tolerância. Tolerância D3:
 - Commits que existem apenas no GitHub ainda não são recuperados automaticamente (não há
   clone da origem nesta etapa): um commit ausente do repositório local resulta em
   `nao-reproduzivel/commit-ausente`.
+
+## F1.2b — reprocessamento
+
+Para o que a F1.2a não reproduz no build original, a F1.2b responde outra pergunta: **o motor
+de referência decidiria igual com a mesma entrada?** Isso nunca vale como reprodução original e
+fica numa camada própria (`classe: 'reprocessamento'`).
+
+```ts
+import { reproducaoHistorica } from './src/reproducao/historica';
+const r = await reproducaoHistorica(juncao, { area, provedor, executor, executorHistorico });
+```
+
+- **Entrada**: a junção da F1.1. Revisões de evidência vão para `reproduzir()` da F1.2a, sem
+  mudança; só as tentativas que terminam em `build-nao-elegivel` ou `commit-ausente` caem para o
+  reprocessamento (lista fechada). `original-divergente` e as demais subcausas são finais. A
+  tentativa original segue inteira em `tentativaOriginal`.
+- **Entradas do histórico**: cada uma tem exatamente um destino — `coberta-por-evidencia` (as
+  revisões são os itens), `irma-vinculada` (aposta irmã: aponta para o resultado da raiz, nunca
+  conta como concorda/diverge), `reprocessamento` ou `nao-reproduzivel/<subcausa>`.
+- **Referência** (`referencia.json`): só o SHA de 40 caracteres do primeiro commit **publicado**
+  com a Fase 0 — hoje `null` (Fase 0 não publicada) → `sem-build-referencia`. Nunca HEAD, branch,
+  tag ou "o mais recente". `8964bf4` é a **referência sintética de teste**: aceita só no modo de
+  teste, recusada como oficial, e marcada `tipo: 'teste-sintetica'` em todo resultado e no
+  manifesto (contagens separadas por tipo, nunca somadas com produção).
+- **Relógio inferido (D1 corrigida)**: `salvoEm` tem precisão de minuto (o site grava
+  `AAAA-MM-DDTHH:MM:00-03:00`), então o instante real está em `[salvoEm, salvoEm + 60 s)`. Só há
+  relógio quando: formato exato do site (com conferência de ida e volta — `Date.parse` aceita
+  datas impossíveis como 30/02), data e hora preenchidas (hora vazia viraria 00:00 fabricado),
+  `resumo.inicio` igual ao que o site montaria, `salvoEm + 60 s <= inicio`, e sem a marca
+  `cronologiaNaoComprovada` (D-b). O reprocessamento roda nas **duas pontas** do minuto:
+  qualquer diferença no resumo → `relogio-desconhecido` (nenhuma ponta é escolhida). Falha de
+  uma ponta (tempo, ambiente, erro do harness) → falha, nunca divergência, com o parcial em
+  `pontas`.
+- **Comparação**: campos de decisão sem tolerância (decisão, DQ, seleção técnica: chave, odd,
+  casa, EV, P, nível). `stake` e lista "Melhores entradas" → `nao-comparavel` (D-d: o histórico
+  não guarda travas nem apostas registradas). Aposta escolhida na lista → seleção
+  `nao-comparavel` (o site troca `resumo.entrada`). Protocolo gravado ≠ V4 →
+  `protocolo-diferente`, fora de concorda/diverge (D-c).
+
+**Limitações da F1.2b**
+
+1. "Diverge" não é erro: o motor de referência é mais novo que muitas entradas; a F1.4 trata o
+   reprocessamento como camada própria.
+2. `salvoEm` supõe o aparelho em −03:00 (rótulo fixo do site); outro fuso não é detectável.
+3. A D1 corrigida reduz a cobertura (salvo no minuto do apito, depois dele, ou com cronologia não
+   comprovada → desconhecido), de propósito.
+4. Backups `.json` gravam `NaN` como `null`: o rascunho do histórico não tem marcadores
+   `{$invalido}` para restaurar; o reprocessamento usa o que o backup guardou.
+5. Navegador × Node, como na F1.2a.
+6. Sem referência oficial até a publicação da Fase 0 (D4): até lá, só a referência sintética de
+   teste, nas suítes.
