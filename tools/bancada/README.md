@@ -258,3 +258,48 @@ diagnóstico).
    (o conteúdo — evidências e entradas — nasce dentro do build isolado).
 4. Com a D4 registrada (`ef6df15`), uma execução de produção reprocessa na referência oficial;
    as evidências reais só existem a partir da publicação da Fase 0 (24/11/2026).
+
+## F1.3 — derivações (P do modelo, peso w, mistura e desfecho)
+
+```ts
+await executarBancada(arquivos, {
+  modo: 'execucao',
+  area,
+  provedor,
+  executor,
+  executorHistorico,
+  derivar: true,
+});
+// → derivacoes.json (detalhe, local) e relatorio-derivacoes.json (só contagens)
+```
+
+Só na bancada; o motor é apenas **lido** (`criarModelo`, `distribuicaoModelo`, `probEfetiva`,
+`pesoModelo`, `apurarAposta`). Três universos, cada registro com exatamente um estado:
+
+- **Seleções** (análises com revisão de decisão): `pModeloBruto` (λ antes do ajuste 9.4),
+  `pModeloAjustado` (o λ que a V4 usou), `wMistura` (DQ + mercado muito líquido + escalação
+  incerta, teto 0,30 no nicho), `pMistura = w × P_ajustado + (1 − w) × P_mercado` (a mistura da
+  V4) e `pMisturaBruta` (a mesma com o λ bruto, para a F1.4 medir o efeito do ajuste). No R3 a
+  parte "mercado" é o `P_consenso` (o P_true gravado do R3 já é mistura).
+- **Entradas das análises elegíveis** (inclui v1/v2): só desfecho; sem evidência, os campos do
+  modelo ficam `indisponivel-sem-evidencia` — nada é fabricado (E4).
+- **Apostas feitas**: só desfecho.
+
+**Conferência obrigatória (E2: motor atual)**: o recálculo é comparado com o que a evidência
+gravou — `pModelo` da V4, `wModelo` e `P_true` no R3, `pModelo` e `chance` da lista — com a
+tolerância D3. Não bateu → `derivacao-divergente`, com os campos; nunca corrigido em silêncio.
+
+**Régua do desfecho** (a do motor, `probEfetiva`): ganho y=1 peso 1 · meio ganho y=1 peso ½ ·
+devolvida fora (peso 0) · meia perda y=0 peso ½ · perda y=0 peso 1. Nunca 0,75 nem 0,5 como y.
+Um teste prova, enumerando a matriz de placares, que a média ponderada de y é exatamente o
+`probEfetiva`. Estados: `apurado`, `sem-placar`, `placar-em-conflito`, `dado-insuficiente`,
+`mercado-desconhecido` e `conflito-manual` (E3: só quando o placar é apurável e a marcação manual
+diverge da apuração automática, que prevalece; sem placar continua `sem-placar`).
+
+**Limitações da F1.3**
+
+1. Derivação com o motor atual: a conferência detecta diferença de versão, não a corrige.
+2. Mercados que pedem dado fora do placar (1º gol, escanteios do 1º tempo...) ficam
+   `dado-insuficiente`.
+3. Análises v1/v2 não têm P do modelo: a calibração do modelo começa com as evidências gravadas a
+   partir da publicação da Fase 0.

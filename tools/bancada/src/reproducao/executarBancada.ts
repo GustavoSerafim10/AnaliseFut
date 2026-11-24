@@ -19,6 +19,8 @@ import { lerBackup } from '../leitura/lerBackup';
 import type { Area } from './area';
 import { sha256, type ProvedorBuild } from './build';
 import { consolidar, relatorioDeRevisao } from './consolidar';
+import type { Derivacoes } from '../derivacoes/contratoDerivacoes';
+import { derivar, relatorioDeDerivacoes } from '../derivacoes/derivar';
 import type { Camada, Consolidado, RelatorioRevisao } from './contratoConsolidacao';
 import { preverReferencia } from './diagnostico';
 import type { Executor } from './executor';
@@ -32,6 +34,8 @@ interface Base {
   referenciaDeTeste?: string;
   registroReferencia?: RegistroReferencia;
   execucaoId?: string;
+  /** F1.3: deriva P do modelo, peso w, mistura e desfecho (só leitura do motor) */
+  derivar?: boolean;
 }
 export type OpcoesBancada =
   | (Base & { modo: 'diagnostico' })
@@ -54,6 +58,8 @@ export interface ResultadoBancada {
   relatorio: RelatorioRevisao;
   /** resultado completo da F1.2 (revisões e entradas); null no diagnóstico */
   f12: ReproducaoHistorica | null;
+  /** F1.3 (com derivar: true); null sem ela */
+  derivacoes: Derivacoes | null;
 }
 
 export async function executarBancada(
@@ -118,5 +124,14 @@ export async function executarBancada(
   const relatorio = relatorioDeRevisao(consolidado);
   writeFileSync(join(pasta, 'consolidado.json'), JSON.stringify(consolidado, null, 1));
   writeFileSync(join(pasta, 'relatorio-revisao.json'), JSON.stringify(relatorio, null, 1));
-  return { pasta, juncao, conjunto, f12, consolidado, relatorio };
+  let derivacoes: Derivacoes | null = null;
+  if (o.derivar) {
+    derivacoes = derivar({ conjunto, juncao, consolidado });
+    writeFileSync(join(pasta, 'derivacoes.json'), JSON.stringify(derivacoes, null, 1));
+    writeFileSync(
+      join(pasta, 'relatorio-derivacoes.json'),
+      JSON.stringify(relatorioDeDerivacoes(derivacoes), null, 1),
+    );
+  }
+  return { pasta, juncao, conjunto, f12, consolidado, relatorio, derivacoes };
 }
