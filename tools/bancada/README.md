@@ -143,9 +143,12 @@ distintos) → campos de decisão sem tolerância. Tolerância D3:
 
 **Limitações aprovadas da F1.2a**
 
-- A evidência do teste demonstrativo (suíte real, teste 1) foi gerada pela árvore de trabalho
-  atual, conferida no próprio teste como idêntica a `8964bf4` em `apps/`, `packages/`,
-  `package.json` e `package-lock.json`. Ela demonstra a capacidade de reprodução, mas **não é
+- A evidência do teste demonstrativo (suíte real, teste 1) é **gerada dentro do build isolado
+  de `8964bf4`**, pelo código e pelo vitest daquele commit (`test-reproducao/zz-bancada-gerador.ts`,
+  com a procedência dos módulos conferida), e não pela árvore de trabalho — a suíte roda mesmo
+  com alterações pendentes no site. A identidade do build é conferida arquivo a arquivo contra o
+  commit (`apps/`, `packages/`, `package.json`, `package-lock.json`; blobs calculados pelo próprio
+  git). Ainda assim é uma evidência sintética: demonstra a capacidade de reprodução, mas **não é
   uma evidência histórica original de produção**.
 - Commits que existem apenas no GitHub ainda não são recuperados automaticamente (não há
   clone da origem nesta etapa): um commit ausente do repositório local resulta em
