@@ -37,6 +37,7 @@ import {
 const C = 'a'.repeat(40);
 const AUSENTE = 'b'.repeat(40);
 const T = REFERENCIA_TESTE_SINTETICA;
+const D4 = 'ef6df156f2cd43ef793d653e55cfa3d2e2ea4b3f';
 const repo = raizRepositorio();
 const antes = instantaneoRepositorio();
 let area: Area;
@@ -107,9 +108,21 @@ describe('D1 corrigida: relógio inferido', () => {
 });
 
 describe('referência (D4, D-e, proteção 3)', () => {
-  it('a oficial está sem SHA: sem-build-referencia, sem cair para nada', () => {
-    expect(registroOficial().sha).toBeNull();
-    expect(resolverReferencia({ repositorio: repo })).toMatchObject({ ok: false });
+  it('D4 registrada: a oficial é ef6df15 (1º commit publicado com a Fase 0), tipo produção', () => {
+    expect(registroOficial().sha).toBe(D4);
+    expect(resolverReferencia({ repositorio: repo })).toEqual({
+      ok: true,
+      sha: D4,
+      tipo: 'producao',
+    });
+  });
+  it('sem SHA registrado: sem-build-referencia, sem cair para nada', () => {
+    expect(
+      resolverReferencia({
+        repositorio: repo,
+        registro: { sha: null, registradoEm: null, motivo: 'teste: sem referência oficial' },
+      }),
+    ).toMatchObject({ ok: false });
   });
   it.each(['HEAD', 'main', 'origin/main', 'v1.0', '8964bf4', 'B'.repeat(40)])(
     'nome simbólico ou SHA incompleto como oficial (%s) é recusado',
@@ -241,7 +254,15 @@ describe('reprodução histórica combinada', () => {
     const prov = new ProvedorFalso([C, T]);
     const x = await reproducaoHistorica(
       juncao([{ e: entrada('h1') }]),
-      opcoes({ referenciaDeTeste: undefined, provedor: prov }),
+      opcoes({
+        referenciaDeTeste: undefined,
+        registroReferencia: {
+          sha: null,
+          registradoEm: null,
+          motivo: 'teste: sem referência oficial',
+        },
+        provedor: prov,
+      }),
     );
     expect(x.entradas[0]).toMatchObject({
       destino: 'nao-reproduzivel',
@@ -282,7 +303,14 @@ describe('reprodução histórica combinada', () => {
     // sem referência: a tentativa continua registrada no motivo e no campo
     const y = await reproducaoHistorica(
       juncao([{ e: entrada('jogo-r') }], [inelegivel]),
-      opcoes({ referenciaDeTeste: undefined }),
+      opcoes({
+        referenciaDeTeste: undefined,
+        registroReferencia: {
+          sha: null,
+          registradoEm: null,
+          motivo: 'teste: sem referência oficial',
+        },
+      }),
     );
     expect(y.revisoes[0]).toMatchObject({
       classe: 'nao-reproduzivel',

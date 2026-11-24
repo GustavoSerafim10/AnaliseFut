@@ -66,6 +66,10 @@ afterAll(() => {
 
 const execucao = (referenciaDeTeste?: string): OpcoesBancada => ({
   modo: 'execucao',
+  // sem a referência de teste, a suíte simula "sem referência oficial" (não baixa o build da D4)
+  registroReferencia: referenciaDeTeste
+    ? undefined
+    : { sha: null, registradoEm: null, motivo: 'teste: sem referência oficial' },
   area,
   provedor,
   executor: new ExecutorProcesso(),

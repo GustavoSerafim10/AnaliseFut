@@ -1,5 +1,5 @@
 {
-  "sha": null,
-  "registradoEm": null,
-  "motivo": "D4: o build de referência oficial é o SHA exato do primeiro commit PUBLICADO com a Fase 0. A Fase 0 ainda não foi publicada; este campo só pode ser preenchido por commit autorizado depois da publicação."
+  "sha": "ef6df156f2cd43ef793d653e55cfa3d2e2ea4b3f",
+  "registradoEm": "2026-11-24",
+  "motivo": "D4: o build de referência oficial é o SHA exato do primeiro commit PUBLICADO com a Fase 0. ef6df15 foi o primeiro servido em produção (deploy do GitHub Actions em 24/11/2026); b7b3235 também continha a Fase 0, mas o deploy dele falhou e nunca foi servido. Registrado com autorização; muda só por commit autorizado."
 }

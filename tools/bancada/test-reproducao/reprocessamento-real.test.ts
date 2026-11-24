@@ -181,6 +181,11 @@ describe('F1.2b com build real (referência sintética de teste)', () => {
       {
         ...opcoes,
         referenciaDeTeste: undefined,
+        registroReferencia: {
+          sha: null,
+          registradoEm: null,
+          motivo: 'teste: sem referência oficial',
+        },
       },
     );
     temporarios.push(x.pasta);

@@ -173,7 +173,9 @@ const r = await reproducaoHistorica(juncao, { area, provedor, executor, executor
   revisões são os itens), `irma-vinculada` (aposta irmã: aponta para o resultado da raiz, nunca
   conta como concorda/diverge), `reprocessamento` ou `nao-reproduzivel/<subcausa>`.
 - **Referência** (`referencia.json`): só o SHA de 40 caracteres do primeiro commit **publicado**
-  com a Fase 0 — hoje `null` (Fase 0 não publicada) → `sem-build-referencia`. Nunca HEAD, branch,
+  com a Fase 0 — **registrado em 24/11/2026: `ef6df15`** (o primeiro servido em produção; o
+  `b7b3235` também tinha a Fase 0, mas o deploy dele falhou). Sem SHA registrado, o resultado
+  seria `sem-build-referencia`. Nunca HEAD, branch,
   tag ou "o mais recente". `8964bf4` é a **referência sintética de teste**: aceita só no modo de
   teste, recusada como oficial, e marcada `tipo: 'teste-sintetica'` em todo resultado e no
   manifesto (contagens separadas por tipo, nunca somadas com produção).
@@ -202,8 +204,9 @@ const r = await reproducaoHistorica(juncao, { area, provedor, executor, executor
 4. Backups `.json` gravam `NaN` como `null`: o rascunho do histórico não tem marcadores
    `{$invalido}` para restaurar; o reprocessamento usa o que o backup guardou.
 5. Navegador × Node, como na F1.2a.
-6. Sem referência oficial até a publicação da Fase 0 (D4): até lá, só a referência sintética de
-   teste, nas suítes.
+6. A referência oficial (D4, `ef6df15`) foi registrada em 24/11/2026. As suítes continuam usando
+   só a referência sintética de teste; a primeira execução com a oficial preparará o build dela
+   (cerca de 160 MB na área isolada).
 
 ## F1.2c — ponto de entrada, diagnóstico e consolidação
 
@@ -253,5 +256,5 @@ diagnóstico).
    possibilidades ficam em `naoVerificado`.
 3. Nos testes reais, os arquivos de backup são montados com o serializador da árvore de trabalho
    (o conteúdo — evidências e entradas — nasce dentro do build isolado).
-4. Até a publicação da Fase 0 (D4), uma execução de produção dá `sem-build-referencia` para tudo
-   que dependeria de reprocessamento.
+4. Com a D4 registrada (`ef6df15`), uma execução de produção reprocessa na referência oficial;
+   as evidências reais só existem a partir da publicação da Fase 0 (24/11/2026).

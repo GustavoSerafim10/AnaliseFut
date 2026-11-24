@@ -217,8 +217,26 @@ describe('diagnóstico (C)', () => {
   });
 
   it('sem referência oficial: o diagnóstico determina sem-build-referencia e a execução confirma', async () => {
-    const d = await executarBancada(arquivos, { modo: 'diagnostico', area });
-    const x = await executarBancada(arquivos, execucao({ referenciaDeTeste: undefined }));
+    const d = await executarBancada(arquivos, {
+      modo: 'diagnostico',
+      area,
+      registroReferencia: {
+        sha: null,
+        registradoEm: null,
+        motivo: 'teste: sem referência oficial',
+      },
+    });
+    const x = await executarBancada(
+      arquivos,
+      execucao({
+        referenciaDeTeste: undefined,
+        registroReferencia: {
+          sha: null,
+          registradoEm: null,
+          motivo: 'teste: sem referência oficial',
+        },
+      }),
+    );
     expect(d.consolidado.camada).toBe('producao');
     expect(porId(d.consolidado.analises).get('h1')!.previsao).toMatchObject({
       determinado: 'sem-build-referencia',
