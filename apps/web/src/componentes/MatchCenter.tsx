@@ -94,7 +94,6 @@ function indicadores(d: Derivado, t: 'casa' | 'fora'): string[] {
   if (l !== undefined) out.push(`λ ${f(l)}`);
   if (s?.xg !== undefined) out.push(`xG ${f(s.xg)}`);
   if (s) out.push(`MARCA ${f(s.golsPro)}`, `SOFRE ${f(s.golsContra)}`);
-  out.push(t === 'casa' ? 'CASA' : 'FORA');
   return out;
 }
 
@@ -180,8 +179,13 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
       </div>
       <div className="mc-texto">
         <div className="mc-nome">{nome}</div>
-        <div className="mc-indicadores">{indicadores(d, t).join(' | ')}</div>
-        <EscolherCores nome={nome} cores={cores} />
+        {indicadores(d, t).length > 0 && (
+          <div className="mc-indicadores">{indicadores(d, t).join(' | ')}</div>
+        )}
+        <div className="mc-rodape-time">
+          <span className={`mc-pilula mc-pilula-${t}`}>{t === 'casa' ? 'Casa' : 'Fora'}</span>
+          <EscolherCores nome={nome} cores={cores} />
+        </div>
       </div>
     </div>
   );
@@ -221,6 +225,8 @@ export function MatchCenter({ r, d }: { r: Rascunho; d: Derivado }) {
             <span className="mc-vs-anel" aria-hidden="true" />
             <span className="mc-vs-texto">VS</span>
           </div>
+          {/* não há campo de estádio no cadastro: mostra a competição, nada inventado */}
+          {r.jogo.competicao && <div className="mc-sub">{r.jogo.competicao}</div>}
         </div>
         {lado('fora', fora, coresFora, brilhoFora)}
       </div>

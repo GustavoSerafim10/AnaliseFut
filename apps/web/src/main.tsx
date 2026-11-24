@@ -9,6 +9,7 @@ import '@fontsource/chakra-petch/latin-600.css';
 import '@fontsource/chakra-petch/latin-700.css';
 import './estilos.css';
 import './tema-noturno.css';
+import './tema-broadcast.css';
 import { iniciarHistorico } from './historico';
 
 // o histórico vem do banco do navegador, que é assíncrono: abre antes de desenhar o site

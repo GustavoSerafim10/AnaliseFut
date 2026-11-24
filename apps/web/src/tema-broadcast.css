@@ -1,0 +1,317 @@
+/* =========================================================================
+   Tema "Broadcast esportivo + terminal quantitativo HUD" — camada por cima de
+   estilos.css e tema-noturno.css (carregada por último). Só aparência: nenhuma
+   regra esconde texto, campo ou botão, e nada muda a lógica.
+   Fundo e banner valem para todas as abas; cartões, dropzone, checklist e botão
+   principal estão restritos à aba Partida (.aba-jogo) nesta primeira parte.
+   ========================================================================= */
+:root {
+  --hud-ciano: #38bdf8;
+  --hud-esmeralda: #10b981;
+  --hud-laranja: #f97316;
+  --hud-vidro: rgba(10, 16, 30, 0.68);
+  --hud-borda: rgba(56, 189, 248, 0.18);
+  --hud-sombra: 0 24px 48px rgba(0, 0, 0, 0.75);
+}
+
+/* ---------- 1. fundo atmosférico: estádio noturno + vinheta ----------
+   .ambiente já é position: fixed (equivale a background-attachment: fixed e,
+   ao contrário dele, funciona no Safari do iPhone) */
+.ambiente {
+  background:
+    /* vinheta: 0,72 no centro → 0,92 nas bordas, para o texto ficar legível */
+    radial-gradient(
+      ellipse 75% 70% at 50% 42%,
+      rgba(5, 8, 17, 0.72) 0%,
+      rgba(5, 8, 17, 0.8) 55%,
+      rgba(3, 5, 12, 0.92) 100%
+    ),
+    /* luz do gramado subindo da base */
+    radial-gradient(ellipse 70% 32% at 50% 100%, rgba(16, 185, 129, 0.14), transparent 70%),
+    url('./assets/estadio-dados.webp') center 62% / cover no-repeat,
+    var(--fundo);
+}
+/* a foto agora é a base inteira: a faixa apagada do tema noturno sai */
+.ambiente::before {
+  display: none;
+}
+
+/* camada tática SVG (componentes/OverlayTatico.tsx) */
+.overlay-tatico {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0.35;
+}
+.overlay-tatico .ot-campo {
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
+}
+.overlay-tatico .ot-radar {
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.55));
+}
+/* celular: os cartões ocupam a largura toda; a camada tática fica mais discreta */
+@media (max-width: 860px) {
+  .overlay-tatico {
+    opacity: 0.2;
+  }
+}
+
+/* ---------- 3. banner do confronto (Match Center) ---------- */
+.match-center {
+  /* mesma largura útil dos cartões (.conteudo-aba: 1600 px com 20 px de respiro) */
+  width: calc(100% - 40px);
+  max-width: 1560px;
+  margin: 14px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(56, 189, 248, 0.08);
+}
+/* o painel "Cores" abre para fora do banner: overflow só corta o fundo */
+.match-center:has(.mc-cores[open]) {
+  overflow: visible;
+}
+.match-center:has(.mc-cores[open]) .mc-fundo {
+  border-radius: 18px;
+}
+/* divisão diagonal pelas cores dos clubes, com o gramado visível no centro */
+.mc-fundo::after {
+  z-index: 1;
+  background:
+    linear-gradient(180deg, transparent 62%, rgba(5, 10, 23, 0.85)),
+    /* filetes de luz nas duas diagonais */
+    linear-gradient(
+        112deg,
+        transparent 39.6%,
+        color-mix(in srgb, var(--casa) 80%, #fff) 39.9%,
+        transparent 40.3%,
+        transparent 59.7%,
+        color-mix(in srgb, var(--fora) 80%, #fff) 60.1%,
+        transparent 60.4%
+      ),
+    /* textura de listras diagonais nos dois lados */
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.045) 0 16px, transparent 16px 38px),
+    /* pontas escurecidas: o texto claro precisa ler até sobre clube de cor clara (branco) */
+    linear-gradient(
+        112deg,
+        color-mix(in srgb, var(--casa) 48%, #05080f) 0%,
+        color-mix(in srgb, var(--casa) 38%, rgba(5, 8, 15, 0.55)) 26%,
+        color-mix(in srgb, var(--casa) 18%, transparent) 39.8%,
+        transparent 40%,
+        transparent 60%,
+        color-mix(in srgb, var(--fora) 18%, transparent) 60.2%,
+        color-mix(in srgb, var(--fora) 38%, rgba(5, 8, 15, 0.55)) 74%,
+        color-mix(in srgb, var(--fora) 48%, #05080f) 100%
+      );
+  -webkit-mask: linear-gradient(90deg, #000 0 39.5%, rgba(0, 0, 0, 0.35) 40% 60%, #000 60.5%);
+  mask: linear-gradient(90deg, #000 0 39.5%, rgba(0, 0, 0, 0.35) 40% 60%, #000 60.5%);
+}
+/* escudo com sombra projetada + aura da cor do time */
+.mc-escudo {
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--time, #38bdf8) 50%, transparent));
+}
+.mc-nome {
+  font-weight: 800;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.45),
+    0 6px 22px rgba(0, 0, 0, 0.6);
+}
+.mc-indicadores {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.mc-rodape-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.mc-fora .mc-rodape-time {
+  justify-content: inherit;
+}
+.mc-rodape-time .mc-cores {
+  margin-top: 0;
+}
+.mc-pilula {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--fonte-tecnica);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f8fafc;
+  background: color-mix(in srgb, var(--time, #38bdf8) 30%, rgba(5, 8, 17, 0.75));
+  border: 1px solid color-mix(in srgb, var(--time, #38bdf8) 65%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--time, #38bdf8) 30%, transparent);
+}
+/* badge do topo: competição, data e hora */
+.mc-meta {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(5, 8, 17, 0.62);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-size: 14px;
+}
+/* VS grande e metálico, com as cores dos dois clubes no reflexo */
+.mc-vs {
+  width: 112px;
+  height: 112px;
+}
+.mc-vs-texto {
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #e2e8f0 34%,
+    #7c8aa0 50%,
+    #f1f5f9 66%,
+    #94a3b8 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: none;
+  filter: drop-shadow(-6px 0 14px color-mix(in srgb, var(--casa) 70%, transparent))
+    drop-shadow(6px 0 14px color-mix(in srgb, var(--fora) 70%, transparent))
+    drop-shadow(0 3px 2px rgba(0, 0, 0, 0.6));
+}
+/* sob o VS: competição centralizada sobre o gramado */
+.mc-sub {
+  margin-top: 6px;
+  font-family: var(--fonte-tecnica);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+}
+@media (max-width: 860px) {
+  .match-center {
+    margin: 10px auto 0;
+    border-radius: 14px;
+  }
+  .mc-vs {
+    width: 76px;
+    height: 76px;
+  }
+  .mc-vs-texto {
+    font-size: 42px;
+  }
+}
+
+/* ---------- 2. cartões da aba Partida: vidro tático com cantos HUD ---------- */
+.aba-jogo .painel {
+  position: relative;
+  background: var(--hud-vidro);
+  border: 1px solid var(--hud-borda);
+  border-radius: 14px;
+  box-shadow:
+    var(--hud-sombra),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+/* quatro cantos acesos num só pseudo-elemento; o segundo canto antigo sai */
+.aba-jogo .painel:not(.cc-painel)::before {
+  --c: var(--hud-ciano);
+  --t: 22px;
+  inset: -1px;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  opacity: 1;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--t) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 2px var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--t) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 2px var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--t) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 2px var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--t) 2px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 2px var(--t) no-repeat;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.75));
+}
+.aba-jogo .painel:not(.cc-painel)::after {
+  display: none;
+}
+/* celular: o mesmo vidro, com menos desfoque (custo de desenho) */
+@media (max-width: 860px) {
+  .aba-jogo .painel {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* ---------- 4. componentes internos ---------- */
+/* dropzone "Colar print" */
+.aba-jogo .upload-colar {
+  border: 1px dashed rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.06);
+}
+/* "Arquivos" em âmbar */
+.aba-jogo .upload span {
+  border: 1px solid rgba(251, 191, 36, 0.7);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #1c1003;
+  box-shadow: 0 0 18px rgba(217, 119, 6, 0.35);
+}
+.aba-jogo .upload span:hover {
+  box-shadow: 0 0 26px rgba(245, 158, 11, 0.55);
+}
+
+/* checklist: linhas limpas, pílulas à direita */
+.aba-jogo .checklist .cl-linha {
+  border-bottom: 1px solid rgba(56, 189, 248, 0.08);
+}
+.aba-jogo .checklist li:last-child .cl-linha {
+  border-bottom: 0;
+}
+.aba-jogo .cl-estado {
+  border-radius: 999px;
+  font-weight: 700;
+}
+.aba-jogo .cl-ok {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.7);
+  background: rgba(16, 185, 129, 0.16);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+}
+.aba-jogo .cl-pendente {
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.14);
+  box-shadow: none;
+}
+
+/* botão principal "→ Ver a análise" */
+.aba-jogo .acoes-jogo button.primario {
+  /* as duas cores pedidas; o azul forte vai até 45% para o texto branco ficar sobre ele
+     (≈ 4,9:1 de contraste no centro; com a mistura meio a meio daria ≈ 3,3:1) */
+  background: linear-gradient(135deg, #2563eb 0%, #2563eb 45%, #38bdf8 100%);
+  border-color: rgba(125, 211, 252, 0.65);
+  color: #ffffff;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(3, 17, 31, 0.55);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+}
+.aba-jogo .acoes-jogo button.primario:hover:not(:disabled) {
+  box-shadow: 0 0 34px rgba(56, 189, 248, 0.65);
+}

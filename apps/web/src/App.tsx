@@ -10,6 +10,7 @@ import { AbaStats } from './abas/AbaStats';
 import { Estadio } from './componentes/Estadio';
 import { GaleriaFundo } from './componentes/GaleriaFundo';
 import { MatchCenter } from './componentes/MatchCenter';
+import { OverlayTatico } from './componentes/OverlayTatico';
 import { Icone, type NomeIcone } from './componentes/ui';
 import {
   carregarFigurinhas,
@@ -347,6 +348,7 @@ export function App() {
   return (
     <>
       <div className="ambiente" aria-hidden="true" />
+      <OverlayTatico />
       {verLance && (
         <>
           <GaleriaFundo fotos={galeria} />
