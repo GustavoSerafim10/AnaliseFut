@@ -204,3 +204,54 @@ const r = await reproducaoHistorica(juncao, { area, provedor, executor, executor
 5. Navegador × Node, como na F1.2a.
 6. Sem referência oficial até a publicação da Fase 0 (D4): até lá, só a referência sintética de
    teste, nas suítes.
+
+## F1.2c — ponto de entrada, diagnóstico e consolidação
+
+```ts
+import { executarBancada } from './src/reproducao/executarBancada';
+// só previsões: não prepara build, não abre processo, não executa o motor
+await executarBancada(arquivos, { modo: 'diagnostico', area });
+// execução: F1.2a + F1.2b sobre a MESMA junção, depois consolidação
+await executarBancada(arquivos, { modo: 'execucao', area, provedor, executor, executorHistorico });
+```
+
+Uma leitura e uma junção para tudo: a impressão do conjunto é a mesma de `montarConjunto`.
+
+**Status por análise elegível** (exatamente um): `reproduzida` (revisão de decisão
+original-exata/equivalente), `reproducao-divergente`, `reprocessada` (com `comparacao` e o tipo
+da referência), `nao-reproduzivel` (com a subcausa), `sem-revisao-de-decisao` (tem evidência, mas
+nenhuma revisão antes do apito — fato da F1.1, não falha de reprodução) e `nao-executado` (modo
+diagnóstico).
+
+- **Revisão representativa**: sempre a revisão de decisão da F1.1 (`identidadeDecisao`).
+  Revisões depois do apito nunca a substituem.
+- **Apostas irmãs**: herdam o status da raiz e nunca contam como análise. Raiz ausente, excluída
+  pela F1.1 ou também irmã → `vinculo-nao-resolvido`, com o motivo.
+- **Conservação** em universos separados: análises elegíveis, irmãs e entradas excluídas pela
+  F1.1 somam as entradas canônicas, sem repetição; seleções e apostas herdam o status da
+  análise (ou `vinculo-nao-resolvido`). Exclusões da F1.1 contadas por categoria.
+- **Diagnóstico**: cada previsão sai `natureza: 'previsao'`. `determinado` só quando o desfecho
+  não depende de execução (D1 reprovada, evidência inconsistente, sem referência); o resto fica em
+  `naoVerificado` (falhas que só a execução revela, inclusive commit ausente e relógio ambíguo).
+  A referência registrada é aceita sem conferir se o commit existe (`verificada: false`).
+- **Camadas**: com a referência sintética, `camada: 'teste-sintetica'`; sem ela, `producao`. Um
+  resultado de uma camada nunca entra na consolidação da outra (erro).
+
+**Política de dados reais**
+
+- Toda saída fica em `%LOCALAPPDATA%\pe-bancada\execucoes\<id>\` — nunca no repositório:
+  `consolidado.json` (detalhe, com ids e chaves de jogo: uso local) e `relatorio-revisao.json`
+  (só contagens e impressões: é o que vai para revisão, sem times, casas ou ids).
+- Os testes usam só dados sintéticos, gerados com as funções do site ou dentro do build isolado.
+- Rodar sobre backups reais exige autorização explícita a cada vez; apagar uma execução é
+  apagar a pasta dela.
+
+**Limitações da F1.2c**
+
+1. Sem retomada: uma execução interrompida recomeça do zero.
+2. O diagnóstico não confere se commits e a referência existem (isso exigiria `git`): essas
+   possibilidades ficam em `naoVerificado`.
+3. Nos testes reais, os arquivos de backup são montados com o serializador da árvore de trabalho
+   (o conteúdo — evidências e entradas — nasce dentro do build isolado).
+4. Até a publicação da Fase 0 (D4), uma execução de produção dá `sem-build-referencia` para tudo
+   que dependeria de reprocessamento.
