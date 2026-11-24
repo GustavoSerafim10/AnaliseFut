@@ -6,6 +6,7 @@ import type { PrintDoJogo } from '../ocr';
 import { EditorFigurinhas } from '../componentes/Figurinhas';
 import { Icone, type NomeIcone } from '../componentes/ui';
 import type { Rascunho } from '../estado';
+import { avisoLigaPrincipal } from '../leituraDecisao';
 import type { PropsAba } from './tipos';
 
 const OPCOES: [keyof Rascunho['config'], string, string][] = [
@@ -354,6 +355,12 @@ export function AbaJogo({
             </label>
           ))}
         </div>
+        {avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop) && (
+          <div className="caixa alerta miudo aviso-liga">
+            <Icone nome="alerta" tamanho={16} />{' '}
+            {avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop)}
+          </div>
+        )}
 
         <details className="parametros">
           <summary>

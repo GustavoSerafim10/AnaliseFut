@@ -391,7 +391,7 @@ export function AbaAnalise({
         <Indicadores d={d} />
         <div className="grade-analise">
           <div className="coluna">
-            <CentroDecisao d={d} />
+            <CentroDecisao d={d} r={r} />
             <Distribuicao d={d} nomes={{ casa: nome('casa'), fora: nome('fora') }} />
           </div>
           <div className="coluna">

@@ -4,6 +4,8 @@
  */
 import { NOMES_ESTRATEGIA, NOMES_REFERENCIA, type ResultadoV4 } from '@pe/engine';
 import type { Derivado } from '../dados';
+import type { Rascunho } from '../estado';
+import { avisoLigaPrincipal, evSoMercado } from '../leituraDecisao';
 import { Dica, Icone, Numero, type NomeIcone } from './ui';
 
 type Decisao = ResultadoV4['decisao'];
@@ -48,7 +50,7 @@ const p1s = (x: number) => `${x > 0 ? '+' : ''}${p1(x)}`;
 const n2 = (x: number) => x.toFixed(2).replace('.', ',');
 const hora = (iso?: string) => (iso ? iso.slice(11, 16) : '—');
 
-export function CentroDecisao({ d }: { d: Derivado }) {
+export function CentroDecisao({ d, r }: { d: Derivado; r?: Rascunho }) {
   const v = d.v4;
   if (!v) {
     return (
@@ -75,7 +77,19 @@ export function CentroDecisao({ d }: { d: Derivado }) {
   const e = ESTADO[v.decisao];
   const m = v.melhor;
   const margem = m?.oddMinima ? m.melhorOdd / m.oddMinima - 1 : null;
+  // só exibição: quanto do EV vem do modelo (R3) e se a liga grande ficou sem a caixinha
+  const evMercado = m ? evSoMercado(m) : null;
+  const avisoLiga =
+    m && r && m.nivel === 'R3' && m.nivelMercado !== 3
+      ? avisoLigaPrincipal(r.jogo.competicao, r.config.ligaTop)
+      : null;
   const alertas = [
+    ...(avisoLiga ? [avisoLiga] : []),
+    ...(evMercado !== null && m && m.ev > 0 && evMercado <= 0
+      ? [
+          `o EV positivo vem só do modelo: pelo preço da casa, sem o modelo, o EV seria ${p1s(evMercado)}`,
+        ]
+      : []),
     ...v.avisos,
     ...(m?.stake?.ajustes ?? []),
     ...d.pendencias.filter((p) => !d.pendenciasV4.includes(p)).map((p) => `apoio V3.3: ${p}`),
@@ -154,6 +168,15 @@ export function CentroDecisao({ d }: { d: Derivado }) {
               <small> gate {m.evMinimo === null ? '—' : p1(m.evMinimo)}</small>
             </dd>
           </div>
+          {evMercado !== null && (
+            <div className="dn-ev-mercado">
+              <dt>EV só pelo mercado</dt>
+              <dd className={evMercado < 0 ? 'negativo' : 'abaixo-gate'}>
+                {p1s(evMercado)}
+                <small> sem o modelo (w {n2(m.wModelo ?? 0)})</small>
+              </dd>
+            </div>
+          )}
           <div>
             <dt>
               Odd mínima <Dica termo="minima" />
